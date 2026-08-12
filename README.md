@@ -14,6 +14,8 @@
     &nbsp;·&nbsp;
     <a href="https://vibegame.tettet.org/technical_report.pdf"><strong>Technical Report</strong></a>
     &nbsp;·&nbsp;
+    <a href="https://discord.gg/Ec6d9wx8sU"><strong>Discord</strong></a>
+    &nbsp;·&nbsp;
     <a href="assets/wechat-group.png"><strong>WeChat Group</strong></a>
   </p>
   <p><strong>VibeGame: Vibe your favorite game.</strong></p>
