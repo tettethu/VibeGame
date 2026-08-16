@@ -11,3 +11,4 @@ tmp*
 
 # Local artifact of `uv sync`; resolution is pinned in pyproject.
 uv.lock
+.dockerignore

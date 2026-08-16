@@ -18,7 +18,7 @@
     &nbsp;·&nbsp;
     <a href="assets/wechat-group.png"><strong>WeChat Group</strong></a>
   </p>
-  <p><strong>VibeGame: Vibe Your Dream Game.</strong></p>
+  <p><strong>VibeGame: Vibe Your Dream Game</strong></p>
 </div>
 
 ## News
