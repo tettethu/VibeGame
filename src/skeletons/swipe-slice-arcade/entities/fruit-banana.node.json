@@ -1,0 +1,35 @@
+{
+  "name": "Fruit",
+  "script": "Fruit",
+  "tags": [
+    "fruit",
+    "sliceable"
+  ],
+  "visual": {
+    "type": "image",
+    "texture": "fruit_banana_whole",
+    "width": 54,
+    "height": 54
+  },
+  "collider": {
+    "body": "dynamic",
+    "shape": "circle",
+    "radius": 27,
+    "gravity": true
+  },
+  "config": {
+    "fruitType": "banana",
+    "score": 12,
+    "weight": 0.8,
+    "velocityX": 0,
+    "velocityY": -560,
+    "missY": 620,
+    "cleanupMargin": 120,
+    "sliced": false,
+    "wholeTexture": "fruit_banana_whole",
+    "leftTexture": "fruit_banana_left",
+    "rightTexture": "fruit_banana_right",
+    "depth": 100,
+    "minReadableTimeForMiss": 0.45
+  }
+}

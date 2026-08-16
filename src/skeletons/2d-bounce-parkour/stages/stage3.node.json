@@ -1,0 +1,28 @@
+{
+  "name": "Stage3",
+  "tags": ["stage"],
+  "config": {
+    "spawnX": 120,
+    "spawnY": 380,
+    "levelWidth": 3600
+  },
+  "children": [
+    { "src": "entities/start-platform.node.json", "name": "StartPlatform", "config": { "x": 120, "y": 440 } },
+    { "src": "entities/balloon-red.node.json",  "name": "B01", "config": { "x": 320,  "y": 370, "phase": 0.0 } },
+    { "src": "entities/balloon-blue.node.json", "name": "B02", "config": { "x": 540,  "y": 350, "phase": 0.4 } },
+    { "src": "entities/balloon-gold.node.json", "name": "B03", "config": { "x": 720,  "y": 280, "phase": 0.8 } },
+    { "src": "entities/balloon-red.node.json",  "name": "B04", "config": { "x": 1140, "y": 360, "phase": 1.2 } },
+    { "src": "entities/balloon-red.node.json",  "name": "B05", "config": { "x": 1380, "y": 350, "phase": 1.5 } },
+    { "src": "entities/mid-platform.node.json", "name": "MidPlatform1", "config": { "x": 1600, "y": 440 } },
+    { "src": "entities/balloon-red.node.json",  "name": "B06", "config": { "x": 1840, "y": 360, "phase": 1.8 } },
+    { "src": "entities/balloon-gold.node.json", "name": "B07", "config": { "x": 2000, "y": 280, "phase": 0.2 } },
+    { "src": "entities/balloon-blue.node.json", "name": "B08", "config": { "x": 2440, "y": 350, "phase": 0.5 } },
+    { "src": "entities/balloon-red.node.json",  "name": "B09", "config": { "x": 2640, "y": 360, "phase": 0.9 } },
+    { "src": "entities/mid-platform.node.json", "name": "MidPlatform2", "config": { "x": 2820, "y": 440 } },
+    { "src": "entities/balloon-blue.node.json", "name": "B10", "config": { "x": 3060, "y": 340, "phase": 1.2 } },
+    { "src": "entities/balloon-gold.node.json", "name": "B11", "config": { "x": 3260, "y": 280, "phase": 1.5 } },
+    { "src": "entities/goal-platform.node.json", "name": "GoalPlatform", "config": { "x": 3460, "y": 440 } },
+    { "src": "entities/goal-flag.node.json",     "name": "GoalFlag",     "config": { "x": 3460, "y": 372 } },
+    { "src": "entities/hero.node.json",          "name": "Hero",         "config": { "x": 120,  "y": 380 } }
+  ]
+}

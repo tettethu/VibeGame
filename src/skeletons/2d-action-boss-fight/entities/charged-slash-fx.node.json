@@ -1,0 +1,44 @@
+{
+  "name": "ChargedSlashFx",
+  "script": "OneShotFx",
+  "tags": [
+    "fx",
+    "chargedSlashFx"
+  ],
+  "visual": {
+    "type": "atlas",
+    "texture": "fx_charged_slash",
+    "frame": "charged_slash_0",
+    "width": 170,
+    "height": 86,
+    "depth": 80
+  },
+  "config": {
+    "x": 0,
+    "y": 0,
+    "kind": "charged_slash",
+    "lifetime": 0.4,
+    "maxLifetime": 1.5,
+    "alpha": 0.95
+  },
+  "animations": {
+    "default": "charged_slash",
+    "clips": {
+      "charged_slash": {
+        "source": {
+          "type": "atlas",
+          "texture": "fx_charged_slash"
+        },
+        "frames": [
+          "charged_slash_0",
+          "charged_slash_1",
+          "charged_slash_2",
+          "charged_slash_3"
+        ],
+        "frameRate": 10,
+        "loop": false,
+        "onFinish": "hold"
+      }
+    }
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "name": "OneShotFx",
+  "script": "OneShotFx",
+  "visual": {
+    "type": "atlas",
+    "texture": "fx_hit_spark",
+    "frame": "hit_spark_0",
+    "width": 82,
+    "height": 90,
+    "depth": 80
+  },
+  "config": {
+    "x": 0,
+    "y": 0,
+    "kind": "hit_spark",
+    "lifetime": 0.22,
+    "maxLifetime": 1.5,
+    "alpha": 1
+  },
+  "animations": {
+    "default": "hit_spark",
+    "clips": {
+      "normal_slash": {
+        "source": {
+          "type": "atlas",
+          "texture": "fx_normal_slash"
+        },
+        "frames": [
+          "normal_slash_0",
+          "normal_slash_1",
+          "normal_slash_2",
+          "normal_slash_3"
+        ],
+        "frameRate": 14,
+        "loop": false,
+        "onFinish": "hold",
+        "width": 112,
+        "height": 110
+      },
+      "charged_slash": {
+        "source": {
+          "type": "atlas",
+          "texture": "fx_charged_slash"
+        },
+        "frames": [
+          "charged_slash_0",
+          "charged_slash_1",
+          "charged_slash_2",
+          "charged_slash_3"
+        ],
+        "frameRate": 10,
+        "loop": false,
+        "onFinish": "hold",
+        "width": 190,
+        "height": 230
+      },
+      "air_slash": {
+        "source": {
+          "type": "atlas",
+          "texture": "fx_air_slash"
+        },
+        "frames": [
+          "air_slash_0",
+          "air_slash_1",
+          "air_slash_2",
+          "air_slash_3"
+        ],
+        "frameRate": 12,
+        "loop": false,
+        "onFinish": "hold",
+        "width": 118,
+        "height": 150
+      },
+      "hit_spark": {
+        "source": {
+          "type": "atlas",
+          "texture": "fx_hit_spark"
+        },
+        "frames": [
+          "hit_spark_0",
+          "hit_spark_1",
+          "hit_spark_2",
+          "hit_spark_3"
+        ],
+        "frameRate": 16,
+        "loop": false,
+        "onFinish": "hold",
+        "width": 82,
+        "height": 90
+      },
+      "ground_crack": {
+        "source": {
+          "type": "atlas",
+          "texture": "fx_ground_crack"
+        },
+        "frames": [
+          "ground_crack_0",
+          "ground_crack_1",
+          "ground_crack_2",
+          "ground_crack_3"
+        ],
+        "frameRate": 12,
+        "loop": false,
+        "onFinish": "hold",
+        "width": 210,
+        "height": 90
+      },
+      "ash_burst": {
+        "source": {
+          "type": "atlas",
+          "texture": "fx_ash_burst"
+        },
+        "frames": [
+          "ash_burst_0",
+          "ash_burst_1",
+          "ash_burst_2",
+          "ash_burst_3"
+        ],
+        "frameRate": 10,
+        "loop": false,
+        "onFinish": "hold",
+        "width": 180,
+        "height": 210
+      },
+      "thorn_impact": {
+        "source": {
+          "type": "atlas",
+          "texture": "projectile_thorn_bolt_impact"
+        },
+        "frames": [
+          "thorn_bolt_impact_0",
+          "thorn_bolt_impact_1",
+          "thorn_bolt_impact_2",
+          "thorn_bolt_impact_3"
+        ],
+        "frameRate": 14,
+        "loop": false,
+        "onFinish": "hold",
+        "width": 92,
+        "height": 116
+      }
+    }
+  }
+}

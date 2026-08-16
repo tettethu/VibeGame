@@ -1,0 +1,14 @@
+{
+  "name": "Bat",
+  "script": "BatEnemy",
+  "tags": ["enemy", "bat"],
+  "visual": { "type": "atlas", "texture": "bat_flap", "frame": "flap_0", "width": 128, "height": 80 },
+  "animations": {
+    "default": "flap",
+    "clips": {
+      "flap": { "frames": ["flap_0", "flap_1", "flap_2", "flap_3"], "frameRate": 5, "loop": true }
+    }
+  },
+  "collider": { "body": "dynamic", "width": 18, "height": 18, "gravity": false },
+  "config": { "hp": 25, "speed": 150, "contactDamage": 8, "expReward": 12 }
+}

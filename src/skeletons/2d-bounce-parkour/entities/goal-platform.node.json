@@ -1,0 +1,6 @@
+{
+  "name": "GoalPlatform",
+  "tags": ["ground", "goal"],
+  "visual": { "type": "atlas", "texture": "platforms", "frame": "goal", "width": 160, "height": 40 },
+  "collider": { "body": "static", "host": "separate"}
+}

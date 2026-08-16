@@ -1,0 +1,376 @@
+{
+  "comboBonus": {
+    "3": 5,
+    "4": 10,
+    "5": 20,
+    "6": 30
+  },
+  "halfPopGravityBoost": 70,
+  "sliceVfxAngleJitterDeg": [-22, 22],
+  "types": [
+    "apple",
+    "watermelon",
+    "banana",
+    "orange",
+    "pineapple",
+    "coconut",
+    "strawberry"
+  ],
+  "profiles": {
+    "apple": {
+      "label": "Apple",
+      "score": 10,
+      "radius": 25,
+      "spawnWeight": 1.35,
+      "weight": 1.0,
+      "speed": {
+        "vxMin": 120,
+        "vxMax": 235,
+        "vyMin": -620,
+        "vyMax": -535
+      },
+      "halfPop": {
+        "x": 145,
+        "y": -85,
+        "spin": 4.2,
+        "spread": 1.0
+      },
+      "sliceVfx": [
+        {
+          "texture": "vfx_juice_red_burst_round",
+          "width": 86,
+          "height": 76,
+          "ttl": 0.52,
+          "depth": 94,
+          "scatter": 8,
+          "scaleStart": 0.7,
+          "scaleEnd": 1.06
+        },
+        {
+          "texture": "vfx_juice_red_droplets",
+          "width": 82,
+          "height": 64,
+          "ttl": 0.68,
+          "depth": 96,
+          "scatter": 16,
+          "velocityY": -10,
+          "scaleStart": 0.75,
+          "scaleEnd": 1.12
+        }
+      ]
+    },
+    "watermelon": {
+      "label": "Watermelon",
+      "score": 25,
+      "radius": 36,
+      "spawnWeight": 0.62,
+      "weight": 1.45,
+      "speed": {
+        "vxMin": 70,
+        "vxMax": 155,
+        "vyMin": -600,
+        "vyMax": -520
+      },
+      "halfPop": {
+        "x": 195,
+        "y": -45,
+        "spin": 2.4,
+        "spread": 1.15
+      },
+      "sliceVfx": [
+        {
+          "texture": "vfx_juice_watermelon_splash_wide",
+          "width": 160,
+          "height": 128,
+          "ttl": 0.72,
+          "depth": 94,
+          "scatter": 16,
+          "scaleStart": 0.72,
+          "scaleEnd": 1.1
+        },
+        {
+          "texture": "vfx_juice_watermelon_arc_seeds",
+          "width": 142,
+          "height": 92,
+          "ttl": 0.76,
+          "depth": 96,
+          "scatter": 22,
+          "velocityY": -10,
+          "scaleStart": 0.7,
+          "scaleEnd": 1.08
+        },
+        {
+          "texture": "vfx_juice_watermelon_burst_seeded",
+          "width": 112,
+          "height": 96,
+          "ttl": 0.64,
+          "depth": 97,
+          "scatter": 16,
+          "scaleStart": 0.76,
+          "scaleEnd": 1.14
+        }
+      ]
+    },
+    "banana": {
+      "label": "Banana",
+      "score": 12,
+      "radius": 27,
+      "spawnWeight": 1.05,
+      "weight": 0.8,
+      "speed": {
+        "vxMin": 160,
+        "vxMax": 305,
+        "vyMin": -660,
+        "vyMax": -570
+      },
+      "halfPop": {
+        "x": 170,
+        "y": -125,
+        "spin": 5.8,
+        "spread": 1.05
+      },
+      "sliceVfx": [
+        {
+          "texture": "vfx_juice_yellow_fast_streak",
+          "width": 98,
+          "height": 72,
+          "ttl": 0.48,
+          "depth": 95,
+          "scatter": 8,
+          "velocityY": -8,
+          "scaleStart": 0.72,
+          "scaleEnd": 1.06
+        }
+      ]
+    },
+    "orange": {
+      "label": "Orange",
+      "score": 15,
+      "radius": 26,
+      "spawnWeight": 1.0,
+      "weight": 0.92,
+      "speed": {
+        "vxMin": 135,
+        "vxMax": 275,
+        "vyMin": -650,
+        "vyMax": -555
+      },
+      "halfPop": {
+        "x": 215,
+        "y": -110,
+        "spin": 5.5,
+        "spread": 1.28
+      },
+      "sliceVfx": [
+        {
+          "texture": "vfx_juice_orange_splash_crown",
+          "width": 112,
+          "height": 90,
+          "ttl": 0.6,
+          "depth": 94,
+          "scatter": 12,
+          "scaleStart": 0.72,
+          "scaleEnd": 1.1
+        },
+        {
+          "texture": "vfx_juice_orange_droplet_cluster",
+          "width": 122,
+          "height": 66,
+          "ttl": 0.72,
+          "depth": 96,
+          "scatter": 20,
+          "velocityY": -8,
+          "scaleStart": 0.78,
+          "scaleEnd": 1.12
+        },
+        {
+          "texture": "vfx_juice_orange_splash_scatter",
+          "width": 112,
+          "height": 72,
+          "ttl": 0.58,
+          "depth": 97,
+          "scatter": 18,
+          "velocityY": -6,
+          "scaleStart": 0.72,
+          "scaleEnd": 1.08
+        }
+      ]
+    },
+    "pineapple": {
+      "label": "Pineapple",
+      "score": 20,
+      "radius": 31,
+      "spawnWeight": 0.72,
+      "weight": 1.25,
+      "speed": {
+        "vxMin": 90,
+        "vxMax": 205,
+        "vyMin": -630,
+        "vyMax": -545
+      },
+      "halfPop": {
+        "x": 125,
+        "y": -45,
+        "spin": 2.7,
+        "spread": 0.78
+      },
+      "sliceVfx": [
+        {
+          "texture": "vfx_juice_yellow_fast_streak",
+          "width": 106,
+          "height": 76,
+          "ttl": 0.54,
+          "depth": 94,
+          "scatter": 10,
+          "scaleStart": 0.72,
+          "scaleEnd": 1.04
+        },
+        {
+          "texture": "vfx_pulp_yellow_fibers",
+          "width": 118,
+          "height": 90,
+          "ttl": 0.82,
+          "depth": 96,
+          "scatter": 20,
+          "velocityY": -4,
+          "scaleStart": 0.76,
+          "scaleEnd": 1.12
+        },
+        {
+          "texture": "vfx_pulp_yellow_chunks",
+          "width": 102,
+          "height": 76,
+          "ttl": 0.74,
+          "depth": 97,
+          "scatter": 18,
+          "velocityY": -2,
+          "scaleStart": 0.75,
+          "scaleEnd": 1.1
+        }
+      ]
+    },
+    "coconut": {
+      "label": "Coconut",
+      "score": 35,
+      "radius": 33,
+      "spawnWeight": 0.38,
+      "weight": 1.7,
+      "speed": {
+        "vxMin": 55,
+        "vxMax": 135,
+        "vyMin": -590,
+        "vyMax": -510
+      },
+      "halfPop": {
+        "x": 115,
+        "y": -28,
+        "spin": 1.7,
+        "spread": 0.68
+      },
+      "sliceVfx": [
+        {
+          "texture": "vfx_fragment_coconut_mixed",
+          "width": 112,
+          "height": 84,
+          "ttl": 0.84,
+          "depth": 96,
+          "scatter": 18,
+          "velocityY": -6,
+          "scaleStart": 0.76,
+          "scaleEnd": 1.12
+        },
+        {
+          "texture": "vfx_fragment_coconut_white",
+          "width": 100,
+          "height": 80,
+          "ttl": 0.78,
+          "depth": 97,
+          "scatter": 16,
+          "velocityY": -4,
+          "scaleStart": 0.7,
+          "scaleEnd": 1.08
+        }
+      ]
+    },
+    "strawberry": {
+      "label": "Strawberry",
+      "score": 8,
+      "radius": 19,
+      "spawnWeight": 1.18,
+      "weight": 0.65,
+      "speed": {
+        "vxMin": 205,
+        "vxMax": 370,
+        "vyMin": -670,
+        "vyMax": -575
+      },
+      "halfPop": {
+        "x": 245,
+        "y": -150,
+        "spin": 7.3,
+        "spread": 1.38
+      },
+      "sliceVfx": [
+        {
+          "texture": "vfx_juice_red_burst_small",
+          "width": 68,
+          "height": 54,
+          "ttl": 0.42,
+          "depth": 95,
+          "scatter": 8,
+          "scaleStart": 0.7,
+          "scaleEnd": 1.04
+        },
+        {
+          "texture": "vfx_juice_red_streak_fast",
+          "width": 96,
+          "height": 64,
+          "ttl": 0.52,
+          "depth": 96,
+          "scatter": 14,
+          "velocityY": -12,
+          "scaleStart": 0.68,
+          "scaleEnd": 1.04
+        }
+      ]
+    }
+  },
+  "bomb": {
+    "radius": 27,
+    "spawnChanceBase": 0.08,
+    "spawnChanceMax": 0.22,
+    "spawnChanceElapsedRate": 0.0035,
+    "spawnChanceDifficultyRate": 0.015,
+    "introDelay": 10,
+    "introSpawnedCount": 8,
+    "weight": 1.1,
+    "speed": {
+      "vxMin": 100,
+      "vxMax": 240,
+      "vyMin": -655,
+      "vyMax": -555
+    },
+    "texture": "bomb_idle",
+    "warningTexture": "bomb_warning",
+    "explosionVfx": {
+      "ttl": 1.15,
+      "width": 190,
+      "height": 162,
+      "depth": 205,
+      "alphaStart": 1,
+      "alphaEnd": 0,
+      "scaleStart": 0.9,
+      "scaleEnd": 1.24,
+      "textureSequence": [
+        {
+          "texture": "bomb_explosion_ignition",
+          "at": 0
+        },
+        {
+          "texture": "bomb_explosion_peak",
+          "at": 0.12
+        }
+      ]
+    }
+  }
+}

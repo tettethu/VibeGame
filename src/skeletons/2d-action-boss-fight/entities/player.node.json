@@ -1,0 +1,341 @@
+{
+  "name": "Player",
+  "script": "PlayerController",
+  "tags": [
+    "player"
+  ],
+  "visual": {
+    "type": "atlas",
+    "texture": "player_idle",
+    "frame": "idle_0",
+    "width": 51,
+    "height": 78
+  },
+  "collider": {
+    "body": "dynamic",
+    "host": "separate",
+    "worldBounds": true
+  },
+  "config": {
+    "x": 220,
+    "y": 426,
+    "hp": 5,
+    "speed": 235,
+    "chargeMoveSpeed": 90,
+    "jumpForce": 500,
+    "dashSpeed": 520,
+    "dashDuration": 0.18,
+    "dashCooldown": 0.65,
+    "dashInvulnDuration": 0.16,
+    "chargeFullTime": 0.75,
+    "releaseLockTime": 0.42,
+    "normalDamage": 4,
+    "airDamage": 4,
+    "chargedDamage": 12,
+    "normalLockTime": 0.24,
+    "normalActiveTime": 0.15,
+    "airLockTime": 0.3,
+    "airActiveTime": 0.16,
+    "chargedActiveTime": 0.38,
+    "hurtDuration": 0.35,
+    "invulnDuration": 1.0,
+    "knockbackX": 180,
+    "knockbackY": -120,
+    "attackFx": {
+      "normal": {
+        "kind": "normal_slash",
+        "template": "entities/normal-slash-fx.node.json",
+        "offsetX": 54,
+        "offsetY": -8,
+        "lifetime": 0.18,
+        "alpha": 0.95
+      },
+      "air": {
+        "kind": "air_slash",
+        "template": "entities/air-slash-fx.node.json",
+        "offsetX": 56,
+        "offsetY": -10,
+        "lifetime": 0.2,
+        "alpha": 0.95
+      },
+      "charged": {
+        "kind": "charged_slash",
+        "template": "entities/charged-slash-fx.node.json",
+        "triggerFrame": 2,
+        "offsetX": 86,
+        "offsetY": -12,
+        "lifetime": 0.4,
+        "alpha": 0.95
+      }
+    },
+    "runVelocityThreshold": 5,
+    "runtimeResetGroundedFrames": 3,
+    "velocityEpsilon": 0.001,
+    "hurtShakeMs": 110,
+    "hurtShakeIntensity": 0.004,
+    "invulnFlickerRate": 18,
+    "invulnFlickerAlpha": 0.45,
+    "defaultFacing": 1,
+    "hitboxNodes": {
+      "normal": "NormalNail",
+      "air": "AirNail",
+      "charged": "ChargedNail"
+    },
+    "chargeReadyIndicatorNode": "ChargeReadyIndicator",
+    "invulnFlickerModulo": 2
+  },
+  "children": [
+    {
+      "name": "NormalNail",
+      "script": "Collider",
+      "collider": {
+        "body": "dynamic",
+        "width": 74,
+        "height": 42,
+        "offsetX": 54,
+        "offsetY": -8,
+        "gravity": false,
+        "immovable": true
+      },
+      "config": {
+        "startEnabled": false,
+        "flipWithParent": true
+      }
+    },
+    {
+      "name": "AirNail",
+      "script": "Collider",
+      "collider": {
+        "body": "dynamic",
+        "width": 86,
+        "height": 56,
+        "offsetX": 56,
+        "offsetY": -10,
+        "gravity": false,
+        "immovable": true
+      },
+      "config": {
+        "startEnabled": false,
+        "flipWithParent": true
+      }
+    },
+    {
+      "name": "ChargedNail",
+      "script": "Collider",
+      "collider": {
+        "body": "dynamic",
+        "width": 170,
+        "height": 86,
+        "offsetX": 86,
+        "offsetY": -12,
+        "gravity": false,
+        "immovable": true
+      },
+      "config": {
+        "startEnabled": false,
+        "flipWithParent": true
+      }
+    },
+    {
+      "name": "ChargeReadyIndicator",
+      "tags": [
+        "fx",
+        "chargeReadyIndicator"
+      ],
+      "visual": {
+        "type": "image",
+        "texture": "fx_charge_ready",
+        "width": 120,
+        "height": 110,
+        "depth": 74
+      },
+      "config": {
+        "x": 220,
+        "y": 387,
+        "alpha": 0.24
+      }
+    }
+  ],
+  "visualTransform": {
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "animations": {
+    "default": "idle",
+    "clips": {
+      "idle": {
+        "source": {
+          "type": "atlas",
+          "texture": "player_idle"
+        },
+        "frames": [
+          "idle_0",
+          "idle_1",
+          "idle_2",
+          "idle_3"
+        ],
+        "frameRate": 6,
+        "loop": true
+      },
+      "run": {
+        "source": {
+          "type": "atlas",
+          "texture": "player_run"
+        },
+        "frames": [
+          "run_0",
+          "run_1",
+          "run_2",
+          "run_3"
+        ],
+        "frameRate": 10,
+        "loop": true
+      },
+      "jump": {
+        "source": {
+          "type": "atlas",
+          "texture": "player_jump"
+        },
+        "frames": [
+          "jump_0"
+        ],
+        "frameRate": 1,
+        "loop": false,
+        "onFinish": "hold"
+      },
+      "fall": {
+        "source": {
+          "type": "atlas",
+          "texture": "player_fall"
+        },
+        "frames": [
+          "fall_0"
+        ],
+        "frameRate": 1,
+        "loop": false,
+        "onFinish": "hold"
+      },
+      "dash": {
+        "source": {
+          "type": "atlas",
+          "texture": "player_dash"
+        },
+        "frames": [
+          "dash_0",
+          "dash_1",
+          "dash_2",
+          "dash_3"
+        ],
+        "frameRate": 14,
+        "loop": false,
+        "onFinish": "hold"
+      },
+      "attack": {
+        "source": {
+          "type": "atlas",
+          "texture": "player_normal_attack"
+        },
+        "frames": [
+          "attack_0",
+          "attack_1",
+          "attack_2",
+          "attack_3"
+        ],
+        "frameRate": 14,
+        "loop": false,
+        "onFinish": "hold"
+      },
+      "charge_build": {
+        "source": {
+          "type": "atlas",
+          "texture": "player_charge"
+        },
+        "frames": [
+          "charge_0",
+          "charge_1",
+          "charge_2",
+          "charge_3"
+        ],
+        "frameRate": 8,
+        "loop": false,
+        "onFinish": "hold"
+      },
+      "charge_full": {
+        "source": {
+          "type": "atlas",
+          "texture": "player_charge_full"
+        },
+        "frames": [
+          "charge_full_0",
+          "charge_full_1",
+          "charge_full_2",
+          "charge_full_3"
+        ],
+        "frameRate": 8,
+        "loop": true
+      },
+      "charge_release": {
+        "source": {
+          "type": "atlas",
+          "texture": "player_charge_release"
+        },
+        "frames": [
+          "charge_release_0",
+          "charge_release_1",
+          "charge_release_2",
+          "charge_release_3"
+        ],
+        "frameRate": 10,
+        "loop": false,
+        "onFinish": "hold"
+      },
+      "air_attack": {
+        "source": {
+          "type": "atlas",
+          "texture": "player_air_attack"
+        },
+        "frames": [
+          "air_attack_0",
+          "air_attack_1",
+          "air_attack_2",
+          "air_attack_3"
+        ],
+        "frameRate": 12,
+        "loop": false,
+        "onFinish": "hold"
+      },
+      "hurt": {
+        "source": {
+          "type": "atlas",
+          "texture": "player_hurt"
+        },
+        "frames": [
+          "hurt_0",
+          "hurt_1",
+          "hurt_2",
+          "hurt_3"
+        ],
+        "frameRate": 12,
+        "loop": false,
+        "onFinish": "hold"
+      },
+      "die": {
+        "source": {
+          "type": "atlas",
+          "texture": "player_death"
+        },
+        "frames": [
+          "death_0",
+          "death_1",
+          "death_2",
+          "death_3",
+          "death_4",
+          "death_5"
+        ],
+        "frameRate": 12,
+        "loop": false,
+        "onFinish": "hold"
+      }
+    }
+  }
+}

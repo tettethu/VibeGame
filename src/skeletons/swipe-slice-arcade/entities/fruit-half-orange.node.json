@@ -1,0 +1,32 @@
+{
+  "name": "FruitHalf",
+  "script": "FruitHalf",
+  "tags": [
+    "fruitHalf"
+  ],
+  "visual": {
+    "type": "image",
+    "texture": "fruit_orange_left",
+    "width": 52,
+    "height": 52
+  },
+  "collider": {
+    "body": "dynamic",
+    "shape": "circle",
+    "radius": 10.92,
+    "gravity": true
+  },
+  "config": {
+    "fruitType": "orange",
+    "side": "left",
+    "velocityX": 0,
+    "velocityY": -120,
+    "spin": 3,
+    "weight": 0.92,
+    "cleanupMargin": 140,
+    "texture": "fruit_orange_left",
+    "depth": 90,
+    "tiltAngle": 0.22,
+    "ttl": 2.5
+  }
+}

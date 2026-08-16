@@ -1,0 +1,8 @@
+{
+  "name": "Archer",
+  "script": "ArcherEnemy",
+  "tags": ["enemy", "archer"],
+  "visual": { "type": "image", "texture": "archer_idle", "width": 44, "height": 58 },
+  "collider": { "body": "dynamic", "width": 18, "height": 30, "gravity": false, "immovable": true },
+  "config": { "hp": 50, "shootInterval": 2.0, "bulletSpeed": 200, "bulletDamage": 15, "bulletStyle": "archer", "expReward": 20 }
+}

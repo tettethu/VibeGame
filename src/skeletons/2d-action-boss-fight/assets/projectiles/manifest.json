@@ -1,0 +1,28 @@
+{
+  "projectile_thorn_bolt_fly": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "thorn_bolt_fly_0",
+      "thorn_bolt_fly_1",
+      "thorn_bolt_fly_2",
+      "thorn_bolt_fly_3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "projectile_thorn_bolt_impact": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "thorn_bolt_impact_0",
+      "thorn_bolt_impact_1",
+      "thorn_bolt_impact_2",
+      "thorn_bolt_impact_3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  }
+}

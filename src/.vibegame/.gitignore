@@ -1,0 +1,8 @@
+tasks/
+worktrees/
+logs/
+.session-lock
+review-lock.json
+team/state.json
+team/messages.jsonl
+team/lock

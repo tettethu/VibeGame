@@ -1,0 +1,58 @@
+{
+  "name": "Player",
+  "script": "Player",
+  "tags": ["player"],
+  "visual": { "type": "atlas", "texture": "player_run", "frame": "run_0", "width": 56, "height": 80 },
+  "collider": { "body": "dynamic", "host": "separate", "gravity": false, "worldBounds": true },
+  "animations": {
+    "default": "idle",
+    "clips": {
+      "idle": { "frames": ["run_0"], "frameRate": 4, "loop": true },
+      "walk": { "frames": ["run_1", "run_2", "run_3", "run_4"], "frameRate": 10, "loop": true },
+      "roll": {
+        "frames": ["roll_0", "roll_1", "roll_2", "roll_3", "roll_4", "roll_5", "roll_6", "roll_7"],
+        "frameRate": 20,
+        "loop": false,
+        "source": { "type": "atlas", "texture": "player_roll" }
+      }
+    }
+  },
+  "animator": {
+    "defaultState": "idle",
+    "parameters": { "isMoving": "bool", "isRolling": "bool" },
+    "states": {
+      "idle": { "clip": "idle" },
+      "walk": { "clip": "walk" },
+      "roll": { "clip": "roll" }
+    },
+    "transitions": [
+      { "from": "idle", "to": "roll", "when": [{ "param": "isRolling", "eq": true }] },
+      { "from": "walk", "to": "roll", "when": [{ "param": "isRolling", "eq": true }] },
+      { "from": "roll", "to": "walk", "when": [{ "param": "isRolling", "eq": false }, { "param": "isMoving", "eq": true }] },
+      { "from": "roll", "to": "idle", "when": [{ "param": "isRolling", "eq": false }, { "param": "isMoving", "eq": false }] },
+      { "from": "idle", "to": "walk", "when": [{ "param": "isMoving", "eq": true }] },
+      { "from": "walk", "to": "idle", "when": [{ "param": "isMoving", "eq": false }] }
+    ]
+  },
+  "children": [{
+    "name": "Weapon",
+    "script": "WeaponVisual",
+    "visual": { "type": "image", "texture": "weapon_pistol", "width": 20, "height": 40 },
+    "config": { "offsetX": -5, "offsetY": 20 }
+  }],
+  "config": {
+    "maxHP": 5,
+    "maxShield": 5,
+    "maxMana": 200,
+    "manaRegenRate": 5,
+    "shieldRegenDelay": 3,
+    "shieldRegenInterval": 2,
+    "speed": 180,
+    "invincibleDuration": 1.0,
+    "pickupRadius": 20,
+    "rollDuration": 0.4,
+    "rollCooldown": 1.0,
+    "rollSpeedMultiplier": 3.5,
+    "critChance": 0.15
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "move_left":  ["LEFT", "A"],
+  "move_right": ["RIGHT", "D"],
+  "jump":       ["SPACE", "W", "UP"],
+  "attack":     ["Z", "J"],
+  "dash":       ["X", "K", "SHIFT"],
+  "pause":      ["ESC"]
+}

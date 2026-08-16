@@ -1,0 +1,32 @@
+{
+  "arena_ruined_gothic": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#2b2b3a",
+    "pivot": [0.5, 0.5]
+  },
+  "ui_mask_icon": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#dff7ff",
+    "pivot": [0.5, 0.5]
+  },
+  "ui_boss_hp_icon": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#8899aa",
+    "pivot": [0.5, 0.5]
+  },
+  "ui_boss_hp_slot": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#222222",
+    "pivot": [0.5, 0.5]
+  },
+  "ui_boss_hp_bar": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#5fd0ff",
+    "pivot": [0.5, 0.5]
+  }
+}

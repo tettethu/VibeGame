@@ -1,0 +1,13 @@
+**/.DS_Store
+**/__pycache__
+**/*.egg-info
+**/.venv
+**/node_modules
+**/.env
+build/
+logs/
+.cache/
+tmp*
+
+# Local artifact of `uv sync`; resolution is pinned in pyproject.
+uv.lock

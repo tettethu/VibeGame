@@ -1,0 +1,24 @@
+{
+  "name": "swipe-slice-arcade",
+  "version": "0.1.0",
+  "engine": "vibegame@0.1.0",
+  "settings": {
+    "width": 960,
+    "height": 540,
+    "scaleMode": "FIT",
+    "pixelArt": false,
+    "backgroundColor": "#000000",
+    "physics": {
+      "gravity": {
+        "x": 0,
+        "y": 560
+      },
+      "debug": false
+    }
+  },
+  "startScene": "scenes/main.scene.json",
+  "manifests": [
+    "assets/manifest.json"
+  ],
+  "inputMap": "config/input-map.json"
+}

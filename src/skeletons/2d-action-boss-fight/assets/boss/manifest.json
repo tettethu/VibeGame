@@ -1,0 +1,116 @@
+{
+  "boss_idle": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "idle_0",
+      "idle_1",
+      "idle_2",
+      "idle_3"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "boss_walk": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "walk_0",
+      "walk_1",
+      "walk_2",
+      "walk_3"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "boss_antler_slam": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "antler_slam_0",
+      "antler_slam_1",
+      "antler_slam_2",
+      "antler_slam_3",
+      "antler_slam_4",
+      "antler_slam_5",
+      "antler_slam_6",
+      "antler_slam_7"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "boss_needle_lunge": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "needle_lunge_0",
+      "needle_lunge_1",
+      "needle_lunge_2",
+      "needle_lunge_3",
+      "needle_lunge_4",
+      "needle_lunge_5",
+      "needle_lunge_6",
+      "needle_lunge_7"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "boss_thorn_volley_cast": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "thorn_volley_cast_0",
+      "thorn_volley_cast_1",
+      "thorn_volley_cast_2",
+      "thorn_volley_cast_3"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "boss_focus": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "focus_0",
+      "focus_1",
+      "focus_2",
+      "focus_3"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "boss_hit": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "hit_0",
+      "hit_1",
+      "hit_2",
+      "hit_3"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "boss_death": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "death_0",
+      "death_1",
+      "death_2",
+      "death_3",
+      "death_4",
+      "death_5"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  }
+}

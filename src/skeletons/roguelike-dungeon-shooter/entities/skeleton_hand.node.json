@@ -1,0 +1,8 @@
+{
+  "name": "SkeletonHand",
+  "script": "SkeletonHandEnemy",
+  "tags": ["enemy", "skeleton_hand"],
+  "visual": { "type": "atlas", "texture": "sk_hand_emerge", "frame": "emerge_0", "width": 96, "height": 96 },
+  "collider": { "body": "dynamic", "width": 24, "height": 24, "gravity": false },
+  "config": { "hp": 35, "contactDamage": 12, "attackInterval": 2.5, "attackRange": 80, "expReward": 15 }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Slime",
+  "script": "SlimeEnemy",
+  "tags": ["enemy", "slime"],
+  "visual": { "type": "atlas", "texture": "slime_jump", "frame": "jump_0", "width": 32, "height": 32 },
+  "collider": { "body": "dynamic", "width": 24, "height": 18, "gravity": false },
+  "config": { "hp": 30, "speed": 80, "contactDamage": 10, "expReward": 10 }
+}

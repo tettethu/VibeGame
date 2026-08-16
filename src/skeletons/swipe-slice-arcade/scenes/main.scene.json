@@ -1,0 +1,225 @@
+{
+  "name": "Main",
+  "root": {
+    "name": "Root",
+    "children": [
+      {
+        "name": "Background",
+        "visual": {
+          "type": "image",
+          "texture": "bg_dojo_backdrop",
+          "width": 960,
+          "height": 540
+        },
+        "config": {
+          "x": 480,
+          "y": 270
+        }
+      },
+      {
+        "name": "GameRoot",
+        "script": "GameController",
+        "tags": [
+          "game"
+        ],
+        "config": {
+          "missLimit": 3,
+          "missY": 620,
+          "cleanupMargin": 140,
+          "spawnIntervalSlow": 1.5,
+          "spawnIntervalMin": 0.52,
+          "spawnRampTau": 12,
+          "spawnRampFull": 55,
+          "targetCountStart": 2,
+          "targetCountMax": 10,
+          "waveSizeMax": 4,
+          "gameOverOverlayDelayMs": 1100,
+          "difficultyBucketSeconds": 15,
+          "initialSpawnCooldown": 0.12,
+          "openingWaveLaneFractions": [0.36, 0.64],
+          "halfSpawnOffsetFactor": 0.2,
+          "comboCalloutDurationMs": 900,
+          "halfVelocityCarryX": 0.24,
+          "halfVelocityCarryY": 0.18,
+          "apexHeightMinFraction": 0.32,
+          "apexHeightMaxFraction": 0.48,
+          "apexHeavyBiasScale": 0.08,
+          "apexHeavyBiasMin": -0.04,
+          "apexHeavyBiasMax": 0.08,
+          "apexMinFractionClampLow": 0.3,
+          "apexMinFractionClampHigh": 0.42,
+          "apexMaxFractionClampLow": 0.42,
+          "apexMaxFractionClampHigh": 0.56,
+          "openingFruitTypeWindowSeconds": 6,
+          "openingFruitTypeSpawnCount": 10,
+          "spawnDelayJitterMin": 0.85,
+          "spawnDelayJitterMax": 1.15,
+          "halfPopJitterXMin": 0.88,
+          "halfPopJitterXMax": 1.14,
+          "halfPopJitterYMin": 0.85,
+          "halfPopJitterYMax": 1.15,
+          "halfPopJitterSpinMin": 0.85,
+          "halfPopJitterSpinMax": 1.2,
+          "launchGeometry": {
+            "laneMarginX": 100,
+            "laneJitterX": 50,
+            "edgeYMarginMin": 10,
+            "edgeYMarginMax": 72,
+            "dropInJitterX": 34,
+            "dropInYMarginMin": 82,
+            "dropInYMarginMax": 122,
+            "dropInClampMargin": 90,
+            "edgeOvershootX": 36,
+            "sideRollThreshold1": 0.18,
+            "sideRollThreshold2": 0.36,
+            "fallbackClampMargin": 65,
+            "fallbackXMargin": 105,
+            "dropInOvershootY": 44,
+            "minGravityY": 80,
+            "minRise": 24
+          },
+          "spawnPressureTuning": {
+            "fullCooldownFloor": 0.1,
+            "emptyCooldownBase": 0.35,
+            "emptyCooldownRampFactor": 0.22,
+            "belowCooldownBase": 0.55,
+            "belowCooldownRampFactor": 0.4
+          }
+        },
+        "children": [
+          {
+            "name": "_FruitAppleTemplate",
+            "src": "entities/fruit-apple.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_FruitWatermelonTemplate",
+            "src": "entities/fruit-watermelon.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_FruitBananaTemplate",
+            "src": "entities/fruit-banana.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_FruitOrangeTemplate",
+            "src": "entities/fruit-orange.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_FruitPineappleTemplate",
+            "src": "entities/fruit-pineapple.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_FruitCoconutTemplate",
+            "src": "entities/fruit-coconut.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_FruitStrawberryTemplate",
+            "src": "entities/fruit-strawberry.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_FruitHalfAppleTemplate",
+            "src": "entities/fruit-half-apple.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_FruitHalfWatermelonTemplate",
+            "src": "entities/fruit-half-watermelon.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_FruitHalfBananaTemplate",
+            "src": "entities/fruit-half-banana.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_FruitHalfOrangeTemplate",
+            "src": "entities/fruit-half-orange.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_FruitHalfPineappleTemplate",
+            "src": "entities/fruit-half-pineapple.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_FruitHalfCoconutTemplate",
+            "src": "entities/fruit-half-coconut.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_FruitHalfStrawberryTemplate",
+            "src": "entities/fruit-half-strawberry.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_BombTemplate",
+            "src": "entities/bomb.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_SliceVfxTemplate",
+            "src": "entities/slice-vfx.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "_BombExplosionTemplate",
+            "src": "entities/bomb-explosion.node.json",
+            "enabled": false,
+            "tags": []
+          },
+          {
+            "name": "SwipeSlash",
+            "script": "SwipeSlashModule",
+            "tags": [
+              "swipe"
+            ],
+            "config": {
+              "hostTag": "game",
+              "minDistance": 6,
+              "hitPadding": 7,
+              "trailMs": 190,
+              "depth": 220,
+              "groups": [
+                {
+                  "tag": "sliceable",
+                  "method": "slice",
+                  "category": "slice",
+                  "defaultRadius": 24
+                },
+                {
+                  "tag": "bomb",
+                  "method": "hitBySlash",
+                  "category": "hazard",
+                  "defaultRadius": 27,
+                  "stopOnHit": true
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

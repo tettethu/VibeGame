@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roguelike Deckbuilder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    #game-container { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+    #game-container canvas { display: block; width: 100% !important; height: 100% !important; }
+
+    /* ---- HUD overlay ---- */
+    #hud-overlay {
+      position: absolute; inset: 0;
+      pointer-events: none;
+      font-family: 'Rajdhani', system-ui, sans-serif;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #fff;
+      -webkit-text-stroke: 0.5px rgba(0,0,0,0.5);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    }
+    #hud-overlay * { box-sizing: border-box; }
+    #hud-logical-root {
+      position: absolute; left: 0; top: 0;
+      transform-origin: 0 0;
+      pointer-events: none;
+    }
+
+    /* Top-left player info */
+    #hud-player-info {
+      position: absolute; top: 16px; left: 16px;
+      display: flex; align-items: flex-start; gap: 16px;
+      pointer-events: none;
+    }
+    #hud-portrait {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: #334; border: 2px solid #0df;
+      flex-shrink: 0; display: flex; align-items: center;
+      justify-content: center; overflow: hidden;
+    }
+    #hud-portrait img { width: 40px !important; height: 40px !important; }
+    #hud-player-stats { height: 44px; display: flex; flex-direction: column; justify-content: space-between; gap: 0; }
+    #hud-hp-text  { height: 20px; font-size: 22px; line-height: 1; color: #ff6666; display: flex; align-items: center; }
+    #hud-eds-text { height: 20px; font-size: 20px; line-height: 1; color: #ffcc00; display: flex; align-items: center; }
+    #hud-hp-text img,
+    #hud-eds-text img { height: 20px !important; width: auto !important; margin-right: 4px !important; }
+    #hud-hp-value  { text-shadow: 0 0 8px #ff6666, 0 1px 2px #000; }
+    #hud-eds-value { text-shadow: 0 0 8px #ffcc00, 0 1px 2px #000; }
+    #hud-status-row { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+    .hud-status-badge {
+      background: #f80; color: #000; border-radius: 6px;
+      padding: 2px 12px; font-size: 22px;
+    }
+
+    /* Top-right gear */
+    #hud-gear {
+      position: absolute; top: 12px; right: 12px;
+      width: 36px; height: 36px; border-radius: 50%;
+      border: 2px solid #666; background: rgba(0,0,0,0.45);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; pointer-events: all;
+      transition: border-color 0.15s;
+    }
+    #hud-gear:hover { border-color: #0df; }
+
+    /* Enemy HP */
+    #hud-enemy-hp {
+      position: absolute;
+      width: 180px;
+      pointer-events: none;
+      text-align: center;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.85));
+      transform: scale(0.5);
+      transform-origin: bottom center;
+    }
+    #hud-enemy-name {
+      margin-bottom: 3px;
+      font-size: 13px; font-weight: 700;
+      color: #ff6666; letter-spacing: 0.12em;
+      text-shadow: 0 0 8px #f44, 0 1px 2px #000;
+      white-space: nowrap;
+    }
+    #hud-enemy-hp-bar {
+      position: relative; height: 20px;
+      border: 1px solid rgba(255,120,120,0.9);
+      border-radius: 8px;
+      background: rgba(12, 4, 8, 0.72);
+      overflow: visible;
+      box-shadow: inset 0 0 8px rgba(0,0,0,0.75), 0 0 8px rgba(255,40,80,0.35);
+    }
+    #hud-enemy-hp-fill {
+      position: absolute; left: 0; top: 0; bottom: 0; width: 100%;
+      border-radius: 7px;
+      background: linear-gradient(90deg, #8b0018, #ff3048);
+      transition: width 0.18s ease;
+    }
+    #hud-enemy-hp-text {
+      position: absolute; left: 0; right: 0; top: 50%;
+      transform: translateY(-50%);
+      z-index: 1;
+      font-size: 13px; line-height: 1;
+      color: #fff; text-shadow: 0 1px 2px #000;
+    }
+
+    /* Enemy intent */
+    #hud-enemy-intent {
+      position: absolute;
+      font-size: 20px; font-weight: 700;
+      color: #fff;
+      pointer-events: none;
+      display: flex; align-items: center; gap: 4px;
+      white-space: nowrap;
+    }
+    #hud-enemy-intent span { text-shadow: 0 0 8px #f44, 0 1px 2px #000; }
+
+
+    /* Character combat badges: player Block/Vulnerable and enemy Block/Vulnerable */
+    #hud-player-combat-status,
+    #hud-enemy-status {
+      position: absolute;
+      display: flex; align-items: center; gap: 6px;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .hud-combat-badge {
+      background: #f80; color: #000; border-radius: 6px;
+      padding: 2px 12px; font-size: 22px;
+      line-height: 1.15;
+      box-shadow: 0 0 8px rgba(255,128,0,0.45), 0 1px 2px #000;
+    }
+    .hud-combat-badge.hud-block {
+      background: #29a; color: #fff;
+      box-shadow: 0 0 8px rgba(0,220,255,0.45), 0 1px 2px #000;
+    }
+
+    /* Bottom-left energy + draw */
+    #hud-energy {
+      position: absolute; bottom: 126px; left: 16px;
+      pointer-events: none;
+      transform: scale(0.63);
+      transform-origin: left bottom;
+    }
+    #hud-energy-row   { display: flex; align-items: center; }
+    #hud-energy-value {
+      font-size: 30px; color: #ffcc00; line-height: 1;
+      text-shadow: 0 0 12px #ffcc00, 0 2px 4px #000;
+      -webkit-text-stroke: 1px rgba(0,0,0,0.4);
+    }
+    #hud-energy-label { font-size: 10px; color: #999; margin-top: 2px; }
+    #hud-draw-count   { font-size: 14px; color: #aaa; margin-top: 6px; }
+
+    /* Bottom-right turn + END TURN + discard */
+    #hud-turn-info {
+      position: absolute; bottom: 126px; right: 16px;
+      text-align: right; pointer-events: none;
+      display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+      transform: scale(0.63);
+      transform-origin: right bottom;
+    }
+    #hud-turn-label { font-size: 13px; color: #aaa; }
+    #hud-end-turn {
+      padding: 10px 22px;
+      border: 2px solid #0df; border-radius: 8px;
+      background: rgba(0, 180, 200, 0.12);
+      color: #0df;
+      font-family: 'Rajdhani', system-ui, sans-serif;
+      font-size: 16px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      cursor: pointer; pointer-events: all;
+      transition: background 0.1s, opacity 0.15s;
+      text-shadow: 0 0 8px #0df, 0 1px 2px #000;
+    }
+    #hud-end-turn:hover:not(:disabled) { background: rgba(0, 220, 255, 0.25); }
+    #hud-end-turn:disabled { opacity: 0.38; cursor: not-allowed; }
+    #hud-discard-count { font-size: 14px; color: #aaa; }
+
+    /* ---- Hand ---- */
+    #hand-root {
+      position: absolute; bottom: 10px; left: 50%;
+      transform: translateX(-50%);
+      width: 920px; height: 400px;
+      pointer-events: none;
+    }
+
+    .card {
+      position: absolute;
+      width: 258px; height: 372px;
+      border-radius: 21px;
+      background: #1a1a2e;
+      border: 1px solid #555;
+      color: #ddd;
+      pointer-events: all;
+      cursor: pointer;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+      overflow: hidden;
+      user-select: none;
+      font-family: 'Rajdhani', system-ui, sans-serif;
+    }
+    .card.card-hover {
+      box-shadow: 0 0 20px 4px rgba(0, 220, 255, 0.75);
+      border-color: #0df;
+      z-index: 20 !important;
+    }
+    .card.card-unaffordable {
+      opacity: 0.42; cursor: not-allowed; pointer-events: none;
+    }
+    /* Dark gradient for text readability; top fully transparent to show burned-in cost */
+    .card::after {
+      content: ''; position: absolute; inset: 0; border-radius: 21px;
+      background: linear-gradient(
+        to bottom,
+        rgba(0,0,0,0.0)  0%,
+        rgba(0,0,0,0.0)  35%,
+        rgba(0,0,0,0.55) 65%,
+        rgba(0,0,0,0.85) 100%
+      );
+      pointer-events: none; z-index: 1;
+    }
+    .card-name {
+      position: absolute; top: 14px; left: 12px; right: 12px;
+      font-size: 27px; font-weight: 700; color: #ffcc00;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      z-index: 2;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    }
+    .card-type-label {
+      position: absolute; bottom: 90px; left: 0; right: 0;
+      text-align: center; font-size: 24px; color: #aaa; letter-spacing: 0.08em;
+      z-index: 2;
+    }
+    .card-desc {
+      position: absolute; bottom: 12px; left: 12px; right: 12px;
+      font-size: 22px; color: #ddd; line-height: 1.3;
+      text-transform: none; font-weight: 600;
+      z-index: 2;
+    }
+
+    /* ---- Card drag/hover states ---- */
+
+    /* Flat hover: transition now also covers translateY + scale for hover expand */
+    .card {
+      transition: transform 0.15s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    }
+
+    /* Card being dragged: no transition, follows cursor instantly */
+    .card.card-dragging {
+      transition: none !important;
+      cursor: grabbing;
+      z-index: 100 !important;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.6);
+    }
+
+    /* Card flying out to center: duration is set by HandRenderer config */
+    .card.card-flying-out {
+      pointer-events: none;
+    }
+
+    /* Drag arrow SVG: covers entire game-container, non-interactive */
+    #drag-arrow {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 50;
+      overflow: visible;
+    }
+
+    /* Target selection border */
+    #target-selector {
+      position: absolute;
+      border: 4px solid #0ff;
+      box-shadow: 0 0 14px 2px rgba(0,255,255,0.45);
+      border-radius: 4px;
+      pointer-events: none;
+      z-index: 55;
+      display: none;
+    }
+
+    /* Tooltip */
+    #card-tooltip {
+      position: absolute;
+      background: rgba(8, 12, 26, 0.97);
+      border: 1px solid #0df;
+      border-radius: 6px;
+      padding: 8px 10px;
+      width: 184px;
+      pointer-events: none;
+      z-index: 30;
+      display: none;
+      font-family: 'Rajdhani', system-ui, sans-serif;
+    }
+    #card-tooltip .tt-title { font-size: 13px; color: #0df; margin-bottom: 5px; font-weight: 700; }
+    #card-tooltip .tt-body  { font-size: 11px; color: #ccc; line-height: 1.4; text-transform: none; font-weight: 600; }
+
+    /* ---- UpgradeChoiceModule overlay CSS ---- */
+    #upgrade-overlay {
+      position: absolute; inset: 0; z-index: 40;
+      background: rgba(0,0,0,0.84);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .up-stage { text-align: center; }
+    .up-eyebrow  { font-family: 'Rajdhani', system-ui, sans-serif; font-size: 12px; color: #0df; letter-spacing: 0.2em; margin-bottom: 6px; text-transform: uppercase; }
+    .up-title    { font-family: 'Rajdhani', system-ui, sans-serif; font-size: 32px; color: #fff; margin-bottom: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+    .up-subtitle { font-family: 'Rajdhani', system-ui, sans-serif; font-size: 14px; color: #888; margin-bottom: 24px; text-transform: none; }
+    .up-cards    { display: flex; gap: 20px; justify-content: center; margin-bottom: 20px; }
+    .up-card {
+      width: 136px; padding: 16px 12px 12px;
+      background: #111827; border: 2px solid #333; border-radius: 8px;
+      cursor: pointer; color: #ddd;
+      transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+      position: relative; overflow: hidden;
+      font-family: 'Rajdhani', system-ui, sans-serif;
+      text-align: center;
+    }
+    .up-card:hover { transform: translateY(-7px); box-shadow: 0 0 16px rgba(0,220,255,0.55); border-color: #0df; }
+    .up-card[data-cat="offense"] .up-card-band { background: #c43; }
+    .up-card[data-cat="defense"] .up-card-band { background: #29a; }
+    .up-card[data-cat="utility"] .up-card-band { background: #84a; }
+    .up-card-band  { height: 5px; position: absolute; top: 0; left: 0; right: 0; }
+    .up-card-icon  { color: #888; margin: 10px 0 6px; }
+    .up-card-icon svg { width: 28px; height: 28px; }
+    .up-card-label { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .up-card-desc  { font-size: 11px; color: #aaa; line-height: 1.35; text-transform: none; }
+    .up-card-key   { margin-top: 10px; }
+    .up-card-key span {
+      display: inline-block; width: 22px; height: 22px; line-height: 22px;
+      border: 1px solid #555; border-radius: 4px; font-size: 13px; color: #888;
+    }
+    .up-footer { font-family: 'Rajdhani', system-ui, sans-serif; font-size: 12px; color: #555; text-transform: none; }
+    .up-footer kbd { border: 1px solid #444; border-radius: 3px; padding: 1px 5px; }
+    .up-card.is-active { border-color: #0df; box-shadow: 0 0 14px #0df; }
+
+    /* Skip button inside upgrade overlay */
+    .up-skip {
+      margin-top: 16px;
+      padding: 8px 28px;
+      background: transparent; border: 1px solid #444; border-radius: 6px;
+      color: #666; cursor: pointer;
+      font-family: 'Rajdhani', system-ui, sans-serif;
+      font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em;
+      transition: border-color 0.1s, color 0.1s;
+    }
+    .up-skip:hover { border-color: #888; color: #aaa; }
+  </style>
+  <!-- crossorigin="anonymous" lets the browser surface full stack traces from
+       Phaser instead of collapsing them into "Script error." (CORS rule for
+       cross-origin scripts). Without it, runtime errors thrown inside Phaser
+       are unobservable, which has caused multi-agent misdiagnosis. -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js" crossorigin="anonymous"></script>
+  <script>window.__APP_CONFIG__ = window.__APP_CONFIG__ || { appBasePath: '', apiBaseUrl: '' }</script>
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <script type="module">
+    // Keep engine boot unconditional.
+    // UI may gate gameplay, but must not bypass or replace boot.
+    const cfg = window.__APP_CONFIG__ || {}
+    const base = String(cfg.appBasePath || '').replace(/\/+$/, '')
+    const { boot } = await import(`${base}/engine/boot.js`)
+    boot(document.getElementById('game-container'))
+  </script>
+</body>
+</html>

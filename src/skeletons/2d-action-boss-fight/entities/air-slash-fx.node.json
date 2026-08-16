@@ -1,0 +1,44 @@
+{
+  "name": "AirSlashFx",
+  "script": "OneShotFx",
+  "tags": [
+    "fx",
+    "airSlashFx"
+  ],
+  "visual": {
+    "type": "atlas",
+    "texture": "fx_air_slash",
+    "frame": "air_slash_0",
+    "width": 86,
+    "height": 56,
+    "depth": 80
+  },
+  "config": {
+    "x": 0,
+    "y": 0,
+    "kind": "air_slash",
+    "lifetime": 0.2,
+    "maxLifetime": 1.5,
+    "alpha": 0.95
+  },
+  "animations": {
+    "default": "air_slash",
+    "clips": {
+      "air_slash": {
+        "source": {
+          "type": "atlas",
+          "texture": "fx_air_slash"
+        },
+        "frames": [
+          "air_slash_0",
+          "air_slash_1",
+          "air_slash_2",
+          "air_slash_3"
+        ],
+        "frameRate": 12,
+        "loop": false,
+        "onFinish": "hold"
+      }
+    }
+  }
+}

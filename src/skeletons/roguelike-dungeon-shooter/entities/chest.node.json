@@ -1,0 +1,9 @@
+{
+  "name": "Chest",
+  "script": "Chest",
+  "tags": ["chest"],
+  "visual": { "type": "atlas", "texture": "chest", "frame": "chest_closed", "width": 48, "height": 48 },
+  "config": {
+    "triggerRange": 48
+  }
+}

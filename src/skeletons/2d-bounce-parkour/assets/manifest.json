@@ -1,0 +1,56 @@
+{
+  "hero_idle": {
+    "type": "placeholder_atlas",
+    "frames": ["0","1","2","3"],
+    "pivot": [0.5, 0.5]
+  },
+  "hero_run": {
+    "type": "placeholder_atlas",
+    "frames": ["0","1","2","3"],
+    "pivot": [0.5, 0.5]
+  },
+  "hero_actions": {
+    "type": "placeholder_atlas",
+    "frames": ["bounce","dash","die","fall","jump"],
+    "pivot": [0.5, 0.5]
+  },
+  "balloons_idle": {
+    "type": "placeholder_atlas",
+    "frames": ["red","blue","gold"],
+    "pivot": [0.5, 0.5]
+  },
+  "balloons_pop": {
+    "type": "placeholder_atlas",
+    "frames": ["red_0","red_1","red_2","red_3","blue_0","blue_1","blue_2","blue_3","gold_0","gold_1","gold_2","gold_3"],
+    "pivot": [0.5, 0.5]
+  },
+  "clouds": {
+    "type": "placeholder_atlas",
+    "frames": ["a","b"]
+  },
+  "hills": {
+    "type": "placeholder_atlas",
+    "frames": ["back","front"]
+  },
+  "bg_sky": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#9ed2ff"
+  },
+  "confetti": {
+    "type": "placeholder_atlas",
+    "frames": ["blue_diamond","gold_star","green_triangle","orange_strip","pink_strip","purple_lozenge","red_square","white_dot"],
+    "pivot": [0.5, 0.5]
+  },
+  "platforms": {
+    "type": "placeholder_atlas",
+    "frames": ["goal","mid","start"],
+    "pivot": [0.5, 0.5]
+  },
+  "goal_flag": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#ffdd00",
+    "pivot": [0.5, 0.5]
+  }
+}

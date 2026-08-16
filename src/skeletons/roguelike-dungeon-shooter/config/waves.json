@@ -1,0 +1,25 @@
+{
+  "waves": [
+    { "wave": 1, "enemies": [{ "type": "slime", "count": 2 }] },
+    { "wave": 2, "enemies": [{ "type": "bat", "count": 1 }, { "type": "archer", "count": 1 }] },
+    { "wave": 3, "enemies": [{ "type": "bat", "count": 2 }, { "type": "ghost", "count": 1 }, { "type": "archer", "count": 1 }] }
+  ],
+  "boss": {
+    "type": "boss",
+    "hp": 8000,
+    "hpMultiplier": 1.0
+  },
+  "waveBreak": 1.5,
+  "spawnMargin": 60,
+  "crystalLayouts": [
+    {
+      "name": "single_corner_double",
+      "mode": "single_corner_double"
+    },
+    {
+      "name": "four_corners_single",
+      "mode": "four_corners_single"
+    }
+  ],
+  "upgradeAfterWave": true
+}

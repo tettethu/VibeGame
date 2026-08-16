@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vibegame://schema/scene.json",
+  "title": "VibeGame Scene",
+  "description": "Scene definition with a node tree hierarchy.",
+  "type": "object",
+  "required": ["name", "root"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Human-readable scene name."
+    },
+    "root": {
+      "$ref": "#/$defs/nodeDef",
+      "description": "Root node of the scene tree."
+    }
+  },
+  "$defs": {
+    "nodeDef": {
+      "type": "object",
+      "anyOf": [
+        { "required": ["name"] },
+        { "required": ["src"] }
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Node identifier within its siblings."
+        },
+        "id": {
+          "type": "string",
+          "description": "Explicit unique ID. Auto-generated if omitted."
+        },
+        "src": {
+          "type": "string",
+          "description": "Path to a .node.json file. Loads and merges definition (shallow config merge)."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Disabled nodes skip lifecycle calls."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "description": "Tags for findByTag() lookups."
+        },
+        "script": {
+          "type": "string",
+          "description": "Script class name (must match a registered script)."
+        },
+        "config": {
+          "$ref": "node.json#/$defs/configDef",
+          "description": "Key-value data passed to the script."
+        },
+        "visualTransform": {
+          "$ref": "node.json#/properties/visualTransform"
+        },
+        "visual": {
+          "$ref": "node.json#/$defs/visualDef",
+          "description": "Declarative visual: engine creates Phaser object before ready()."
+        },
+        "collider": {
+          "$ref": "node.json#/$defs/colliderDef",
+          "description": "Physics body configuration. Requires a gameObject (from visual or script)."
+        },
+        "animations": {
+          "$ref": "node.json#/$defs/animationsDef",
+          "description": "Animation clips played via AnimationPlayer."
+        },
+        "animator": {
+          "$ref": "node.json#/$defs/animatorDef",
+          "description": "Parameter-driven state machine layered on AnimationPlayer."
+        },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/nodeDef" },
+          "description": "Child node definitions."
+        }
+      }
+    }
+  }
+}

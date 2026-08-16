@@ -1,0 +1,36 @@
+{
+  "name": "BalloonGold",
+  "script": "Balloon",
+  "tags": ["balloon"],
+  "visual": { "type": "atlas", "texture": "balloons_idle", "frame": "gold", "width": 27, "height": 48 },
+  "collider": {
+    "shape": "circle",
+    "radius": 16,
+    "body": "dynamic",
+    "gravity": false,
+    "immovable": true
+  },
+  "animations": {
+    "clips": {
+      "pop": {
+        "source": { "type": "atlas", "texture": "balloons_pop" },
+        "frames": ["gold_0", "gold_1", "gold_2", "gold_3"],
+        "frameRate": 14,
+        "loop": false,
+        "onFinish": "hold"
+      }
+    }
+  },
+  "config": {
+    "floatPeriod": 1.7,
+    "amplitude": 12,
+    "breathPeriod": 1.3,
+    "breathAmount": 0.1,
+    "phase": 0,
+    "variantKey": "gold",
+    "bounceMultiplier": 1.3,
+    "displayWidth": 27,
+    "displayHeight": 48,
+    "popHideMs": 320
+  }
+}

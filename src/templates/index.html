@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vibegame</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    #game-container { position: relative; }
+    #game-container canvas { display: block; }
+  </style>
+  <!-- crossorigin="anonymous" lets the browser surface full stack traces from
+       Phaser instead of collapsing them into "Script error." (CORS rule for
+       cross-origin scripts). Without it, runtime errors thrown inside Phaser
+       are unobservable, which has caused multi-agent misdiagnosis. -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js" crossorigin="anonymous"></script>
+  <script>window.__APP_CONFIG__ = window.__APP_CONFIG__ || { appBasePath: '', apiBaseUrl: '' }</script>
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <script type="module">
+    // Keep engine boot unconditional.
+    // UI may gate gameplay, but must not bypass or replace boot.
+    const cfg = window.__APP_CONFIG__ || {}
+    const base = String(cfg.appBasePath || '').replace(/\/+$/, '')
+    const { boot } = await import(`${base}/engine/boot.js`)
+    boot(document.getElementById('game-container'))
+  </script>
+</body>
+</html>

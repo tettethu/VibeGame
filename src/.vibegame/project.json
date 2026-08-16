@@ -1,0 +1,17 @@
+{
+  "name": "{{project_name}}",
+  "version": "0.1.0",
+  "engine": "vibegame@0.1.0",
+  "settings": {
+    "width": 1280,
+    "height": 720,
+    "pixelArt": false,
+    "backgroundColor": "#000000",
+    "physics": {
+      "gravity": { "x": 0, "y": 0 },
+      "debug": false
+    }
+  },
+  "startScene": "scenes/main.scene.json",
+  "inputMap": "config/input-map.json"
+}

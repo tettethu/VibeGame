@@ -1,0 +1,58 @@
+{
+  "agents": {
+    "orchestrator": {
+      "cli": "claude",
+      "model": "opus[1m]"
+    },
+    "artist": {
+      "cli": "claude",
+      "model": "opus[1m]"
+    },
+    "designer": {
+      "cli": "claude",
+      "model": "opus[1m]"
+    },
+    "reviewer": {
+      "cli": "codex",
+      "model": "gpt-5.6-sol"
+    },
+    "architect": {
+      "cli": "claude",
+      "model": "opus[1m]"
+    },
+    "programmer": {
+      "cli": "claude",
+      "model": "opus[1m]"
+    },
+    "auditor": {
+      "cli": "codex",
+      "model": "gpt-5.6-sol"
+    },
+    "player": {
+      "cli": "codex",
+      "model": "gpt-5.6-sol"
+    }
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "role": "mate",
+        "type": "check",
+        "check": "agent-reported",
+        "enabled": true
+      },
+      {
+        "role": "lead",
+        "type": "check",
+        "check": "no-working-agents",
+        "enabled": true
+      },
+      {
+        "role": "lead",
+        "type": "check",
+        "check": "unread-messages",
+        "enabled": true
+      }
+    ]
+  }
+}

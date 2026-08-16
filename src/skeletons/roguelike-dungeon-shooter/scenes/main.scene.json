@@ -1,0 +1,22 @@
+{
+  "name": "Main",
+  "root": {
+    "name": "GameManager",
+    "script": "GameManager",
+    "tags": ["game_manager"],
+    "config": {},
+    "children": [
+      { "name": "DungeonMap", "script": "TileMap", "tags": ["tilemap"], "config": { "tileset": "dungeon_semantic" } },
+      { "name": "_PlayerTemplate", "script": "Player", "enabled": false },
+      { "name": "_SlimeTemplate", "script": "SlimeEnemy", "enabled": false },
+      { "name": "_BulletTemplate", "script": "Bullet", "enabled": false },
+      { "name": "_WeaponDropTemplate", "script": "WeaponDrop", "enabled": false },
+      { "name": "_WeaponVisualTemplate", "script": "WeaponVisual", "enabled": false },
+      { "name": "_BatTemplate", "script": "BatEnemy", "enabled": false },
+      { "name": "_GhostTemplate", "script": "GhostEnemy", "enabled": false },
+      { "name": "_SkeletonHandTemplate", "script": "SkeletonHandEnemy", "enabled": false },
+      { "name": "_ArcherTemplate", "script": "ArcherEnemy", "enabled": false },
+      { "name": "_MageTemplate", "script": "MageEnemy", "enabled": false }
+    ]
+  }
+}

@@ -1,0 +1,267 @@
+{
+  "name": "Main",
+  "root": {
+    "name": "Root",
+    "script": "ArenaManager",
+    "config": {
+      "arenaWidth": 1440,
+      "arenaHeight": 540,
+      "cameraWidth": 960,
+      "cameraHeight": 540,
+      "introDelay": 1.0,
+      "placeholderVisuals": false,
+      "outcomeOverlayDelayMs": {
+        "death": 350,
+        "victory": 500
+      },
+      "cameraFollowLerp": {
+        "x": 0.12,
+        "y": 0.08
+      },
+      "timeMsPerSecond": 1000
+    },
+    "children": [
+      {
+        "name": "Background",
+        "visual": {
+          "type": "image",
+          "texture": "arena_ruined_gothic",
+          "width": 1440,
+          "height": 540
+        },
+        "config": {
+          "x": 720,
+          "y": 270
+        }
+      },
+      {
+        "name": "Ground",
+        "script": "Collider",
+        "tags": [
+          "ground"
+        ],
+        "collider": {
+          "body": "static",
+          "width": 1440,
+          "height": 40
+        },
+        "config": {
+          "x": 720,
+          "y": 446
+        }
+      },
+      {
+        "name": "WallLeft",
+        "script": "Collider",
+        "tags": [
+          "wall"
+        ],
+        "collider": {
+          "body": "static",
+          "width": 20,
+          "height": 540
+        },
+        "config": {
+          "x": 35,
+          "y": 270
+        }
+      },
+      {
+        "name": "WallRight",
+        "script": "Collider",
+        "tags": [
+          "wall"
+        ],
+        "collider": {
+          "body": "static",
+          "width": 20,
+          "height": 540
+        },
+        "config": {
+          "x": 1405,
+          "y": 270
+        }
+      },
+      {
+        "src": "entities/player.node.json"
+      },
+      {
+        "src": "entities/boss.node.json"
+      },
+      {
+        "name": "PlayerHUD",
+        "script": "MaskHUDModule",
+        "tags": [
+          "hud",
+          "playerHpHud"
+        ],
+        "config": {
+          "iconKey": "ui_mask_icon",
+          "slotCount": 5,
+          "size": 36,
+          "gap": 6,
+          "anchorX": 0.01875,
+          "anchorY": 0.0296296296,
+          "depth": 120,
+          "dimAlpha": 0.22
+        }
+      },
+      {
+        "name": "BossHP",
+        "script": "StatusBarModule",
+        "tags": [
+          "hud",
+          "bossHpBar"
+        ],
+        "config": {
+          "slot": "ui_boss_hp_slot",
+          "bar": "ui_boss_hp_bar",
+          "slotSize": {
+            "width": 320,
+            "height": 40
+          },
+          "bbox": {
+            "x": 12,
+            "y": 2,
+            "w": 296,
+            "h": 36
+          },
+          "x": 480,
+          "y": 491,
+          "scale": 1,
+          "depth": 120,
+          "leftRate": 1,
+          "scrollFactor": 0,
+          "icon": "ui_boss_hp_icon",
+          "label": {
+              "text": "Boss",
+            "textTransform": "uppercase",
+            "offsetX": 0,
+            "offsetY": -28,
+            "originX": 0.5,
+            "originY": 0.5,
+            "fontFamily": "Georgia, serif",
+            "fontSize": 14,
+            "letterSpacing": 2,
+            "color": "#dff7ff",
+            "align": "center",
+            "pointerEvents": "none",
+            "zIndex": 8,
+            "whiteSpace": "nowrap",
+            "shadows": [
+              {
+                "offsetX": 0,
+                "offsetY": 0,
+                "color": "rgba(210,245,255,0.55)",
+                "blur": 8
+              },
+              {
+                "offsetX": 0,
+                "offsetY": 2,
+                "color": "rgba(0,0,0,0.9)",
+                "blur": 4
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "Overlay",
+        "script": "GameOverlayModule",
+        "tags": [
+          "overlay"
+        ],
+        "config": {
+          "menus": [
+            {
+              "id": "pause",
+              "title": "PAUSED",
+              "subtitle": "Boss waits.",
+              "pausesGame": true,
+              "toggleKey": "Escape",
+              "buttons": [
+                {
+                  "label": "Resume",
+                  "action": "resume"
+                },
+                {
+                  "label": "Restart",
+                  "action": "restart"
+                },
+                {
+                  "label": "Quit",
+                  "action": "quit"
+                }
+              ]
+            },
+            {
+              "id": "death",
+              "title": "YOU DIED",
+              "subtitle": "Read the tell. Try again.",
+              "pausesGame": true,
+              "buttons": [
+                {
+                  "label": "Restart",
+                  "action": "restart"
+                },
+                {
+                  "label": "Quit",
+                  "action": "quit"
+                }
+              ]
+            },
+            {
+              "id": "victory",
+              "title": "VICTORY",
+              "subtitle": "The Boss falls.",
+              "pausesGame": true,
+              "buttons": [
+                {
+                  "label": "Restart",
+                  "action": "restart"
+                },
+                {
+                  "label": "Quit",
+                  "action": "quit"
+                }
+              ]
+            }
+          ],
+          "style": {
+            "fontFamily": "'Cinzel', serif",
+            "titleColor": "#e8f8ff",
+            "subtitleColor": "#9fc6d8",
+            "panelWidth": 300,
+            "panelHeight": 480,
+            "hurtFlashColor": "rgba(220,40,54,0.35)"
+          }
+        }
+      },
+      {
+        "name": "_ThornBoltTemplate",
+        "src": "entities/thorn-bolt.node.json",
+        "enabled": false
+      },
+      {
+        "name": "_OneShotFxTemplate",
+        "src": "entities/one-shot-fx.node.json",
+        "enabled": false
+      },
+      {
+        "name": "_NormalSlashFxTemplate",
+        "src": "entities/normal-slash-fx.node.json",
+        "enabled": false
+      },
+      {
+        "name": "_AirSlashFxTemplate",
+        "src": "entities/air-slash-fx.node.json",
+        "enabled": false
+      },
+      {
+        "name": "_ChargedSlashFxTemplate",
+        "src": "entities/charged-slash-fx.node.json",
+        "enabled": false
+      }
+    ]
+  }
+}

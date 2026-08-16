@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vibegame://schema/project.json",
+  "title": "VIbeGame Project",
+  "description": "Top-level project configuration for a vibegame game.",
+  "type": "object",
+  "required": ["name", "version", "engine", "settings", "startScene"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Display name of the game."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version (e.g. 1.0.0)."
+    },
+    "engine": {
+      "type": "string",
+      "pattern": "^vibegame@",
+      "description": "Engine identifier (e.g. vibegame@0.1.0)."
+    },
+    "settings": {
+      "type": "object",
+      "required": ["width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Canvas width in pixels."
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Canvas height in pixels."
+        },
+        "scaleMode": {
+          "type": "string",
+          "enum": ["NONE", "FIT", "RESIZE", "ENVELOP", "WIDTH_CONTROLS_HEIGHT", "HEIGHT_CONTROLS_WIDTH"],
+          "default": "FIT",
+          "description": "Phaser scale mode."
+        },
+        "pixelArt": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable nearest-neighbor scaling for pixel art."
+        },
+        "transparent": {
+          "type": "boolean",
+          "default": false,
+          "description": "Transparent canvas background."
+        },
+        "backgroundColor": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "default": "#000000",
+          "description": "Background color as CSS hex."
+        },
+        "physics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "gravity": {
+              "type": "object",
+              "required": ["x", "y"],
+              "additionalProperties": false,
+              "properties": {
+                "x": { "type": "number" },
+                "y": { "type": "number" }
+              },
+              "description": "World gravity in px/s^2."
+            },
+            "debug": {
+              "type": "boolean",
+              "default": false,
+              "description": "Show physics debug overlay."
+            }
+          }
+        }
+      }
+    },
+    "startScene": {
+      "type": "string",
+      "description": "Relative path to the initial scene JSON file."
+    },
+    "manifests": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Manifest paths to load and merge. Defaults to [\"assets/manifest.json\"]."
+    },
+    "inputMap": {
+      "type": "string",
+      "description": "Relative path to the input-map.json file."
+    },
+    "runtimeDefaults": {
+      "type": "object",
+      "description": "Environment-specific runtime defaults injected into the page at serve time.",
+      "additionalProperties": false,
+      "properties": {
+        "dev": {
+          "type": "object",
+          "description": "Defaults for local development (vibegame run).",
+          "additionalProperties": false,
+          "properties": {
+            "appBasePath": {
+              "type": "string",
+              "default": "",
+              "description": "URL path prefix for sub-path dev serving."
+            },
+            "apiBaseUrl": {
+              "type": "string",
+              "default": "",
+              "description": "Base URL for business API (e.g. http://127.0.0.1:3001)."
+            }
+          }
+        },
+        "deploy": {
+          "type": "object",
+          "description": "Defaults for production deployment.",
+          "additionalProperties": false,
+          "properties": {
+            "appBasePath": {
+              "type": "string",
+              "default": "",
+              "description": "URL path prefix for sub-path deployment."
+            },
+            "apiBaseUrl": {
+              "type": "string",
+              "default": "",
+              "description": "Base URL for business API in production."
+            }
+          }
+        }
+      }
+    },
+    "releaseExtraRoots": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Additional file/directory roots to include in release branch (beyond default vibegame runtime roots). E.g. [\"server/package.json\", \"server/src/\"]"
+    }
+  }
+}

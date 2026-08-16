@@ -1,0 +1,30 @@
+{
+  "name": "Hero",
+  "script": "Hero",
+  "tags": ["player"],
+  "visual": { "type": "atlas", "texture": "hero_idle", "frame": "0", "width": 32, "height": 56 },
+  "collider": { "body": "dynamic", "host": "separate", "gravity": true },
+  "animations": {
+    "clips": {
+      "idle":   { "source": { "type": "atlas", "texture": "hero_idle" },    "frames": ["0","1","2","3"], "frameRate": 8 },
+      "run":    { "source": { "type": "atlas", "texture": "hero_run"  },    "frames": ["0","1","2","3"], "frameRate": 12 },
+      "jump":   { "source": { "type": "atlas", "texture": "hero_actions" }, "frames": ["jump"],   "frameRate": 1, "loop": false, "onFinish": "hold" },
+      "fall":   { "source": { "type": "atlas", "texture": "hero_actions" }, "frames": ["fall"],   "frameRate": 1, "loop": false, "onFinish": "hold" },
+      "dash":   { "source": { "type": "atlas", "texture": "hero_actions" }, "frames": ["dash"],   "frameRate": 1, "loop": false, "onFinish": "hold" },
+      "bounce": { "source": { "type": "atlas", "texture": "hero_actions" }, "frames": ["bounce"], "frameRate": 1, "loop": false, "onFinish": "hold" }
+    }
+  },
+  "config": {
+    "speed": 200,
+    "jumpForce": 400,
+    "bounceForce": 640,
+    "dashSpeed": 1000,
+    "dashDuration": 0.2,
+    "deathY": 620,
+    "stompAllowance": 12,
+    "stompShakeMs": 80,
+    "stompShakeAmount": 0.003,
+    "stompZoomScale": 1.05,
+    "stompZoomMs": 50
+  }
+}

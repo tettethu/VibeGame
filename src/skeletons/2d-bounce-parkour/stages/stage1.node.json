@@ -1,0 +1,25 @@
+{
+  "name": "Stage1",
+  "tags": ["stage"],
+  "config": {
+    "spawnX": 120,
+    "spawnY": 380,
+    "levelWidth": 2880
+  },
+  "children": [
+    { "src": "entities/start-platform.node.json", "name": "StartPlatform", "config": { "x": 120, "y": 440 } },
+    { "src": "entities/balloon-red.node.json", "name": "Balloon01", "config": { "x": 300,  "y": 360, "phase": 0.0 } },
+    { "src": "entities/balloon-red.node.json", "name": "Balloon02", "config": { "x": 540,  "y": 340, "phase": 0.4 } },
+    { "src": "entities/balloon-red.node.json", "name": "Balloon03", "config": { "x": 780,  "y": 370, "phase": 0.8 } },
+    { "src": "entities/balloon-red.node.json", "name": "Balloon04", "config": { "x": 1020, "y": 350, "phase": 1.2 } },
+    { "src": "entities/balloon-red.node.json", "name": "Balloon05", "config": { "x": 1260, "y": 360, "phase": 1.6 } },
+    { "src": "entities/balloon-red.node.json", "name": "Balloon06", "config": { "x": 1500, "y": 340, "phase": 0.2 } },
+    { "src": "entities/balloon-red.node.json", "name": "Balloon07", "config": { "x": 1740, "y": 370, "phase": 0.6 } },
+    { "src": "entities/balloon-red.node.json", "name": "Balloon08", "config": { "x": 1980, "y": 350, "phase": 1.0 } },
+    { "src": "entities/balloon-red.node.json", "name": "Balloon09", "config": { "x": 2220, "y": 360, "phase": 1.4 } },
+    { "src": "entities/balloon-red.node.json", "name": "Balloon10", "config": { "x": 2460, "y": 340, "phase": 1.8 } },
+    { "src": "entities/goal-platform.node.json", "name": "GoalPlatform", "config": { "x": 2700, "y": 440 } },
+    { "src": "entities/goal-flag.node.json",     "name": "GoalFlag",     "config": { "x": 2700, "y": 372 } },
+    { "src": "entities/hero.node.json", "name": "Hero", "config": { "x": 120, "y": 380 } }
+  ]
+}

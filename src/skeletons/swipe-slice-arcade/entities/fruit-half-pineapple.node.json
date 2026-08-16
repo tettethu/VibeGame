@@ -1,0 +1,32 @@
+{
+  "name": "FruitHalf",
+  "script": "FruitHalf",
+  "tags": [
+    "fruitHalf"
+  ],
+  "visual": {
+    "type": "image",
+    "texture": "fruit_pineapple_left",
+    "width": 62,
+    "height": 62
+  },
+  "collider": {
+    "body": "dynamic",
+    "shape": "circle",
+    "radius": 13.02,
+    "gravity": true
+  },
+  "config": {
+    "fruitType": "pineapple",
+    "side": "left",
+    "velocityX": 0,
+    "velocityY": -120,
+    "spin": 3,
+    "weight": 1.25,
+    "cleanupMargin": 140,
+    "texture": "fruit_pineapple_left",
+    "depth": 90,
+    "tiltAngle": 0.22,
+    "ttl": 2.5
+  }
+}

@@ -1,0 +1,364 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vibegame://schema/node.json",
+  "title": "VibeGame Node",
+  "description": "Reusable node definition (.node.json). Same shape as a single node in a scene, can be referenced via the src field.",
+  "type": "object",
+  "anyOf": [
+    { "required": ["name"] },
+    { "required": ["src"] }
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "src": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path to a .node.json template. The engine resolves it and merges name/tags/enabled/config overrides on top."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Node identifier within its siblings."
+    },
+    "id": {
+      "type": "string",
+      "description": "Explicit unique ID. Auto-generated if omitted."
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Disabled nodes skip lifecycle calls."
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true,
+      "description": "Tags for findByTag() lookups."
+    },
+    "script": {
+      "type": "string",
+      "description": "Script class name (must match a registered script)."
+    },
+    "config": {
+      "$ref": "#/$defs/configDef",
+      "description": "Key-value data passed to the script. x/y used for position."
+    },
+    "visualTransform": {
+      "type": "object",
+      "description": "Visual-only offset applied to the rendered object, leaving transform and collider untouched.",
+      "properties": {
+        "offsetX": { "type": "number", "default": 0 },
+        "offsetY": { "type": "number", "default": 0 }
+      },
+      "additionalProperties": false
+    },
+    "visual": {
+      "$ref": "#/$defs/visualDef",
+      "description": "Declarative visual: engine creates Phaser object before ready()."
+    },
+    "collider": {
+      "$ref": "#/$defs/colliderDef",
+      "description": "Physics body configuration. Requires a gameObject (from visual or script)."
+    },
+    "animations": {
+      "$ref": "#/$defs/animationsDef",
+      "description": "Animation clips played via AnimationPlayer."
+    },
+    "animator": {
+      "$ref": "#/$defs/animatorDef",
+      "description": "Parameter-driven state machine layered on AnimationPlayer."
+    },
+    "children": {
+      "type": "array",
+      "items": { "$ref": "#" },
+      "description": "Child node definitions."
+    }
+  },
+  "$defs": {
+    "configDef": {
+      "type": "object",
+      "description": "Arbitrary key-value config. Engine reads x/y for position.",
+      "properties": {
+        "x": { "type": "number", "description": "World X position." },
+        "y": { "type": "number", "description": "World Y position." },
+        "flipWithParent": {
+          "type": "boolean",
+          "default": false,
+          "description": "Mirror local X, collider offsetX, and visual flipX with the direct parent."
+        }
+      }
+    },
+    "visualDef": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["rect", "image", "spritesheet", "atlas"],
+          "description": "Visual type."
+        },
+        "texture": {
+          "type": "string",
+          "description": "Manifest texture key. Required for image/spritesheet/atlas."
+        },
+        "width": { "type": "number", "description": "Display width in pixels." },
+        "height": { "type": "number", "description": "Display height in pixels." },
+        "color": {
+          "description": "Fill color for rect type. Integer or hex string.",
+          "oneOf": [
+            { "type": "integer" },
+            { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" }
+          ]
+        },
+        "frame": {
+          "oneOf": [{ "type": "integer" }, { "type": "string" }],
+          "description": "Starting frame: index for a spritesheet, frame name for an atlas."
+        },
+        "animations": {
+          "type": "object",
+          "description": "Inline Phaser animations (legacy, prefer top-level animations).",
+          "additionalProperties": {
+            "$ref": "#/$defs/inlineAnimDef"
+          }
+        }
+      }
+    },
+    "inlineAnimDef": {
+      "type": "object",
+      "properties": {
+        "frames": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "description": "Frame indices."
+        },
+        "frameRate": {
+          "type": "number",
+          "default": 10
+        },
+        "loop": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "colliderDef": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "string",
+          "enum": ["dynamic", "static"],
+          "default": "dynamic",
+          "description": "Physics body type."
+        },
+        "shape": {
+          "type": "string",
+          "enum": ["box", "circle"],
+          "default": "box",
+          "description": "Collision shape."
+        },
+        "width": { "type": "number", "description": "Box width." },
+        "height": { "type": "number", "description": "Box height." },
+        "radius": { "type": "number", "description": "Circle radius (shape=circle)." },
+        "offsetX": { "type": "number", "description": "Body X offset from origin." },
+        "offsetY": { "type": "number", "description": "Body Y offset from origin." },
+        "gravity": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether gravity applies (dynamic only)."
+        },
+        "immovable": {
+          "type": "boolean",
+          "default": false,
+          "description": "Prevent being pushed by collisions (dynamic only)."
+        },
+        "worldBounds": {
+          "type": "boolean",
+          "default": false,
+          "description": "Collide with world bounds."
+        },
+        "bounce": {
+          "description": "Bounce coefficient.",
+          "oneOf": [
+            { "type": "number" },
+            {
+              "type": "object",
+              "properties": {
+                "x": { "type": "number" },
+                "y": { "type": "number" }
+              }
+            }
+          ]
+        },
+        "oneWay": {
+          "type": "boolean",
+          "default": false,
+          "description": "One-way platform: only blocks from above."
+        }
+      }
+    },
+    "animationsDef": {
+      "type": "object",
+      "required": ["clips"],
+      "properties": {
+        "default": {
+          "type": "string",
+          "description": "Clip name to play on init."
+        },
+        "clips": {
+          "type": "object",
+          "description": "Named animation clips.",
+          "additionalProperties": {
+            "$ref": "#/$defs/clipDef"
+          }
+        }
+      }
+    },
+    "clipDef": {
+      "type": "object",
+      "required": ["frames"],
+      "properties": {
+        "frames": {
+          "type": "array",
+          "description": "Frame indices, texture names, or per-frame objects carrying a visual offset.",
+          "items": {
+            "oneOf": [
+              { "type": "integer" },
+              { "type": "string" },
+              {
+                "type": "object",
+                "required": ["frame"],
+                "properties": {
+                  "frame": {
+                    "oneOf": [{ "type": "integer" }, { "type": "string" }],
+                    "description": "Frame index or texture name."
+                  },
+                  "offset": {
+                    "type": "array",
+                    "items": { "type": "number" },
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "description": "Visual-only [x, y] shift for this frame occurrence. Requires collider.host \"separate\" when the node has a collider."
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "duration": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Total clip length in seconds, split evenly across frames. Wins over frameRate when both are set."
+        },
+        "frameDurations": {
+          "type": "array",
+          "items": { "type": "number", "exclusiveMinimum": 0 },
+          "description": "Per-frame duration in milliseconds, indexed alongside frames. Wins over duration and frameRate."
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["image", "spritesheet", "atlas"],
+              "description": "Source texture type."
+            },
+            "texture": {
+              "type": "string",
+              "description": "Manifest texture key."
+            }
+          }
+        },
+        "frameRate": {
+          "type": "number",
+          "default": 10,
+          "description": "Frames per second."
+        },
+        "loop": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether the clip loops."
+        },
+        "onFinish": {
+          "type": "string",
+          "enum": ["hold", "first"],
+          "description": "Which frame to hold when a non-looping clip ends."
+        }
+      }
+    },
+    "animatorDef": {
+      "type": "object",
+      "required": ["states"],
+      "properties": {
+        "parameters": {
+          "type": "object",
+          "description": "Parameter name -> type ('bool' or 'trigger').",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["bool", "trigger"]
+          }
+        },
+        "defaultState": {
+          "type": "string",
+          "description": "Initial state name."
+        },
+        "states": {
+          "type": "object",
+          "description": "State name -> state definition.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "clip": {
+                "type": "string",
+                "description": "Animation clip to play in this state."
+              }
+            }
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "description": "Ordered transition rules.",
+          "items": {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": {
+              "from": {
+                "type": "string",
+                "description": "Source state name, or 'Any'."
+              },
+              "to": {
+                "type": "string",
+                "description": "Target state name."
+              },
+              "hasExitTime": {
+                "type": "boolean",
+                "default": false,
+                "description": "Wait for current clip to finish before transitioning."
+              },
+              "when": {
+                "type": "array",
+                "description": "Condition list. All must match.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "param": {
+                      "type": "string",
+                      "description": "Parameter name to check."
+                    },
+                    "eq": {
+                      "description": "Value to match."
+                    },
+                    "trigger": {
+                      "type": "string",
+                      "description": "Trigger name (consumed on transition)."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

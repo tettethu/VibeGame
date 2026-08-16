@@ -1,0 +1,26 @@
+{
+  "name": "SliceVfx",
+  "script": "TimedImageVfxModule",
+  "tags": [
+    "vfx",
+    "sliceVfx"
+  ],
+  "visual": {
+    "type": "image",
+    "texture": "vfx_juice_red_burst_round",
+    "width": 72,
+    "height": 64
+  },
+  "config": {
+    "kind": "slice",
+    "texture": "vfx_juice_red_burst_round",
+    "ttl": 0.55,
+    "depth": 94,
+    "alphaStart": 0.95,
+    "alphaEnd": 0,
+    "scaleStart": 0.72,
+    "scaleEnd": 1.05,
+    "velocityX": 0,
+    "velocityY": 0
+  }
+}

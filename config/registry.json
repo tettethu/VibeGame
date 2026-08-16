@@ -1,0 +1,330 @@
+{
+    "_comment": "Registry of all files installed by 'vibegame init'. onConflict: skip (auto-skip if exists), ask (prompt user).",
+
+    "agents": {
+        "type": "dir",
+        "moveTo": ".claude/agents",
+        "onConflict": "ask",
+        "content": [
+            { "file": "architect.md" },
+            { "file": "artist.md" },
+            { "file": "auditor.md" },
+            { "file": "designer.md" },
+            { "file": "player.md" },
+            { "file": "programmer.md" },
+            { "file": "reviewer.md" }
+        ]
+    },
+    "skills/vibegame-build": {
+        "type": "dir",
+        "moveTo": ".claude/skills/vibegame-build",
+        "onConflict": "ask",
+        "content": [{ "file": "SKILL.md" }]
+    },
+    "skills/vibegame-start": {
+        "type": "dir",
+        "moveTo": ".claude/skills/vibegame-start",
+        "onConflict": "ask",
+        "content": [{ "file": "SKILL.md" }]
+    },
+    "skills/vibegame-edit": {
+        "type": "dir",
+        "moveTo": ".claude/skills/vibegame-edit",
+        "onConflict": "ask",
+        "content": [{ "file": "SKILL.md" }]
+    },
+    "skills/self-evolve": {
+        "type": "dir",
+        "moveTo": ".claude/skills/self-evolve",
+        "onConflict": "ask",
+        "content": [{ "file": "SKILL.md" }]
+    },
+    "skills/artist-self-evolve": {
+        "type": "dir",
+        "moveTo": ".claude/skills/artist-self-evolve",
+        "onConflict": "ask",
+        "content": [{ "file": "SKILL.md" }]
+    },
+    "_codex/skills/vibegame-build": {
+        "src": "skills/vibegame-build",
+        "type": "dir",
+        "moveTo": ".codex/skills/vibegame-build",
+        "onConflict": "ask",
+        "content": [{ "file": "SKILL.md" }]
+    },
+    "_codex/skills/vibegame-start": {
+        "src": "skills/vibegame-start",
+        "type": "dir",
+        "moveTo": ".codex/skills/vibegame-start",
+        "onConflict": "ask",
+        "content": [{ "file": "SKILL.md" }]
+    },
+    "_codex/skills/vibegame-edit": {
+        "src": "skills/vibegame-edit",
+        "type": "dir",
+        "moveTo": ".codex/skills/vibegame-edit",
+        "onConflict": "ask",
+        "content": [{ "file": "SKILL.md" }]
+    },
+    "_codex/skills/self-evolve": {
+        "src": "skills/self-evolve",
+        "type": "dir",
+        "moveTo": ".codex/skills/self-evolve",
+        "onConflict": "ask",
+        "content": [{ "file": "SKILL.md" }]
+    },
+    "_codex/skills/artist-self-evolve": {
+        "src": "skills/artist-self-evolve",
+        "type": "dir",
+        "moveTo": ".codex/skills/artist-self-evolve",
+        "onConflict": "ask",
+        "content": [{ "file": "SKILL.md" }]
+    },
+    ".vibegame/hooks": {
+        "type": "dir",
+        "moveTo": ".vibegame/hooks",
+        "onConflict": "ask",
+        "content": [
+            { "file": "session-start.py" },
+            { "file": "user-prompt-submit.py" },
+            { "file": "goal-capture.py" },
+            { "file": "enforce-team-setup.py" },
+            { "file": "enforce-team-mode.py" },
+            { "file": "agent-team-stop.py" },
+            { "file": "teammate-message-touch.py" },
+            { "file": "web_hook.py" },
+            { "file": "status_line.py" }
+        ]
+    },
+    "_context_config": {
+        "src": "../config/context.json",
+        "type": "file",
+        "moveTo": ".vibegame/config/context.json",
+        "onConflict": "ask",
+        "hasTemplate": false
+    },
+    ".codex/config.toml": {
+        "type": "file",
+        "moveTo": ".codex/config.toml",
+        "onConflict": "ask",
+        "hasTemplate": true
+    },
+    ".claude/settings.json": {
+        "type": "file",
+        "moveTo": ".claude/settings.json",
+        "onConflict": "ask"
+    },
+    "CLAUDE.md": {
+        "type": "file",
+        "moveTo": "CLAUDE.md",
+        "onConflict": "ask",
+        "hasTemplate": true
+    },
+    "_codex/AGENTS.md": {
+        "src": "CLAUDE.md",
+        "type": "file",
+        "moveTo": "AGENTS.md",
+        "onConflict": "ask",
+        "hasTemplate": true
+    },
+
+    ".vibegame/spec/design": {
+        "type": "dir",
+        "moveTo": ".vibegame/spec/design",
+        "onConflict": "ask",
+        "content": [
+            { "file": "index.md" },
+            { "file": "theories/core-frameworks.md" },
+            { "file": "theories/player-motivation.md" },
+            { "file": "theories/mechanism-design.md" },
+            { "file": "theories/challenge-design.md" },
+            { "file": "theories/feedback-loops.md" },
+            { "file": "theories/game-fairness.md" },
+            { "file": "theories/player-types.md" },
+            { "file": "theories/player-personality.md" },
+            { "file": "theories/game-theory.md" },
+            { "file": "theories/multiplayer-design.md" },
+            { "file": "theories/social-systems.md" },
+            { "file": "theories/information-design.md" },
+            { "file": "theories/hidden-narrative.md" },
+            { "file": "theories/design-process.md" },
+            { "file": "theories/business-models.md" },
+            { "file": "patterns/ui-conventions.md" },
+            { "file": "patterns/boss-design.md" }
+        ]
+    },
+
+    ".vibegame/project.json": {
+        "type": "file",
+        "moveTo": "project.json",
+        "onConflict": "skip",
+        "hasTemplate": true
+    },
+    "templates/index.html": {
+        "type": "file",
+        "moveTo": "index.html",
+        "onConflict": "skip"
+    },
+    "templates/scenes/main.scene.json": {
+        "type": "file",
+        "moveTo": "scenes/main.scene.json",
+        "onConflict": "skip"
+    },
+    "templates/config/input-map.json": {
+        "type": "file",
+        "moveTo": "config/input-map.json",
+        "onConflict": "skip"
+    },
+    ".vibegame/assets.md": {
+        "type": "file",
+        "moveTo": ".vibegame/assets.md",
+        "onConflict": "skip"
+    },
+    ".vibegame/design.jsonl": {
+        "type": "file",
+        "moveTo": ".vibegame/design.jsonl",
+        "onConflict": "skip"
+    },
+    ".vibegame/GDD.md": {
+        "type": "file",
+        "moveTo": ".vibegame/GDD.md",
+        "onConflict": "skip"
+    },
+    ".vibegame/global.json": {
+        "type": "file",
+        "moveTo": ".vibegame/global.json",
+        "onConflict": "skip",
+        "hasTemplate": true
+    },
+    ".vibegame/goal.md": {
+        "type": "file",
+        "moveTo": ".vibegame/goal.md",
+        "onConflict": "skip"
+    },
+    ".vibegame/settings.json": {
+        "type": "file",
+        "moveTo": ".vibegame/settings.json",
+        "onConflict": "skip"
+    },
+    ".vibegame/orchestrator.md": {
+        "type": "file",
+        "moveTo": ".vibegame/orchestrator.md",
+        "onConflict": "ask"
+    },
+    ".vibegame/play.md": {
+        "type": "file",
+        "moveTo": ".vibegame/play.md",
+        "onConflict": "skip"
+    },
+
+    ".vibegame/team": {
+        "type": "dir",
+        "moveTo": ".vibegame/team",
+        "onConflict": "ask",
+        "content": [
+            { "file": "__init__.py" },
+            { "file": "context_config.py" },
+            { "file": "hook_identity.py" },
+            { "file": "launch.py" },
+            { "file": "logger.py" },
+            { "file": "locks.py" },
+            { "file": "messages.py" },
+            { "file": "paths.py" },
+            { "file": "settings.py" },
+            { "file": "state.py" },
+            { "file": "tmux.py" },
+            { "file": "models.json", "onConflict": "ask" }
+        ]
+    },
+    ".vibegame/schema": {
+        "type": "dir",
+        "moveTo": ".vibegame/schema",
+        "onConflict": "ask",
+        "content": [
+            { "file": "project.schema.json" },
+            { "file": "scene.schema.json" },
+            { "file": "node.schema.json" },
+            { "file": "tilemap.schema.json" },
+            { "file": "input-map.schema.json" },
+            { "file": "manifest.schema.json" }
+        ]
+    },
+    ".vibegame/.gitignore": {
+        "type": "file",
+        "moveTo": ".vibegame/.gitignore",
+        "onConflict": "ask"
+    },
+
+    ".vibegame/spec/cli": {
+        "type": "dir",
+        "moveTo": ".vibegame/spec/cli",
+        "onConflict": "ask",
+        "content": [
+            { "file": "evolve.md" },
+            { "file": "release.md" },
+            { "file": "vlm.md" }
+        ]
+    },
+    ".vibegame/spec/engine": {
+        "type": "dir",
+        "moveTo": ".vibegame/spec/engine",
+        "onConflict": "ask",
+        "scan": "*.md"
+    },
+    ".vibegame/spec/contracts": {
+        "type": "dir",
+        "moveTo": ".vibegame/spec/contracts",
+        "onConflict": "ask",
+        "scan": "*.md"
+    },
+    "modules": {
+        "type": "dir",
+        "moveTo": "modules",
+        "onConflict": "ask",
+        "scan": ["*.js", "*.md", "check/*.check.py"]
+    },
+    "skeletons": {
+        "type": "dir",
+        "moveTo": "skeletons",
+        "onConflict": "ask",
+        "scan": [
+            "**/*.md",
+            "**/*.json",
+            "**/*.js",
+            "**/*.html",
+            "**/*.css",
+            "**/art-pack-assets/*.png",
+            "**/art-pack-assets/*.jpg",
+            "**/art-pack-assets/*.jpeg",
+            "**/art-pack-assets/*.webp"
+        ]
+    },
+    ".vibegame/spec/art": {
+        "type": "dir",
+        "moveTo": ".vibegame/spec/art",
+        "onConflict": "ask",
+        "scan": "*.md"
+    },
+    ".vibegame/spec/index.md": {
+        "type": "file",
+        "moveTo": ".vibegame/spec/index.md",
+        "onConflict": "ask"
+    },
+    ".vibegame/spec/systems": {
+        "type": "dir",
+        "moveTo": ".vibegame/spec/systems",
+        "onConflict": "ask",
+        "content": [
+            { "file": "basic.md" },
+            { "file": "state-machine.md" }
+        ]
+    },
+    ".vibegame/spec/test": {
+        "type": "dir",
+        "moveTo": ".vibegame/spec/test",
+        "onConflict": "ask",
+        "content": [
+            { "file": "index.md" }
+        ]
+    }
+}

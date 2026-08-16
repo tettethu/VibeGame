@@ -1,0 +1,162 @@
+{
+  "name": "Enemy",
+  "script": "EnemyCharacter",
+  "tags": [
+    "enemy"
+  ],
+  "visual": {
+    "type": "atlas",
+    "texture": "smasher_idle",
+    "width": 155,
+    "height": 220,
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "animations": {
+    "default": "idle",
+    "clips": {
+      "idle": {
+        "frames": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "duration": 0.8,
+        "loop": true
+      },
+      "taunt": {
+        "frames": [
+          "0",
+          "1",
+          "2"
+        ],
+        "duration": 0.28,
+        "loop": false,
+        "onFinish": "hold",
+        "source": {
+          "texture": "smasher_taunt",
+          "type": "atlas"
+        }
+      },
+      "attack": {
+        "frames": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "duration": 0.42,
+        "loop": false,
+        "onFinish": "hold",
+        "source": {
+          "texture": "smasher_attack",
+          "type": "atlas"
+        }
+      },
+      "die": {
+        "frames": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "duration": 0.4,
+        "loop": false,
+        "onFinish": "hold",
+        "source": {
+          "texture": "smasher_die",
+          "type": "atlas"
+        }
+      }
+    }
+  },
+  "animator": {
+    "defaultState": "idle",
+    "parameters": {
+      "tauntTrigger": "trigger",
+      "tauntDoneTrigger": "trigger",
+      "attackTrigger": "trigger",
+      "attackDoneTrigger": "trigger",
+      "dieTrigger": "trigger"
+    },
+    "states": {
+      "idle": {
+        "clip": "idle"
+      },
+      "taunt": {
+        "clip": "taunt"
+      },
+      "attack": {
+        "clip": "attack"
+      },
+      "die": {
+        "clip": "die"
+      }
+    },
+    "transitions": [
+      {
+        "from": "idle",
+        "to": "taunt",
+        "when": [
+          {
+            "trigger": "tauntTrigger"
+          }
+        ]
+      },
+      {
+        "from": "taunt",
+        "to": "idle",
+        "when": [
+          {
+            "trigger": "tauntDoneTrigger"
+          }
+        ]
+      },
+      {
+        "from": "taunt",
+        "to": "idle",
+        "hasExitTime": true
+      },
+      {
+        "from": "idle",
+        "to": "attack",
+        "when": [
+          {
+            "trigger": "attackTrigger"
+          }
+        ]
+      },
+      {
+        "from": "attack",
+        "to": "idle",
+        "when": [
+          {
+            "trigger": "attackDoneTrigger"
+          }
+        ]
+      },
+      {
+        "from": "attack",
+        "to": "idle",
+        "hasExitTime": true
+      },
+      {
+        "from": "Any",
+        "to": "die",
+        "when": [
+          {
+            "trigger": "dieTrigger"
+          }
+        ]
+      }
+    ]
+  },
+  "config": {
+    "x": 720,
+    "y": 500
+  }
+}

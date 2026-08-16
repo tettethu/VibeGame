@@ -18,7 +18,7 @@
     &nbsp;·&nbsp;
     <a href="assets/wechat-group.png"><strong>WeChat Group</strong></a>
   </p>
-  <p><strong>VibeGame: Vibe your favorite game.</strong></p>
+  <p><strong>VibeGame: Vibe Your Dream Game.</strong></p>
 </div>
 
 ## News
@@ -65,7 +65,7 @@ We provide a web dashboard for interacting more freely with the agent team and m
 ## Roadmap
 
 - [x] Release the VibeGame technical report
-- [ ] Open-source the Phaser-based VibeGame implementation
+- [x] Open-source the Phaser-based VibeGame implementation
 - [ ] Add Godot support
 - [ ] Add Unity support
 - [ ] Expand VibeGame from 2D to end-to-end 3D game creation

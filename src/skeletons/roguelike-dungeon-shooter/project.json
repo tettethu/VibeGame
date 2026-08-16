@@ -1,0 +1,24 @@
+{
+  "name": "PROJECT_NAME",
+  "version": "0.1.0",
+  "engine": "vibegame@0.1.0",
+  "settings": {
+    "width": 960,
+    "height": 540,
+    "pixelArt": true,
+    "backgroundColor": "#1a1a2e",
+    "physics": {
+      "gravity": {
+        "x": 0,
+        "y": 0
+      },
+      "debug": false
+    }
+  },
+  "startScene": "scenes/main.scene.json",
+  "inputMap": "config/input-map.json",
+  "releaseExtraRoots": [
+    "entities/",
+    "assets/fonts/"
+  ]
+}

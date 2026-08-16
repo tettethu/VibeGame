@@ -1,0 +1,14 @@
+{
+  "name": "CardPicker",
+  "script": "UpgradeChoiceModule",
+  "config": {
+    "mountSelector": "#game-container",
+    "choiceCount": 3,
+    "strings": {
+      "eyebrow":  "FIGHT CLEARED",
+      "title":    "CHOOSE A CARD",
+      "subtitle": "Add one card to your deck, or skip.",
+      "footer":   "Click or press 1 2 3"
+    }
+  }
+}

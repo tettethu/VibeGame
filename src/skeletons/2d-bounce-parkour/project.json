@@ -1,0 +1,18 @@
+{
+  "name": "2d-bounce-parkour",
+  "version": "0.1.0",
+  "engine": "vibegame@0.1.0",
+  "settings": {
+    "width": 960,
+    "height": 540,
+    "pixelArt": true,
+    "backgroundColor": "#9ed2ff",
+    "physics": {
+      "gravity": { "x": 0, "y": 900 },
+      "debug": false
+    }
+  },
+  "startScene": "scenes/main.scene.json",
+  "inputMap": "config/input-map.json",
+  "manifests": ["assets/manifest.json"]
+}

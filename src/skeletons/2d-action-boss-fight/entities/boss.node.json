@@ -1,0 +1,396 @@
+{
+  "name": "Boss",
+  "script": "BossController",
+  "tags": [
+    "boss"
+  ],
+  "visual": {
+    "type": "atlas",
+    "texture": "boss_idle",
+    "frame": "idle_0",
+    "width": 236,
+    "height": 270
+  },
+  "collider": {
+    "body": "dynamic",
+    "host": "separate",
+    "gravity": true,
+    "immovable": false,
+    "worldBounds": true
+  },
+  "config": {
+    "x": 820,
+    "y": 426,
+    "name": "Boss",
+    "hp": 84,
+    "meleeDamage": 1,
+    "projectileDamage": 1,
+    "approachSpeed": 75,
+    "backoffSpeed": 95,
+    "needleLungeSpeed": 470,
+    "antlerSlamRange": 150,
+    "needleLungeRange": 470,
+    "thornVolleyRange": 540,
+    "windup": {
+      "ANTLER_SLAM": 0.78,
+      "NEEDLE_LUNGE": 0.58,
+      "THORN_VOLLEY": 0.82
+    },
+    "active": {
+      "ANTLER_SLAM": 0.24,
+      "NEEDLE_LUNGE": 0.36,
+      "THORN_VOLLEY": 0.15
+    },
+    "recovery": {
+      "ANTLER_SLAM": 0.9,
+      "NEEDLE_LUNGE": 0.68,
+      "THORN_VOLLEY": 0.75
+    },
+    "cooldown": {
+      "ANTLER_SLAM": 3.4,
+      "NEEDLE_LUNGE": 3,
+      "THORN_VOLLEY": 3.9
+    },
+    "lowHpThreshold": 0.5,
+    "lowHpCooldownMultiplier": 0.82,
+    "thornVolleyCount": 3,
+    "thornProjectileSpeed": 260,
+    "thornSpreadY": 90,
+    "hurtDuration": 0.25,
+    "fx": {
+      "hitSpark": {
+        "kind": "hit_spark",
+        "offsetX": -28,
+        "offsetY": -36,
+        "lifetime": 0.16,
+        "alpha": 0.95
+      },
+      "groundCrack": {
+        "kind": "ground_crack",
+        "offsetX": 56,
+        "offsetY": -10,
+        "lifetime": 0.3,
+        "alpha": 0.95
+      },
+      "deathBurst": {
+        "kind": "ash_burst",
+        "offsetX": 0,
+        "offsetY": -44,
+        "lifetime": 0.45,
+        "alpha": 0.95
+      }
+    },
+    "frameEvents": {
+      "ANTLER_SLAM": {
+        "windup": [
+          {
+            "frame": 5,
+            "event": "enter_active"
+          },
+          {
+            "frame": 5,
+            "event": "hitbox_on"
+          },
+          {
+            "frame": 5,
+            "event": "spawn_fx",
+            "key": "groundCrack"
+          }
+        ]
+      },
+      "NEEDLE_LUNGE": {
+        "windup": [
+          {
+            "frame": 3,
+            "event": "enter_active"
+          },
+          {
+            "frame": 3,
+            "event": "hitbox_on"
+          },
+          {
+            "frame": 3,
+            "event": "start_lunge"
+          }
+        ]
+      },
+      "THORN_VOLLEY": {
+        "windup": [
+          {
+            "frame": 3,
+            "event": "enter_active"
+          },
+          {
+            "frame": 3,
+            "event": "spawn_projectile"
+          }
+        ]
+      }
+    },
+    "neutralBackoffRangeMultiplier": 0.78,
+    "neutralApproachRangeMultiplier": 0.9,
+    "facingDeadzone": 8,
+    "runtimeStepDt": 0.016666666666666666,
+    "velocityEpsilon": 0.001,
+    "thornSpawnOffsetX": 82,
+    "thornSpawnOffsetY": -58,
+    "thornSpawnSpacingY": 10,
+    "hitShakeMs": 80,
+    "hitShakeIntensity": 0.0035,
+    "hitboxNodes": {
+      "ANTLER_SLAM": "AntlerSlam",
+      "NEEDLE_LUNGE": "NeedleLunge"
+    },
+    "closingPoseHoldTime": 0.12,
+    "defaultFacing": -1,
+    "approachVelocityThreshold": 1,
+    "spreadCenterDivisor": 2,
+    "hitboxFxNodes": {
+      "NEEDLE_LUNGE": "NeedleLunge/NeedleLungeFx"
+    }
+  },
+  "children": [
+    {
+      "name": "AntlerSlam",
+      "script": "Collider",
+      "collider": {
+        "body": "dynamic",
+        "width": 170,
+        "height": 112,
+        "offsetX": -64,
+        "offsetY": 12,
+        "gravity": false,
+        "immovable": true
+      },
+      "config": {
+        "startEnabled": false,
+        "flipWithParent": true
+      }
+    },
+    {
+      "name": "NeedleLunge",
+      "script": "Collider",
+      "collider": {
+        "body": "dynamic",
+        "width": 465,
+        "height": 120,
+        "offsetX": -162,
+        "offsetY": -100,
+        "gravity": false,
+        "immovable": true
+      },
+      "config": {
+        "startEnabled": false,
+        "flipWithParent": true
+      },
+      "children": [
+        {
+          "name": "NeedleLungeFx",
+          "tags": [
+            "fx",
+            "hitboxFx",
+            "needleLungeFx"
+          ],
+          "visual": {
+            "type": "atlas",
+            "texture": "fx_boss_lunge",
+            "frame": "boss_lunge_0",
+            "width": 280,
+            "height": 72,
+            "depth": 82
+          },
+          "config": {
+            "x": 650,
+            "y": 326,
+            "clip": "lunge_fx",
+            "flipWithParent": true,
+            "startVisible": false
+          },
+          "animations": {
+            "default": "lunge_fx",
+            "clips": {
+              "lunge_fx": {
+                "source": {
+                  "type": "atlas",
+                  "texture": "fx_boss_lunge"
+                },
+                "frames": [
+                  "boss_lunge_0",
+                  "boss_lunge_1",
+                  "boss_lunge_2",
+                  "boss_lunge_3"
+                ],
+                "frameRate": 16,
+                "loop": false,
+                "onFinish": "hold"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "visualTransform": {
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  "animations": {
+    "default": "idle",
+    "clips": {
+      "idle": {
+        "source": {
+          "type": "atlas",
+          "texture": "boss_idle"
+        },
+        "frames": [
+          "idle_0",
+          "idle_1",
+          "idle_2",
+          "idle_3"
+        ],
+        "frameRate": 7,
+        "loop": true
+      },
+      "walk": {
+        "source": {
+          "type": "atlas",
+          "texture": "boss_walk"
+        },
+        "frames": [
+          "walk_0",
+          "walk_1",
+          "walk_2",
+          "walk_3"
+        ],
+        "frameRate": 8,
+        "loop": true
+      },
+      "antler_slam": {
+        "source": {
+          "type": "atlas",
+          "texture": "boss_antler_slam"
+        },
+        "frames": [
+          "antler_slam_0",
+          "antler_slam_1",
+          "antler_slam_2",
+          "antler_slam_3",
+          "antler_slam_4",
+          "antler_slam_5",
+          "antler_slam_6",
+          "antler_slam_7"
+        ],
+        "frameRate": 12,
+        "loop": false,
+        "onFinish": "hold"
+      },
+      "needle_lunge": {
+        "source": {
+          "type": "atlas",
+          "texture": "boss_needle_lunge"
+        },
+        "frames": [
+          "needle_lunge_0",
+          "needle_lunge_1",
+          "needle_lunge_2",
+          "needle_lunge_3",
+          "needle_lunge_4",
+          "needle_lunge_5",
+          "needle_lunge_6",
+          "needle_lunge_7"
+        ],
+        "frameRate": 12,
+        "loop": false,
+        "onFinish": "hold"
+      },
+      "thorn_volley_cast": {
+        "source": {
+          "type": "atlas",
+          "texture": "boss_thorn_volley_cast"
+        },
+        "frames": [
+          "thorn_volley_cast_0",
+          "thorn_volley_cast_1",
+          "thorn_volley_cast_2",
+          "thorn_volley_cast_3"
+        ],
+        "frameRate": 16,
+        "loop": false,
+        "onFinish": "hold"
+      },
+      "hit": {
+        "source": {
+          "type": "atlas",
+          "texture": "boss_hit"
+        },
+        "frames": [
+          "hit_0",
+          "hit_1",
+          "hit_2",
+          "hit_3"
+        ],
+        "frameRate": 12,
+        "loop": false,
+        "onFinish": "hold"
+      },
+      "death": {
+        "source": {
+          "type": "atlas",
+          "texture": "boss_death"
+        },
+        "frames": [
+          "death_0",
+          "death_1",
+          "death_2",
+          "death_3",
+          "death_4",
+          "death_5"
+        ],
+        "frameRate": 10,
+        "loop": false,
+        "onFinish": "hold"
+      },
+      "needle_lunge_windup": {
+        "source": {
+          "type": "atlas",
+          "texture": "boss_needle_lunge"
+        },
+        "frames": [
+          "needle_lunge_0",
+          "needle_lunge_1",
+          "needle_lunge_2",
+          "needle_lunge_3"
+        ],
+        "loop": false,
+        "onFinish": "hold",
+        "duration": 0.58
+      },
+      "needle_lunge_active": {
+        "source": {
+          "type": "atlas",
+          "texture": "boss_needle_lunge"
+        },
+        "frames": [
+          "needle_lunge_4",
+          "needle_lunge_5",
+          "needle_lunge_6"
+        ],
+        "frameRate": 16,
+        "loop": false,
+        "onFinish": "hold"
+      },
+      "needle_lunge_recovery": {
+        "source": {
+          "type": "atlas",
+          "texture": "boss_needle_lunge"
+        },
+        "frames": [
+          "needle_lunge_7"
+        ],
+        "frameRate": 1,
+        "loop": false,
+        "onFinish": "hold"
+      }
+    }
+  }
+}

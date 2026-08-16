@@ -1,0 +1,35 @@
+{
+  "name": "Fruit",
+  "script": "Fruit",
+  "tags": [
+    "fruit",
+    "sliceable"
+  ],
+  "visual": {
+    "type": "image",
+    "texture": "fruit_watermelon_whole",
+    "width": 72,
+    "height": 72
+  },
+  "collider": {
+    "body": "dynamic",
+    "shape": "circle",
+    "radius": 36,
+    "gravity": true
+  },
+  "config": {
+    "fruitType": "watermelon",
+    "score": 25,
+    "weight": 1.45,
+    "velocityX": 0,
+    "velocityY": -560,
+    "missY": 620,
+    "cleanupMargin": 120,
+    "sliced": false,
+    "wholeTexture": "fruit_watermelon_whole",
+    "leftTexture": "fruit_watermelon_left",
+    "rightTexture": "fruit_watermelon_right",
+    "depth": 100,
+    "minReadableTimeForMiss": 0.45
+  }
+}

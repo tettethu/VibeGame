@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vibegame://schema/manifest.json",
+  "title": "VIbeGame Asset Manifest",
+  "description": "Per-folder asset manifest. Each manifest.json manages files in its own directory.",
+  "type": "object",
+  "additionalProperties": {
+    "$ref": "#/$defs/assetEntry"
+  },
+  "$defs": {
+    "tileDef": {
+      "type": "object",
+      "required": ["index"],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Base tile index in the tileset image (grid position)."
+        },
+        "collision": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this tile has full-tile collision."
+        },
+        "color": {
+          "type": "string",
+          "description": "Placeholder fill colour drawn for this tile while the tileset art is not ready. Engine generates a canvas texture from it."
+        },
+        "collisionShapes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/collisionShape" },
+          "description": "Custom collision regions. Overrides full-tile collision when present."
+        },
+        "autotile": {
+          "type": "string",
+          "description": "Auto-tile rule name (e.g. 'bitmask-4')."
+        },
+        "properties": {
+          "type": "object",
+          "description": "Arbitrary per-tile properties (damage, slowFactor, etc.)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "collisionShape": {
+      "type": "object",
+      "required": ["type", "x", "y", "width", "height"],
+      "properties": {
+        "type": { "type": "string", "enum": ["rect"] },
+        "x": { "type": "number", "description": "X offset from tile top-left (px)." },
+        "y": { "type": "number", "description": "Y offset from tile top-left (px)." },
+        "width": { "type": "number", "description": "Shape width (px)." },
+        "height": { "type": "number", "description": "Shape height (px)." }
+      },
+      "additionalProperties": false
+    },
+    "stampDef": {
+      "type": "object",
+      "required": ["width", "height", "data"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1, "description": "Stamp width in tiles." },
+        "height": { "type": "integer", "minimum": 1, "description": "Stamp height in tiles." },
+        "data": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": ["string", "null"] }
+          },
+          "description": "2D array of tile type names."
+        }
+      },
+      "additionalProperties": false
+    },
+    "autotileRule": {
+      "type": "object",
+      "required": ["offsets"],
+      "properties": {
+        "offsets": {
+          "type": "object",
+          "patternProperties": {
+            "^[01]{4}$": { "type": "integer" }
+          },
+          "additionalProperties": false,
+          "description": "4-bit bitmask (top/right/bottom/left) -> index offset."
+        }
+      },
+      "additionalProperties": false
+    },
+    "assetEntry": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["image", "spritesheet", "atlas", "placeholder_atlas", "placeholder_image", "tileset"],
+          "description": "Asset type."
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Filename relative to this manifest's folder."
+        },
+        "frameWidth": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Frame width (spritesheet type)."
+        },
+        "frameHeight": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Frame height (spritesheet type)."
+        },
+        "sprites": {
+          "type": "object",
+          "description": "Sprite bounding boxes (atlas type) or semantic names (placeholder_atlas type).",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "bbox": {
+                "type": "array",
+                "items": { "type": "integer" },
+                "minItems": 4,
+                "maxItems": 4,
+                "description": "[x, y, width, height] in pixels."
+              },
+              "pivot": {
+                "type": "array",
+                "items": { "type": "number" },
+                "minItems": 2,
+                "maxItems": 2,
+                "description": "Optional sprite-level pivot [x, y]."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "frames": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Semantic frame names for placeholder_atlas."
+        },
+        "pivot": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Optional texture-level pivot [x, y]."
+        },
+        "shape": {
+          "type": "string",
+          "enum": ["rectangle", "circle", "hex"],
+          "description": "Placeholder image shape. Only valid for placeholder_image."
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{3,8}|0x[0-9a-fA-F]{6})$",
+          "description": "Placeholder image fill color. Only valid for placeholder_image."
+        },
+        "tileSize": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Display tile size in pixels, square (tileset type)."
+        },
+        "tiles": {
+          "type": "object",
+          "description": "Tile definitions (tileset type). Map of semantic name -> TileDef.",
+          "additionalProperties": { "$ref": "#/$defs/tileDef" }
+        },
+        "autotile": {
+          "type": "object",
+          "description": "Auto-tile rule definitions (tileset type).",
+          "additionalProperties": { "$ref": "#/$defs/autotileRule" }
+        },
+        "stamps": {
+          "type": "object",
+          "description": "Composite tile structures (tileset type).",
+          "additionalProperties": { "$ref": "#/$defs/stampDef" }
+        },
+        "categories": {
+          "type": "object",
+          "description": "Tile groupings for authoring (tileset type). Map of category -> [tileName, ...]. Metadata for agents and tools; the engine does not read it.",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "image" } } },
+          "then": { "required": ["type", "path"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "spritesheet" } } },
+          "then": { "required": ["type", "path", "frameWidth", "frameHeight"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "atlas" } } },
+          "then": { "required": ["type", "path", "sprites"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "placeholder_atlas" } } },
+          "then": { "required": ["type"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "placeholder_image" } } },
+          "then": { "required": ["type"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "tileset" } } },
+          "then": { "required": ["type", "tileSize", "tiles"] }
+        }
+      ]
+    }
+  }
+}

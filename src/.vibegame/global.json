@@ -1,0 +1,7 @@
+{
+    "project_root": "{{project_root}}",
+    "project": "{{project}}",
+    "language": "{{language_code}}",
+    "engine": "vibegame",
+    "debug": false
+}

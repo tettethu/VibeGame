@@ -1,0 +1,280 @@
+{
+  "player_idle": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "0",
+      "1",
+      "2",
+      "3"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "player_attack": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "0",
+      "1",
+      "2",
+      "3"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "player_hurt": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "0",
+      "1"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "player_die": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "0",
+      "1",
+      "2",
+      "3"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "smasher_idle": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "0",
+      "1",
+      "2",
+      "3"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "smasher_taunt": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "0",
+      "1",
+      "2"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "smasher_attack": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "0",
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "smasher_die": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "0",
+      "1",
+      "2",
+      "3"
+    ],
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "vfx_hit_impact": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "0",
+      "1",
+      "2",
+      "3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "vfx_block_break": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "0",
+      "1",
+      "2",
+      "3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "vfx_vulnerable_apply": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "0",
+      "1",
+      "2",
+      "3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "vfx_card_trail": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "0",
+      "1",
+      "2",
+      "3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "cards": {
+    "type": "atlas",
+    "path": "placeholder/card_placeholder_atlas.png",
+    "pivot": [
+      0.5,
+      0.5
+    ],
+    "sprites": {
+      "strike": {
+        "bbox": [
+          0,
+          0,
+          32,
+          32
+        ]
+      },
+      "deflect": {
+        "bbox": [
+          32,
+          0,
+          32,
+          32
+        ]
+      },
+      "bash": {
+        "bbox": [
+          64,
+          0,
+          32,
+          32
+        ]
+      },
+      "twin_strike": {
+        "bbox": [
+          96,
+          0,
+          32,
+          32
+        ]
+      },
+      "heavy_blow": {
+        "bbox": [
+          128,
+          0,
+          32,
+          32
+        ]
+      },
+      "overload": {
+        "bbox": [
+          160,
+          0,
+          32,
+          32
+        ]
+      },
+      "scramble": {
+        "bbox": [
+          192,
+          0,
+          32,
+          32
+        ]
+      },
+      "iron_curtain": {
+        "bbox": [
+          224,
+          0,
+          32,
+          32
+        ]
+      },
+      "phase_shift": {
+        "bbox": [
+          0,
+          32,
+          32,
+          32
+        ]
+      },
+      "neural_link": {
+        "bbox": [
+          32,
+          32,
+          32,
+          32
+        ]
+      },
+      "overclock": {
+        "bbox": [
+          64,
+          32,
+          32,
+          32
+        ]
+      },
+      "reflex_grid": {
+        "bbox": [
+          96,
+          32,
+          32,
+          32
+        ]
+      }
+    }
+  },
+  "hud_icons": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "heart",
+      "energy",
+      "deck",
+      "discard",
+      "block",
+      "vulnerable",
+      "damage",
+      "settings_gear",
+      "portrait_player"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  }
+}

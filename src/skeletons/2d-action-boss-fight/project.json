@@ -1,0 +1,31 @@
+{
+  "name": "2d-action-boss-fight",
+  "version": "0.1.0",
+  "engine": "vibegame@0.1.0",
+  "settings": {
+    "width": 960,
+    "height": 540,
+    "pixelArt": false,
+    "backgroundColor": "#000000",
+    "physics": {
+      "gravity": {
+        "x": 0,
+        "y": 1400
+      },
+      "debug": false
+    }
+  },
+  "startScene": "scenes/main.scene.json",
+  "manifests": [
+    "assets/manifest.json",
+    "assets/player/manifest.json",
+    "assets/boss/manifest.json",
+    "assets/fx/manifest.json",
+    "assets/projectiles/manifest.json"
+  ],
+  "inputMap": "config/input-map.json",
+  "releaseExtraRoots": [
+    "entities/",
+    "modules/"
+  ]
+}

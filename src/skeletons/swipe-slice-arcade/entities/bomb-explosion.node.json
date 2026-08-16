@@ -1,0 +1,34 @@
+{
+  "name": "BombExplosion",
+  "script": "TimedImageVfxModule",
+  "tags": [
+    "vfx",
+    "bombExplosion"
+  ],
+  "visual": {
+    "type": "image",
+    "texture": "bomb_explosion_ignition",
+    "width": 170,
+    "height": 145
+  },
+  "config": {
+    "kind": "bombExplosion",
+    "texture": "bomb_explosion_ignition",
+    "ttl": 0.72,
+    "depth": 205,
+    "alphaStart": 1,
+    "alphaEnd": 0,
+    "scaleStart": 0.85,
+    "scaleEnd": 1.18,
+    "textureSequence": [
+      {
+        "texture": "bomb_explosion_ignition",
+        "at": 0
+      },
+      {
+        "texture": "bomb_explosion_peak",
+        "at": 0.14
+      }
+    ]
+  }
+}

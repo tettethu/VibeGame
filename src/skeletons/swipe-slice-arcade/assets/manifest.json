@@ -1,0 +1,211 @@
+{
+  "bg_dojo_backdrop": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#262b38",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "fruit_apple_whole": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#e74c3c"
+  },
+  "fruit_apple_left": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#e74c3c"
+  },
+  "fruit_apple_right": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#e74c3c"
+  },
+  "fruit_watermelon_whole": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#27ae60"
+  },
+  "fruit_watermelon_left": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#27ae60"
+  },
+  "fruit_watermelon_right": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#27ae60"
+  },
+  "fruit_banana_whole": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#f1c40f"
+  },
+  "fruit_banana_left": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#f1c40f"
+  },
+  "fruit_banana_right": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#f1c40f"
+  },
+  "fruit_orange_whole": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#e67e22"
+  },
+  "fruit_orange_left": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#e67e22"
+  },
+  "fruit_orange_right": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#e67e22"
+  },
+  "fruit_pineapple_whole": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#c9a227"
+  },
+  "fruit_pineapple_left": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#c9a227"
+  },
+  "fruit_pineapple_right": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#c9a227"
+  },
+  "fruit_coconut_whole": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#8d6e63"
+  },
+  "fruit_coconut_left": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#8d6e63"
+  },
+  "fruit_coconut_right": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#8d6e63"
+  },
+  "fruit_strawberry_whole": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#ff4f81"
+  },
+  "fruit_strawberry_left": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#ff4f81"
+  },
+  "fruit_strawberry_right": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#ff4f81"
+  },
+  "vfx_fragment_coconut_mixed": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#a1887f"
+  },
+  "vfx_fragment_coconut_white": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#efebe9"
+  },
+  "vfx_juice_orange_droplet_cluster": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#ffb74d"
+  },
+  "vfx_juice_orange_splash_crown": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#ffb74d"
+  },
+  "vfx_juice_orange_splash_scatter": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#ffb74d"
+  },
+  "vfx_juice_red_burst_round": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#ff8a80"
+  },
+  "vfx_juice_red_burst_small": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#ff8a80"
+  },
+  "vfx_juice_red_droplets": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#ff8a80"
+  },
+  "vfx_juice_red_streak_fast": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#ff8a80"
+  },
+  "vfx_juice_watermelon_arc_seeds": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#66ff99"
+  },
+  "vfx_juice_watermelon_burst_seeded": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#66ff99"
+  },
+  "vfx_juice_watermelon_splash_wide": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#66ff99"
+  },
+  "vfx_juice_yellow_fast_streak": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#fff176"
+  },
+  "vfx_pulp_yellow_chunks": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#ffe082"
+  },
+  "vfx_pulp_yellow_fibers": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#ffe082"
+  },
+  "bomb_idle": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#1c1c1c"
+  },
+  "bomb_warning": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#ff3b30"
+  },
+  "bomb_explosion_ignition": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#ff7043"
+  },
+  "bomb_explosion_peak": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#ffeb3b"
+  }
+}

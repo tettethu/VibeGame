@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Swipe Slice Arcade — Skeleton</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 35%, #273044 0%, #090b12 72%);
+      color: #fff;
+      font-family: ui-rounded, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+    #game-container {
+      position: relative;
+      width: min(100vw, calc(100vh * 16 / 9));
+      aspect-ratio: 16 / 9;
+      max-height: 100vh;
+      overflow: hidden;
+      background: #10131f;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+    }
+    #game-container canvas { display: block; width: 100%; height: 100%; }
+    #fruit-ui {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      user-select: none;
+    }
+    .vg-hud {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      right: 24px;
+      z-index: 3;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+    }
+    .vg-score,
+    .vg-best,
+    .vg-miss {
+      border: 2px solid rgba(255, 255, 255, 0.18);
+      border-radius: 16px;
+      background: rgba(9, 12, 20, 0.58);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(8px);
+    }
+    .vg-score,
+    .vg-best {
+      min-width: 116px;
+      padding: 10px 14px;
+    }
+    .vg-score span,
+    .vg-best span {
+      display: block;
+      color: #9eeaff;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .vg-score strong,
+    .vg-best strong {
+      display: block;
+      margin-top: 2px;
+      color: #fff7b8;
+      font-size: 32px;
+      line-height: 1;
+    }
+    .vg-best strong { color: #b8ffcc; }
+    .vg-misses {
+      margin-left: auto;
+      display: flex;
+      gap: 8px;
+    }
+    .vg-miss {
+      position: relative;
+      width: 54px;
+      height: 54px;
+      padding: 6px;
+      transform: rotate(3deg);
+      transition: opacity 120ms ease, transform 140ms ease, background 140ms ease, border-color 140ms ease;
+    }
+    .vg-miss[data-state="dim"] {
+      opacity: 1;
+      border-color: rgba(255, 255, 255, 0.34);
+      background: rgba(9, 12, 20, 0.72);
+      box-shadow: inset 0 0 0 2px rgba(158, 234, 255, 0.16), 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+    .vg-miss.is-used {
+      background: rgba(255, 70, 70, 0.78);
+      border-color: rgba(255, 255, 255, 0.3);
+      opacity: 1;
+      transform: rotate(-7deg) scale(1.08);
+    }
+    .vg-miss.is-used::before,
+    .vg-miss.is-used::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 60%;
+      height: 4px;
+      background: #fff;
+      border-radius: 2px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+    }
+    .vg-miss.is-used::before { transform: translate(-50%, -50%) rotate(45deg); }
+    .vg-miss.is-used::after { transform: translate(-50%, -50%) rotate(-45deg); }
+    .vg-combo {
+      position: absolute;
+      top: 96px;
+      left: 50%;
+      padding: 10px 20px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, rgba(255, 223, 92, 0.94), rgba(255, 107, 107, 0.94));
+      color: #35110b;
+      font-size: 28px;
+      font-weight: 1000;
+      letter-spacing: 0.03em;
+      opacity: 0;
+      transform: translateX(-50%) translateY(-12px) scale(0.92);
+      transition: opacity 120ms ease, transform 160ms ease;
+      box-shadow: 0 12px 36px rgba(255, 143, 64, 0.32);
+    }
+    .vg-combo.is-visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0) scale(1);
+    }
+    .vg-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: grid;
+      place-items: center;
+      background: radial-gradient(circle at 50% 45%, rgba(31, 39, 58, 0.72), rgba(5, 7, 12, 0.86));
+      pointer-events: auto;
+    }
+    .vg-overlay[hidden] { display: none; }
+    .vg-card {
+      width: min(440px, calc(100% - 42px));
+      padding: 30px 34px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 28px;
+      background: rgba(11, 15, 25, 0.82);
+      text-align: center;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.48);
+    }
+    .vg-card h1 {
+      color: #fff7b8;
+      font-size: 48px;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      text-shadow: 0 5px 0 rgba(0, 0, 0, 0.34);
+    }
+    .vg-card p {
+      margin-top: 14px;
+      color: #dbeaff;
+      font-size: 18px;
+      font-weight: 750;
+    }
+    .vg-card button {
+      margin-top: 24px;
+      border: 0;
+      border-radius: 999px;
+      padding: 14px 34px;
+      background: linear-gradient(135deg, #6df3b1, #8be9ff);
+      color: #081018;
+      font: inherit;
+      font-size: 20px;
+      font-weight: 1000;
+      cursor: pointer;
+      pointer-events: auto;
+      box-shadow: 0 12px 0 #255d66, 0 22px 42px rgba(0, 0, 0, 0.36);
+    }
+    .vg-card button:active { transform: translateY(4px); box-shadow: 0 8px 0 #255d66; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js" crossorigin="anonymous"></script>
+  <script>window.__APP_CONFIG__ = window.__APP_CONFIG__ || { appBasePath: '', apiBaseUrl: '' }</script>
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <script type="module">
+    // Keep engine boot unconditional.
+    // UI may gate gameplay, but must not bypass or replace boot.
+    const cfg = window.__APP_CONFIG__ || {}
+    const base = String(cfg.appBasePath || '').replace(/\/+$/, '')
+    const { boot } = await import(`${base}/engine/boot.js`)
+    boot(document.getElementById('game-container'))
+  </script>
+</body>
+</html>

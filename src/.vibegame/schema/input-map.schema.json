@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vibegame://schema/input-map.json",
+  "title": "VibeGame Input Map",
+  "description": "Maps logical action names to arrays of Phaser keyboard key code names. Two equivalent shapes are accepted: the nested form under an \"actions\" object, which is what `vibegame init` writes, and the flat form where the file itself is the action map.",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["actions"],
+      "properties": {
+        "actions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["keys"],
+            "properties": {
+              "keys": { "$ref": "#/$defs/keyList" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/keyList" }
+    }
+  ],
+  "$defs": {
+    "keyList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "description": "Array of Phaser.Input.Keyboard.KeyCodes property names."
+    }
+  },
+  "examples": [
+    {
+      "actions": {
+        "move_left": { "keys": ["LEFT", "A"] },
+        "jump": { "keys": ["SPACE", "UP", "W"] }
+      }
+    },
+    {
+      "move_left": ["LEFT", "A"],
+      "jump": ["SPACE", "UP", "W"]
+    }
+  ]
+}

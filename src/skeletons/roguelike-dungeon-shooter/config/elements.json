@@ -1,0 +1,137 @@
+{
+  "bullets": {
+    "player": {
+      "width": 24,
+      "height": 24
+    },
+    "enemy": {
+      "width": 24,
+      "height": 24
+    },
+    "archer": {
+      "width": 24,
+      "height": 24
+    },
+    "mage": {
+      "width": 24,
+      "height": 24
+    },
+    "ghost_laser": {
+      "width": 22,
+      "height": 5
+    },
+    "boss": {
+      "width": 14,
+      "height": 14
+    },
+    "boss_orb": {
+      "width": 22,
+      "height": 22,
+      "glowAlpha": 0
+    },
+    "boss_shard": {
+      "width": 16,
+      "height": 24,
+      "glowAlpha": 0
+    },
+    "boss_dart": {
+      "width": 26,
+      "height": 12,
+      "glowAlpha": 0
+    },
+    "boss_soul_dot": {
+      "width": 10,
+      "height": 10,
+      "glowAlpha": 0
+    },
+    "boss_soul_orb": {
+      "width": 22,
+      "height": 22,
+      "glowAlpha": 0
+    },
+    "boss_soul_core": {
+      "width": 18,
+      "height": 18,
+      "glowAlpha": 0
+    },
+    "boss_soul_square": {
+      "width": 18,
+      "height": 18,
+      "glowAlpha": 0
+    },
+    "boss_soul_block": {
+      "width": 32,
+      "height": 24,
+      "glowAlpha": 0
+    },
+    "boss_soul_shard": {
+      "width": 16,
+      "height": 24,
+      "glowAlpha": 0
+    },
+    "boss_soul_dart": {
+      "width": 26,
+      "height": 12,
+      "glowAlpha": 0
+    },
+    "boss_soul_lance": {
+      "width": 42,
+      "height": 12,
+      "glowAlpha": 0
+    },
+    "boss_soul_wave": {
+      "width": 24,
+      "height": 24,
+      "glowAlpha": 0
+    },
+    "boss_soul_wall": {
+      "width": 72,
+      "height": 28,
+      "glowAlpha": 0
+    },
+    "rocket": {
+      "width": 28,
+      "height": 14,
+      "glowAlpha": 0.12
+    },
+    "boundsPadding": 50,
+    "explosionAlpha": 0.35,
+    "explosionScale": 1.5,
+    "explosionDurationMs": 300
+  },
+  "weaponDrop": {
+    "defaultWidth": 20,
+    "defaultHeight": 40,
+    "labelOffsetY": 18,
+    "hintOffsetY": 16,
+    "pickupRange": 40
+  },
+  "enemyHpBar": {
+    "defaultWidth": 24,
+    "displayWidthInset": 8,
+    "backgroundHeight": 6,
+    "height": 4,
+    "offsetY": 4
+  },
+  "expOrb": {
+    "radius": 6,
+    "glowRadius": 9,
+    "magnetRange": 150,
+    "maxSpeed": 600,
+    "acceleration": 800
+  },
+  "weaponVisual": {
+    "defaultOffsetX": 20,
+    "defaultOffsetY": 15
+  },
+  "chest": {
+    "bounceY": -8,
+    "iconOffsetY": -28,
+    "iconFloatY": -12,
+    "iconWidth": 20,
+    "iconHeight": 40,
+    "iconRotationDeg": 90,
+    "promptOffsetY": -52,
+    "pickupFadeY": -20
+  }
+}

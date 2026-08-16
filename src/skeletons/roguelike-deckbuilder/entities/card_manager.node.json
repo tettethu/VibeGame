@@ -1,0 +1,56 @@
+{
+  "name": "CardManager",
+  "script": "DomCardManagerModule",
+  "tags": [
+    "handRenderer",
+    "cardManager"
+  ],
+  "config": {
+    "cardW": 95,
+    "cardH": 136,
+    "xSpread": 66,
+    "hoverScale": 1.28,
+    "hoverLift": 108,
+    "neighborShift": 27,
+    "hitboxPad": 44,
+    "snapBackDuration": 250,
+    "handRootW": 920,
+    "handRootH": 160,
+    "cardAtlas": "cards",
+    "logicalWidth": 960,
+    "logicalHeight": 540,
+    "scaleMode": "stretch",
+    "enemyTargetEffects": [
+      "damage",
+      "damage_x2",
+      "bash",
+      "twin_strike",
+      "vuln_enemy"
+    ],
+    "targets": [
+      {
+        "id": "enemy",
+        "tag": "enemy"
+      },
+      {
+        "id": "self",
+        "tag": "player"
+      }
+    ],
+    "layout": "arc",
+    "arcCenterX": 480,
+    "arcCenterY": 1150,
+    "arcRadius": 720,
+    "arcCenterAngleDeg": -90,
+    "arcAngleStepDeg": 6,
+    "arcMaxAngleDeg": 32,
+    "hoverGapAngleDeg": 2.5,
+    "arrowColor": "#00f5ff",
+    "arrowChevronSpacing": 30,
+    "arrowChevronLength": 18,
+    "arrowChevronWidth": 46,
+    "arrowChevronStroke": 8,
+    "arrowSpring": 6,
+    "showCostBadge": true
+  }
+}

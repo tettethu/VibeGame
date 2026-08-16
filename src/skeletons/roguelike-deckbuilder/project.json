@@ -1,0 +1,23 @@
+{
+  "name": "roguelike-deckbuilder",
+  "version": "0.1.0",
+  "engine": "vibegame@0.1.0",
+  "settings": {
+    "width": 960,
+    "height": 540,
+    "pixelArt": false,
+    "backgroundColor": "#000000",
+    "physics": {
+      "gravity": {
+        "x": 0,
+        "y": 0
+      },
+      "debug": false
+    }
+  },
+  "manifests": [
+    "assets/manifest.json"
+  ],
+  "startScene": "scenes/main.scene.json",
+  "inputMap": "config/input-map.json"
+}

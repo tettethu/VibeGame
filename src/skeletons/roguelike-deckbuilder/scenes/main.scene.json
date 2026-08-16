@@ -1,0 +1,123 @@
+{
+  "name": "Battle",
+  "root": {
+    "name": "Root",
+    "children": [
+      {
+        "name": "BattleManager",
+        "script": "BattleManager",
+        "tags": [
+          "battleManager"
+        ],
+        "config": {}
+      },
+      {
+        "name": "Background",
+        "visual": {
+          "type": "rect",
+          "width": 960,
+          "height": 540,
+          "color": "0x101827"
+        },
+        "config": {
+          "x": 480,
+          "y": 270
+        }
+      },
+      {
+        "name": "Ground",
+        "collider": {
+          "body": "static",
+          "width": 960,
+          "height": 20
+        },
+        "config": {
+          "x": 480,
+          "y": 270
+        }
+      },
+      {
+        "src": "entities/player.node.json"
+      },
+      {
+        "src": "entities/enemy.node.json"
+      },
+      {
+        "src": "entities/card_manager.node.json"
+      },
+      {
+        "name": "HudRenderer",
+        "script": "HudRenderer",
+        "tags": [
+          "hudRenderer"
+        ],
+        "config": {
+          "intentOffsetX": -55,
+          "intentOffsetY": -36,
+          "enemyStatusOffsetX": 70,
+          "enemyStatusOffsetY": -36,
+          "enemyHpOffsetX": -90,
+          "enemyHpOffsetY": -8,
+          "playerCombatOffsetX": -55
+        }
+      },
+      {
+        "name": "Overlay",
+        "script": "GameOverlayModule",
+        "tags": [
+          "overlay"
+        ],
+        "config": {
+          "menus": [
+            {
+              "id": "runover",
+              "title": "RUN OVER",
+              "subtitle": "-",
+              "pausesGame": true,
+              "buttons": [
+                {
+                  "label": "RESTART",
+                  "action": "restart"
+                }
+              ]
+            }
+          ],
+          "style": {
+            "fontFamily": "'Rajdhani', system-ui, sans-serif",
+            "titleColor": "#0df",
+            "subtitleColor": "#888",
+            "panelWidth": 340,
+            "panelHeight": 240,
+            "containerId": "game-container",
+            "hurtFlashColor": "rgba(255,50,50,0.35)"
+          }
+        }
+      },
+      {
+        "name": "_CardPickerTemplate",
+        "src": "entities/card_picker.node.json",
+        "enabled": false
+      },
+      {
+        "name": "_HitImpactVfxTemplate",
+        "src": "entities/vfx_hit_impact.node.json",
+        "enabled": false
+      },
+      {
+        "name": "_CardTrailVfxTemplate",
+        "src": "entities/vfx_card_trail.node.json",
+        "enabled": false
+      },
+      {
+        "name": "_BlockBreakVfxTemplate",
+        "src": "entities/vfx_block_break.node.json",
+        "enabled": false
+      },
+      {
+        "name": "_VulnerableApplyVfxTemplate",
+        "src": "entities/vfx_vulnerable_apply.node.json",
+        "enabled": false
+      }
+    ]
+  }
+}

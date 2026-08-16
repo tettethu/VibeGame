@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "vibegame://schema/tilemap.json",
+  "title": "VibeGame Tilemap Data",
+  "description": "Map data using semantic tile type names. Referenced from scene JSON via TileMap node config.src.",
+  "type": "object",
+  "required": ["tileset", "width", "height", "layers"],
+  "properties": {
+    "tileset": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tileset name (must match a manifest entry key with type 'tileset')."
+    },
+    "width": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Map width in tiles."
+    },
+    "height": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Map height in tiles."
+    },
+    "tileSize": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Override display tile size. If omitted, uses tileset's tileSize."
+    },
+    "layers": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/layerDef" },
+      "description": "Array of layer definitions."
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "layerDef": {
+      "type": "object",
+      "required": ["name", "data"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Layer identifier."
+        },
+        "z": {
+          "type": "number",
+          "description": "Depth/z-index for rendering order. Default 0."
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": ["string", "null"]
+            }
+          },
+          "description": "2D array of tile type names. null = empty cell. Must match tileset tile names."
+        },
+        "collision": {
+          "type": "boolean",
+          "default": true,
+          "description": "Build collision bodies for this layer's solid tiles. Set false for purely decorative layers."
+        },
+        "stamps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stampPlacement" },
+          "description": "Pre-placed stamp instances. The engine writes them into this layer's data before auto-tiling."
+        }
+      },
+      "additionalProperties": false
+    },
+    "stampPlacement": {
+      "type": "object",
+      "required": ["stamp", "x", "y"],
+      "properties": {
+        "stamp": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stamp name from the tileset's stamps definition."
+        },
+        "x": { "type": "integer", "description": "Top-left tile X." },
+        "y": { "type": "integer", "description": "Top-left tile Y." }
+      },
+      "additionalProperties": false
+    }
+  }
+}

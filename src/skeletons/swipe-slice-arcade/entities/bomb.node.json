@@ -1,0 +1,32 @@
+{
+  "name": "Bomb",
+  "script": "Bomb",
+  "tags": [
+    "bomb",
+    "hazard"
+  ],
+  "visual": {
+    "type": "image",
+    "texture": "bomb_idle",
+    "width": 54,
+    "height": 54
+  },
+  "collider": {
+    "body": "dynamic",
+    "shape": "circle",
+    "radius": 27,
+    "gravity": true
+  },
+  "config": {
+    "velocityX": 0,
+    "velocityY": -560,
+    "missY": 620,
+    "cleanupMargin": 120,
+    "weight": 1.1,
+    "armed": true,
+    "texture": "bomb_idle",
+    "warningTexture": "bomb_warning",
+    "depth": 110,
+    "warningBlinkHz": 4
+  }
+}

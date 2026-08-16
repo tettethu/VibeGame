@@ -1,0 +1,8 @@
+{
+  "rooms": 5,
+  "roomWidth": 21,
+  "roomHeight": 15,
+  "corridorWidth": 9,
+  "corridorHeight": 5,
+  "tileSize": 32
+}

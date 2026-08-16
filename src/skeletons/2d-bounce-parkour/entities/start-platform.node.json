@@ -1,0 +1,6 @@
+{
+  "name": "StartPlatform",
+  "tags": ["ground"],
+  "visual": { "type": "atlas", "texture": "platforms", "frame": "start", "width": 160, "height": 40 },
+  "collider": { "body": "static", "host": "separate"}
+}

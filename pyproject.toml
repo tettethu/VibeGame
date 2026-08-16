@@ -1,0 +1,72 @@
+[project]
+name = "vibegame"
+version = "0.1.0"
+description = "Game development agent with integrated art generation tools"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = [
+    # Core dependencies
+    "typer>=0.9.0",
+    # Artist dependencies
+    "numpy>=2.0.0",
+    "opencv-python>=4.8.0",
+    "scipy>=1.11.0",
+    "mcp>=1.0.0",
+    "requests>=2.31.0",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+    # Validates project JSON against .vibegame/schema/ during `vibegame check`
+    "jsonschema>=4.18.0",
+    "questionary>=1.10.0",
+    "pillow>=10.0.0",
+    "perfect-pixel>=0.1.0",
+    # Runtime host
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.20.0",
+    # Pinned: the pip package and its browser build ship as a matched pair,
+    # so a floating version installs browsers that the runtime cannot drive.
+    "playwright==1.58.0",
+    "httpx[socks]>=0.24.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["cli", "artist", "util"]
+
+[project.scripts]
+vibegame = "cli.main:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests/base",
+    "tests/api",
+    "tests/e2e",
+    # dev-only tests (release tooling, project page — things the public user
+    # doesn't need). Run here; not in the release manifest, so absent from the
+    # release tree (pytest skips a missing testpath, no error).
+    "tests/dev",
+    # Bench is self-contained, so its suite lives beside it. Outside tests/ the
+    # path rule cannot reach it, so each file declares `pytestmark = dev`; a file
+    # that forgets is rejected by tests/conftest.py rather than silently skipped.
+    "bench/tests",
+]
+norecursedirs = ["artifacts", "rollouts", "baseline", "test-general-engine-en", "*.egg", ".*", "build", "dist", "node_modules"]
+markers = [
+    "base: free & safe — hermetic tests + local headless-browser runtime tests. Runs by default",
+    "api: hits paid external APIs (imagegen / VLM)",
+    "e2e: real agent CLI end-to-end (claude -p / codex exec) or full game build",
+    "dev: free & hermetic, but tooling only (bench, release, project page) — not the shipped product",
+]
+# Only `base` runs by default. api / e2e cost money or drive real agents, so a
+# bare `pytest` must never touch them; `make test-api` / `test-e2e` opt in with -m.
+addopts = "--strict-markers -m base"

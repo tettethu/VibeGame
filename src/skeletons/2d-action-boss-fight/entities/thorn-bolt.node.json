@@ -1,0 +1,60 @@
+{
+  "name": "ThornBolt",
+  "script": "ThornBolt",
+  "tags": [
+    "projectile"
+  ],
+  "visual": {
+    "type": "atlas",
+    "texture": "projectile_thorn_bolt_fly",
+    "frame": "thorn_bolt_fly_0",
+    "width": 74,
+    "height": 33
+  },
+  "collider": {
+    "shape": "circle",
+    "radius": 8,
+    "body": "dynamic",
+    "gravity": false,
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "config": {
+    "vx": 0,
+    "vy": 0,
+    "damage": 1,
+    "lifetime": 4.5,
+    "impactFx": {
+      "kind": "thorn_impact",
+      "lifetime": 0.18,
+      "alpha": 0.95
+    },
+    "removeBounds": {
+      "minX": -80,
+      "maxX": 1520,
+      "minY": -120,
+      "maxY": 660
+    }
+  },
+  "animations": {
+    "default": "fly",
+    "clips": {
+      "fly": {
+        "source": {
+          "type": "atlas",
+          "texture": "projectile_thorn_bolt_fly"
+        },
+        "frames": [
+          "thorn_bolt_fly_0",
+          "thorn_bolt_fly_1",
+          "thorn_bolt_fly_2",
+          "thorn_bolt_fly_3"
+        ],
+        "frameRate": 10,
+        "loop": true
+      }
+    }
+  }
+}

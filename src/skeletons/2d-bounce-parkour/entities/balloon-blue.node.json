@@ -1,0 +1,36 @@
+{
+  "name": "BalloonBlue",
+  "script": "Balloon",
+  "tags": ["balloon"],
+  "visual": { "type": "atlas", "texture": "balloons_idle", "frame": "blue", "width": 57, "height": 102 },
+  "collider": {
+    "shape": "circle",
+    "radius": 33,
+    "body": "dynamic",
+    "gravity": false,
+    "immovable": true
+  },
+  "animations": {
+    "clips": {
+      "pop": {
+        "source": { "type": "atlas", "texture": "balloons_pop" },
+        "frames": ["blue_0", "blue_1", "blue_2", "blue_3"],
+        "frameRate": 14,
+        "loop": false,
+        "onFinish": "hold"
+      }
+    }
+  },
+  "config": {
+    "floatPeriod": 2.2,
+    "amplitude": 8,
+    "breathPeriod": 1.7,
+    "breathAmount": 0.06,
+    "phase": 0,
+    "variantKey": "blue",
+    "bounceMultiplier": 0.8,
+    "displayWidth": 57,
+    "displayHeight": 102,
+    "popHideMs": 320
+  }
+}

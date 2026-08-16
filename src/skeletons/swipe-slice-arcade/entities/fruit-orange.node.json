@@ -1,0 +1,35 @@
+{
+  "name": "Fruit",
+  "script": "Fruit",
+  "tags": [
+    "fruit",
+    "sliceable"
+  ],
+  "visual": {
+    "type": "image",
+    "texture": "fruit_orange_whole",
+    "width": 52,
+    "height": 52
+  },
+  "collider": {
+    "body": "dynamic",
+    "shape": "circle",
+    "radius": 26,
+    "gravity": true
+  },
+  "config": {
+    "fruitType": "orange",
+    "score": 15,
+    "weight": 0.92,
+    "velocityX": 0,
+    "velocityY": -560,
+    "missY": 620,
+    "cleanupMargin": 120,
+    "sliced": false,
+    "wholeTexture": "fruit_orange_whole",
+    "leftTexture": "fruit_orange_left",
+    "rightTexture": "fruit_orange_right",
+    "depth": 100,
+    "minReadableTimeForMiss": 0.45
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "player_idle": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "idle_0",
+      "idle_1",
+      "idle_2",
+      "idle_3"
+    ]
+  },
+  "player_run": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "run_0",
+      "run_1",
+      "run_2",
+      "run_3"
+    ]
+  },
+  "player_jump": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "jump_0"
+    ]
+  },
+  "player_fall": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "fall_0"
+    ]
+  },
+  "player_dash": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "dash_0",
+      "dash_1",
+      "dash_2",
+      "dash_3"
+    ]
+  },
+  "player_normal_attack": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "attack_0",
+      "attack_1",
+      "attack_2",
+      "attack_3"
+    ]
+  },
+  "player_charge": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "charge_0",
+      "charge_1",
+      "charge_2",
+      "charge_3"
+    ]
+  },
+  "player_charge_full": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "charge_full_0",
+      "charge_full_1",
+      "charge_full_2",
+      "charge_full_3"
+    ]
+  },
+  "player_charge_release": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "charge_release_0",
+      "charge_release_1",
+      "charge_release_2",
+      "charge_release_3"
+    ]
+  },
+  "player_air_attack": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "air_attack_0",
+      "air_attack_1",
+      "air_attack_2",
+      "air_attack_3"
+    ]
+  },
+  "player_hurt": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "hurt_0",
+      "hurt_1",
+      "hurt_2",
+      "hurt_3"
+    ]
+  },
+  "player_death": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "death_0",
+      "death_1",
+      "death_2",
+      "death_3",
+      "death_4",
+      "death_5"
+    ]
+  }
+}

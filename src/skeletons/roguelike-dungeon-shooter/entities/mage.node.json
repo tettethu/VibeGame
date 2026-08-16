@@ -1,0 +1,8 @@
+{
+  "name": "Mage",
+  "script": "MageEnemy",
+  "tags": ["enemy", "mage"],
+  "visual": { "type": "image", "texture": "mage_idle", "width": 48, "height": 86 },
+  "collider": { "body": "dynamic", "width": 18, "height": 34, "gravity": false, "immovable": true },
+  "config": { "hp": 80, "teleportInterval": 4.0, "teleportMargin": 60, "teleportAttempts": 10, "teleportMinDistance": 100, "teleportMaxDistance": 350, "bulletCount": 8, "bulletSpeed": 180, "bulletDamage": 25, "bulletStyle": "mage", "expReward": 30 }
+}

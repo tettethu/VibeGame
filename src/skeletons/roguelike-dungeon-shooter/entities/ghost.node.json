@@ -1,0 +1,8 @@
+{
+  "name": "Ghost",
+  "script": "GhostEnemy",
+  "tags": ["enemy", "ghost"],
+  "visual": { "type": "atlas", "texture": "ghost_idle", "frame": "idle_0", "width": 48, "height": 48 },
+  "collider": { "body": "dynamic", "width": 20, "height": 28, "gravity": false, "immovable": true },
+  "config": { "hp": 45, "shootInterval": 3.0, "bulletSpeed": 160, "bulletDamage": 20, "bulletStyle": "ghost_laser", "expReward": 25 }
+}

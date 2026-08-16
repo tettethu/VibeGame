@@ -1,0 +1,72 @@
+{
+  "inject_config": {
+    "designer": [
+      { "file": ".vibegame/GDD.md", "reason": "Game design document" },
+      { "file": ".vibegame/spec/design/index.md", "reason": "Design theory index and workflow" },
+      { "file": ".vibegame/spec/design/theories/core-frameworks.md", "reason": "MDA + Core Loop + Magic Circle" },
+      { "file": ".vibegame/spec/design/theories/player-motivation.md", "reason": "Player motivation and fun theory" },
+      { "file": ".vibegame/spec/design/patterns/ui-conventions.md", "reason": "UI / HUD / screen patterns" },
+      { "file": ".vibegame/spec/design/patterns/boss-design.md", "reason": "Boss encounter design patterns" },
+      { "file": ".vibegame/spec/engine/ui.md", "reason": "UI routing rules — informs which UI elements need sprite assets vs CSS" },
+      { "file": ".vibegame/design.jsonl", "reason": "Game-specific design theory (project-level jsonl, each row referenced as a doc)" }
+    ],
+    "artist": [
+      { "file": ".vibegame/spec/art/sprite.md", "reason": "Sprite prompt rules and parameter taxonomy" },
+      { "file": ".vibegame/spec/contracts/rastermap.md", "reason": "Raster map pattern — artist annotates image-pixel landmarks in assets.md after delivery" },
+      { "file": ".vibegame/GDD.md", "reason": "Game design document" },
+      { "file": ".vibegame/assets.md", "reason": "Asset inventory" }
+    ],
+    "reviewer": [
+      { "file": ".vibegame/spec/engine/index.md", "reason": "Engine quick guide and default runtime rules" },
+      { "file": ".vibegame/spec/engine/runtime.md", "reason": "Runtime startup, control API, bot testing, evidence, and shutdown" },
+      { "file": ".vibegame/spec/engine/ui.md", "reason": "UI routing rules (CSS / asset / SVG, Phaser.Text ban)" },
+      { "file": ".vibegame/spec/contracts/rastermap.md", "reason": "Raster map pattern — reviewer verifies collider/visual alignment" },
+      { "file": ".vibegame/spec/cli/vlm.md", "reason": "VLM CLI for visual alignment / proportion checks" },
+      { "file": ".vibegame/spec/test/index.md", "reason": "Regression suite contract — reviewer must run every test in tests/" }
+    ]
+  },
+  "default_config": {
+    "architect": [
+      { "file": ".vibegame/spec/engine/index.md", "reason": "Engine quick guide — architect reads before proposing engine-touching changes" },
+      { "file": ".vibegame/spec/engine/ui.md", "reason": "UI routing rules — informs technical plan" },
+      { "file": ".vibegame/spec/test/index.md", "reason": "Test contract — for planning runtime evidence" },
+      { "file": ".vibegame/GDD.md", "reason": "PRD -> GDD consistency check only" },
+      { "file": "prd.md", "reason": "Task product contract (task-local)" }
+    ],
+    "all": [
+      { "file": "prd.md", "reason": "Product contract — every sprint agent must respect it (task-local)" },
+      { "file": "plan.md", "reason": "Technical plan — downstream agents implement / verify against it (task-local)" }
+    ],
+    "programmer": [
+      { "file": ".vibegame/spec/engine/index.md", "reason": "Engine quick guide — required to write engine-correct code" },
+      { "file": ".vibegame/spec/engine/ui.md", "reason": "UI routing rules (CSS / asset / SVG, Phaser.Text ban)" },
+      { "file": ".vibegame/spec/engine/runtime.md", "reason": "Runtime startup, testing, and shutdown" }
+    ],
+    "auditor": [
+      { "file": ".vibegame/spec/engine/index.md", "reason": "Engine quick guide — needed to enforce engine conventions" },
+      { "file": ".vibegame/spec/engine/ui.md", "reason": "UI routing rules" }
+    ],
+    "player": [
+      { "file": ".vibegame/play.md", "reason": "Game overview and play scenarios" },
+      { "file": ".vibegame/spec/engine/runtime.md", "reason": "Runtime startup, control API, bot testing, evidence, and shutdown" },
+      { "file": ".vibegame/spec/cli/vlm.md", "reason": "VLM CLI — player's verifier for visual fine-tuning" },
+      { "file": ".vibegame/spec/test/index.md", "reason": "Regression suite contract — player creates and maintains tests/" }
+    ]
+  },
+  "require_task_dir": ["architect", "programmer", "auditor", "player"],
+  "task_agent_prefixes": {
+    "architect": "architect-",
+    "programmer": "programmer-",
+    "auditor": "auditor-",
+    "player": "player-"
+  },
+  "role_prefixes": [
+    { "prefix": "architect-", "agent_type": "architect" },
+    { "prefix": "programmer-", "agent_type": "programmer" },
+    { "prefix": "auditor-", "agent_type": "auditor" },
+    { "prefix": "player-", "agent_type": "player" },
+    { "prefix": "artist", "agent_type": "artist" },
+    { "prefix": "designer", "agent_type": "designer" },
+    { "prefix": "reviewer", "agent_type": "reviewer" }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "Main",
+  "root": {
+    "name": "Root",
+    "script": "StageManager",
+    "config": { "startStage": "stage1", "clearDelayMs": 1500, "stompConfettiCount": 8, "goalConfettiCount": 32, "worldBoundsUp": 1000, "worldBoundsDown": 4000 },
+    "children": [
+      {
+        "name": "Background",
+        "children": [
+          { "name": "Sky",        "script": "ParallaxModule", "config": { "texture": "bg_sky", "x": 0, "y": 0, "width": 960, "height": 540, "scrollFactorX": 0, "scrollFactorY": 0, "depth": -100 } },
+          { "name": "CloudA",     "script": "ParallaxModule", "config": { "texture": "clouds", "frame": "a", "x": 0, "y": 110, "width": 4000, "height": 159, "scrollFactorX": 0.3, "depth": -45, "driftX": 12 } },
+          { "name": "CloudB",     "script": "ParallaxModule", "config": { "texture": "clouds", "frame": "b", "x": 0, "y": 60,  "width": 4000, "height": 202, "scrollFactorX": 0.3, "depth": -45, "driftX": 18 } },
+          { "name": "HillsBack",  "script": "ParallaxModule", "config": { "texture": "hills",  "frame": "back",  "x": 0, "y": 360, "width": 4000, "height": 229, "scrollFactorX": 0.2, "depth": -50 } },
+          { "name": "HillsFront", "script": "ParallaxModule", "config": { "texture": "hills",  "frame": "front", "x": 0, "y": 330, "width": 4000, "height": 275, "scrollFactorX": 0.4, "depth": -40 } }
+        ]
+      },
+      { "name": "StageHost", "tags": ["stage-host"] },
+      { "name": "Hud", "script": "Hud" },
+      { "name": "_HeroTemplate",           "src": "entities/hero.node.json",          "enabled": false },
+      { "name": "_BalloonRedTemplate",     "src": "entities/balloon-red.node.json",   "enabled": false },
+      { "name": "_BalloonBlueTemplate",    "src": "entities/balloon-blue.node.json",  "enabled": false },
+      { "name": "_BalloonGoldTemplate",    "src": "entities/balloon-gold.node.json",  "enabled": false },
+      { "name": "_StartPlatformTemplate",  "src": "entities/start-platform.node.json","enabled": false },
+      { "name": "_GoalPlatformTemplate",   "src": "entities/goal-platform.node.json", "enabled": false },
+      { "name": "_MidPlatformTemplate",    "src": "entities/mid-platform.node.json",  "enabled": false },
+      { "name": "_GoalFlagTemplate",       "src": "entities/goal-flag.node.json",     "enabled": false },
+      { "name": "_ConfettiTemplate",       "src": "entities/fx/confetti.node.json",   "enabled": false }
+    ]
+  }
+}

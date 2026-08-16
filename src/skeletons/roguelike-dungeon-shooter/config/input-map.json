@@ -1,0 +1,10 @@
+{
+  "move_up":    ["W", "UP"],
+  "move_down":  ["S", "DOWN"],
+  "move_left":  ["A", "LEFT"],
+  "move_right": ["D", "RIGHT"],
+  "interact":   ["E"],
+  "weapon_switch": ["F"],
+  "pause":      ["ESC"],
+  "roll":       ["SPACE"]
+}

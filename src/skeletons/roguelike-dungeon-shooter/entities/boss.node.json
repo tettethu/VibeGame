@@ -1,0 +1,35 @@
+{
+  "name": "Boss",
+  "script": "BossEnemy",
+  "tags": ["enemy", "boss"],
+  "visual": { "type": "atlas", "texture": "wraith_knight_atlas", "frame": "idle_0", "width": 96, "height": 192 },
+  "collider": { "body": "dynamic", "width": 56, "height": 80, "gravity": false },
+  "config": {
+    "hp": 4000,
+    "expReward": 100,
+    "phaseThreshold": 0.4,
+    "transitionDuration": 2.5,
+    "bulletDamage": 15,
+    "baseBulletSpeed": 150,
+    "bulletStyle": "boss",
+    "chaseSpeed": 120,
+    "attackRange": 200,
+    "contactDamage": 25,
+    "contactCooldown": 0.8,
+    "retreatDuration": 0.8,
+    "retreatSpeed": 80,
+    "minionSpawnInterval": 10,
+    "minionMaxCount": 4,
+    "minionPerSpawn": 2,
+    "transitionHandCount": 10,
+    "transitionHandDamage": 15,
+    "transitionHandDuration": 2.0,
+    "transitionHandCooldown": 0.8,
+    "phase1": {
+      "scriptInterval": 1.2
+    },
+    "phase2": {
+      "scriptInterval": 0.7
+    }
+  }
+}

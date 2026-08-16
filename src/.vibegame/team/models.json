@@ -1,0 +1,86 @@
+{
+  "claude": {
+    "command": "claude",
+    "models": ["fable", "fable[1m]", "opus[1m]", "opus", "sonnet", "sonnet[1m]", "haiku"],
+    "default_model": "sonnet",
+    "trust_enter": true,
+    "system_prompt_flag": "--append-system-prompt",
+    "initial_prompt_mode": "argument",
+    "resume": "--resume",
+    "default_params": {"skip_permissions": true, "verbose": true},
+    "flags": {
+      "model": ["--model", true],
+      "name": ["--name", true],
+      "agent": ["--agent", true],
+      "skip_permissions": "--dangerously-skip-permissions",
+      "verbose": "--verbose"
+    },
+    "env": {
+      "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
+    }
+  },
+  "claude-thirdparty": {
+    "command": "claude",
+    "models": ["opus[1m]", "opus", "sonnet", "haiku"],
+    "default_model": "sonnet",
+    "trust_enter": true,
+    "system_prompt_flag": "--append-system-prompt",
+    "initial_prompt_mode": "argument",
+    "resume": "--resume",
+    "default_params": {"skip_permissions": true, "verbose": true},
+    "flags": {
+      "model": ["--model", true],
+      "name": ["--name", true],
+      "agent": ["--agent", true],
+      "skip_permissions": "--dangerously-skip-permissions",
+      "verbose": "--verbose"
+    },
+    "env": {
+      "ANTHROPIC_BASE_URL": "${THIRD_PARTY_BASE_URL}",
+      "ANTHROPIC_AUTH_TOKEN": "${THIRD_PARTY_API_KEY}",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "${THIRD_PARTY_OPUS_MODEL}",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "${THIRD_PARTY_SONNET_MODEL}",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL": "${THIRD_PARTY_HAIKU_MODEL}"
+    }
+  },
+  "codex": {
+    "command": "codex",
+    "models": ["gpt-5.6-sol","gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5","gpt-5.4", "gpt-5.4-mini", "gpt-5.1-mini"],
+    "default_model": "gpt-5.6-sol",
+    "trust_enter": true,
+    "system_prompt_flag": null,
+    "initial_prompt_mode": "argument",
+    "resume": "resume",
+    "default_params": {"skip_permissions": true},
+    "flags": {
+      "model": ["--model", true],
+      "skip_permissions": "--dangerously-bypass-approvals-and-sandbox"
+    }
+  },
+  "glm": {
+    "command": "claude",
+    "models": ["glm-5.1"],
+    "default_model": "glm-5.1",
+    "trust_enter": true,
+    "system_prompt_flag": "--append-system-prompt",
+    "initial_prompt_mode": "argument",
+    "resume": "--resume",
+    "default_params": {"skip_permissions": true, "verbose": true},
+    "flags": {
+      "model": ["--model", true],
+      "name": ["--name", true],
+      "agent": ["--agent", true],
+      "skip_permissions": "--dangerously-skip-permissions",
+      "verbose": "--verbose"
+    },
+    "env": {
+      "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
+      "ANTHROPIC_AUTH_TOKEN": "${GLM_API_KEY}",
+      "ANTHROPIC_MODEL": "${model}",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-5.1",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.1",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.1"
+    },
+    "model_cli_value": "glm-5.1"
+  }
+}

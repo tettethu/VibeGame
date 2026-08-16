@@ -1,0 +1,584 @@
+{
+  "player_run": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "run_0",
+      "run_1",
+      "run_2",
+      "run_3",
+      "run_4"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "player_roll": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "roll_0",
+      "roll_1",
+      "roll_2",
+      "roll_3",
+      "roll_4",
+      "roll_5",
+      "roll_6",
+      "roll_7"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "slime_jump": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "jump_0",
+      "jump_1",
+      "jump_2",
+      "jump_3",
+      "jump_4"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "bat_flap": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "flap_0",
+      "flap_1",
+      "flap_2",
+      "flap_3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "ghost_idle": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "idle_0",
+      "idle_1",
+      "idle_2",
+      "idle_3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "sk_hand_emerge": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "emerge_0",
+      "emerge_1",
+      "emerge_2",
+      "emerge_3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "wraith_shard": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "idle_0",
+      "idle_1",
+      "die_0",
+      "die_1"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "chest": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "chest_closed",
+      "chest_open_r"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "wraith_knight_atlas": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "idle_0",
+      "idle_1",
+      "walk_0",
+      "walk_1",
+      "slash_0",
+      "slash_1",
+      "die_0",
+      "die_1"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "bullet_player": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#ffde59",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "bullet_enemy": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#ff5a54",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "bullet_laser": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#4ad9ff",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "bullet_boss_soul_orb": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#b366ff",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "bullet_boss_soul_dart": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#b366ff",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "bullet_boss_soul_wave": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#b366ff",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "bullet_boss_soul_shard": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#d966b3",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "archer_idle": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#c9a066",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "archer_attack": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#c9a066",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "archer_die": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#c9a066",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "mage_idle": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#8855cc",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "mage_attack": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#8855cc",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "mage_teleport": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#8855cc",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "mage_die": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#8855cc",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "slime_die": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#5fbf5f",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "hud_panel_nb_pixel": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#30251f",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "icon_heart_nb_pixel": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#d94b47",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "icon_shield_nb_pixel": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#6a9edc",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "icon_energy_nb_pixel": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#6cc9dc",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "hud_bar_hp_nb_pixel": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#d94b47",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "hud_bar_shield_nb_pixel": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#79a7dc",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "hud_bar_energy_nb_pixel": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#6cc9dc",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "minimap_panel_pixel": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#5a4633",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "minimap_room_current_pixel": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#ffe097",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "minimap_room_explored_pixel": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#9c7a4a",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "minimap_room_adjacent_pixel": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#5e5142",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "minimap_room_hidden_pixel": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#1b1715",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "minimap_room_start_pixel": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#6cc9dc",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "minimap_room_boss_pixel": {
+    "type": "placeholder_image",
+    "shape": "hex",
+    "color": "#d94b47",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "minimap_conn_h_pixel": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#8c7458",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "minimap_conn_v_pixel": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#8c7458",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "icon_coin": {
+    "type": "image",
+    "path": "ui/icon_coin.svg",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "weapon_pistol": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#d8b36a",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "weapon_shotgun": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#c77a4a",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "weapon_assault_rifle": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#7da36a",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "weapon_rocket_launcher": {
+    "type": "placeholder_image",
+    "shape": "rectangle",
+    "color": "#8b6ac7",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "dungeon_semantic": {
+    "type": "tileset",
+    "path": "tilesets/dungeon_semantic_placeholder.png",
+    "tileSize": 32,
+    "tiles": {
+      "floor_00": {
+        "index": 51,
+        "collision": false
+      },
+      "floor_01": {
+        "index": 52,
+        "collision": false
+      },
+      "floor_02": {
+        "index": 53,
+        "collision": false
+      },
+      "floor_03": {
+        "index": 54,
+        "collision": false
+      },
+      "floor_04": {
+        "index": 55,
+        "collision": false
+      },
+      "floor_05": {
+        "index": 56,
+        "collision": false
+      },
+      "floor_06": {
+        "index": 57,
+        "collision": false
+      },
+      "floor_07": {
+        "index": 58,
+        "collision": false
+      },
+      "floor_08": {
+        "index": 59,
+        "collision": false
+      },
+      "floor_09": {
+        "index": 60,
+        "collision": false
+      },
+      "floor_10": {
+        "index": 67,
+        "collision": false
+      },
+      "floor_11": {
+        "index": 68,
+        "collision": false
+      },
+      "floor_12": {
+        "index": 69,
+        "collision": false
+      },
+      "floor_13": {
+        "index": 70,
+        "collision": false
+      },
+      "wall_top": {
+        "index": 19,
+        "collision": false
+      },
+      "wall_top_alt": {
+        "index": 20,
+        "collision": false
+      },
+      "wall_face": {
+        "index": 35,
+        "collision": true
+      },
+      "wall_face_alt": {
+        "index": 36,
+        "collision": true
+      },
+      "door_top": {
+        "index": 23,
+        "collision": false
+      },
+      "door_face": {
+        "index": 39,
+        "collision": true
+      },
+      "wall_full": {
+        "index": 158,
+        "collision": false
+      },
+      "wall_full_alt": {
+        "index": 174,
+        "collision": false
+      },
+      "door_full": {
+        "index": 159,
+        "collision": false
+      }
+    },
+    "categories": {
+      "floor": [
+        "floor_00",
+        "floor_01",
+        "floor_02",
+        "floor_03",
+        "floor_04",
+        "floor_05",
+        "floor_06",
+        "floor_07",
+        "floor_08",
+        "floor_09",
+        "floor_10",
+        "floor_11",
+        "floor_12",
+        "floor_13"
+      ],
+      "wall": [
+        "wall_top",
+        "wall_top_alt",
+        "wall_face",
+        "wall_face_alt"
+      ],
+      "door": [
+        "door_top",
+        "door_face"
+      ],
+      "wall_runtime": [
+        "wall_full",
+        "wall_full_alt"
+      ],
+      "door_runtime": [
+        "door_full"
+      ]
+    }
+  }
+}

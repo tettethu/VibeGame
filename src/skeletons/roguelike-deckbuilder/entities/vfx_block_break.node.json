@@ -1,0 +1,35 @@
+{
+  "name": "VfxBlockBreak",
+  "script": "TimedImageVfxModule",
+  "visual": {
+    "type": "atlas",
+    "texture": "vfx_block_break",
+    "width": 80,
+    "height": 80
+  },
+  "animations": {
+    "default": "play",
+    "clips": {
+      "play": {
+        "frames": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "duration": 0.28,
+        "loop": false,
+        "onFinish": "hold"
+      }
+    }
+  },
+  "config": {
+    "ttl": 0.28,
+    "alphaStart": 0.9,
+    "alphaEnd": 0,
+    "scaleStart": 1.0,
+    "scaleEnd": 1.8,
+    "velocityY": -20,
+    "kind": "vfx"
+  }
+}

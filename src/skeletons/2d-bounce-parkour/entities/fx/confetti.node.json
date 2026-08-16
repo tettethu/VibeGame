@@ -1,0 +1,14 @@
+{
+  "name": "Confetti",
+  "script": "ConfettiParticle",
+  "visual": { "type": "atlas", "texture": "confetti", "frame": "red_square", "width": 12, "height": 12 },
+  "config": {
+    "lifetime": 0.8,
+    "gravity": 600,
+    "speedMin": 120,
+    "speedMax": 260,
+    "upBias": 220,
+    "displaySize": 12,
+    "frameNames": ["red_square", "blue_diamond", "gold_star", "pink_strip", "green_triangle", "white_dot", "orange_strip", "purple_lozenge"]
+  }
+}

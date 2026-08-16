@@ -1,0 +1,102 @@
+{
+  "fx_normal_slash": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "normal_slash_0",
+      "normal_slash_1",
+      "normal_slash_2",
+      "normal_slash_3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "fx_charged_slash": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "charged_slash_0",
+      "charged_slash_1",
+      "charged_slash_2",
+      "charged_slash_3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "fx_air_slash": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "air_slash_0",
+      "air_slash_1",
+      "air_slash_2",
+      "air_slash_3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "fx_hit_spark": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "hit_spark_0",
+      "hit_spark_1",
+      "hit_spark_2",
+      "hit_spark_3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "fx_ground_crack": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "ground_crack_0",
+      "ground_crack_1",
+      "ground_crack_2",
+      "ground_crack_3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "fx_ash_burst": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "ash_burst_0",
+      "ash_burst_1",
+      "ash_burst_2",
+      "ash_burst_3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "fx_boss_lunge": {
+    "type": "placeholder_atlas",
+    "frames": [
+      "boss_lunge_0",
+      "boss_lunge_1",
+      "boss_lunge_2",
+      "boss_lunge_3"
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  "fx_charge_ready": {
+    "type": "placeholder_image",
+    "shape": "circle",
+    "color": "#7ff6ff",
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  }
+}

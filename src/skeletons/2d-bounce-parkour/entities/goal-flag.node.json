@@ -1,0 +1,5 @@
+{
+  "name": "GoalFlag",
+  "tags": ["goal-flag"],
+  "visual": { "type": "image", "texture": "goal_flag", "width": 48, "height": 96 }
+}

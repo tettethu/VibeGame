@@ -1,0 +1,6 @@
+{
+  "name": "MidPlatform",
+  "tags": ["ground"],
+  "visual": { "type": "atlas", "texture": "platforms", "frame": "mid", "width": 120, "height": 32 },
+  "collider": { "body": "static", "host": "separate"}
+}

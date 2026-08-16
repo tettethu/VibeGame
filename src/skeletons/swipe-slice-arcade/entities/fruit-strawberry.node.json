@@ -1,0 +1,35 @@
+{
+  "name": "Fruit",
+  "script": "Fruit",
+  "tags": [
+    "fruit",
+    "sliceable"
+  ],
+  "visual": {
+    "type": "image",
+    "texture": "fruit_strawberry_whole",
+    "width": 38,
+    "height": 38
+  },
+  "collider": {
+    "body": "dynamic",
+    "shape": "circle",
+    "radius": 19,
+    "gravity": true
+  },
+  "config": {
+    "fruitType": "strawberry",
+    "score": 8,
+    "weight": 0.65,
+    "velocityX": 0,
+    "velocityY": -560,
+    "missY": 620,
+    "cleanupMargin": 120,
+    "sliced": false,
+    "wholeTexture": "fruit_strawberry_whole",
+    "leftTexture": "fruit_strawberry_left",
+    "rightTexture": "fruit_strawberry_right",
+    "depth": 100,
+    "minReadableTimeForMiss": 0.45
+  }
+}

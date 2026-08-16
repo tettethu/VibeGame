@@ -1,0 +1,21 @@
+{
+  "name": "WraithShard",
+  "script": "WraithShardEnemy",
+  "tags": ["enemy", "boss_minion"],
+  "visual": { "type": "atlas", "texture": "wraith_shard", "frame": "idle_0", "width": 36, "height": 40 },
+  "animations": {
+    "default": "idle",
+    "clips": {
+      "idle": { "frames": ["idle_0", "idle_1"], "frameRate": 4, "loop": true },
+      "die":  { "frames": ["die_0", "die_1"],   "frameRate": 8, "loop": false }
+    }
+  },
+  "collider": { "body": "dynamic", "width": 14, "height": 14, "gravity": false },
+  "config": {
+    "hp": 15,
+    "speed": 120,
+    "contactDamage": 5,
+    "contactCooldown": 1.0,
+    "expReward": 0
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "actions": {
+    "move_up":    { "keys": ["UP", "W"] },
+    "move_down":  { "keys": ["DOWN", "S"] },
+    "move_left":  { "keys": ["LEFT", "A"] },
+    "move_right": { "keys": ["RIGHT", "D"] },
+    "jump":       { "keys": ["SPACE"] },
+    "dash":       { "keys": ["SHIFT"] },
+    "confirm":    { "keys": ["ENTER"] },
+    "cancel":     { "keys": ["ESC"] }
+  }
+}

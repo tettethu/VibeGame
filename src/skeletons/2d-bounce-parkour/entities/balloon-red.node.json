@@ -1,0 +1,36 @@
+{
+  "name": "BalloonRed",
+  "script": "Balloon",
+  "tags": ["balloon"],
+  "visual": { "type": "atlas", "texture": "balloons_idle", "frame": "red", "width": 38, "height": 68 },
+  "collider": {
+    "shape": "circle",
+    "radius": 22,
+    "body": "dynamic",
+    "gravity": false,
+    "immovable": true
+  },
+  "animations": {
+    "clips": {
+      "pop": {
+        "source": { "type": "atlas", "texture": "balloons_pop" },
+        "frames": ["red_0", "red_1", "red_2", "red_3"],
+        "frameRate": 14,
+        "loop": false,
+        "onFinish": "hold"
+      }
+    }
+  },
+  "config": {
+    "floatPeriod": 2.0,
+    "amplitude": 10,
+    "breathPeriod": 1.5,
+    "breathAmount": 0.08,
+    "phase": 0,
+    "variantKey": "red",
+    "bounceMultiplier": 1.0,
+    "displayWidth": 38,
+    "displayHeight": 68,
+    "popHideMs": 320
+  }
+}

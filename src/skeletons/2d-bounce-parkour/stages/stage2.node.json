@@ -1,0 +1,26 @@
+{
+  "name": "Stage2",
+  "tags": ["stage"],
+  "config": {
+    "spawnX": 120,
+    "spawnY": 380,
+    "levelWidth": 2960
+  },
+  "children": [
+    { "src": "entities/start-platform.node.json", "name": "StartPlatform", "config": { "x": 120, "y": 440 } },
+    { "src": "entities/balloon-red.node.json",  "name": "B01", "config": { "x": 300,  "y": 370, "phase": 0.0 } },
+    { "src": "entities/balloon-red.node.json",  "name": "B02", "config": { "x": 540,  "y": 360, "phase": 0.4 } },
+    { "src": "entities/balloon-blue.node.json", "name": "B03", "config": { "x": 770,  "y": 350, "phase": 0.7 } },
+    { "src": "entities/balloon-red.node.json",  "name": "B04", "config": { "x": 990,  "y": 370, "phase": 1.1 } },
+    { "src": "entities/balloon-red.node.json",  "name": "B05", "config": { "x": 1230, "y": 350, "phase": 1.5 } },
+    { "src": "entities/balloon-blue.node.json", "name": "B06", "config": { "x": 1470, "y": 340, "phase": 1.8 } },
+    { "src": "entities/balloon-red.node.json",  "name": "B07", "config": { "x": 1790, "y": 360, "phase": 0.3 } },
+    { "src": "entities/balloon-red.node.json",  "name": "B08", "config": { "x": 2010, "y": 350, "phase": 0.7 } },
+    { "src": "entities/balloon-blue.node.json", "name": "B09", "config": { "x": 2250, "y": 340, "phase": 1.0 } },
+    { "src": "entities/balloon-red.node.json",  "name": "B10", "config": { "x": 2470, "y": 360, "phase": 1.3 } },
+    { "src": "entities/balloon-red.node.json",  "name": "B11", "config": { "x": 2640, "y": 360, "phase": 1.6 } },
+    { "src": "entities/goal-platform.node.json", "name": "GoalPlatform", "config": { "x": 2820, "y": 440 } },
+    { "src": "entities/goal-flag.node.json",     "name": "GoalFlag",     "config": { "x": 2820, "y": 372 } },
+    { "src": "entities/hero.node.json",          "name": "Hero",         "config": { "x": 120,  "y": 380 } }
+  ]
+}

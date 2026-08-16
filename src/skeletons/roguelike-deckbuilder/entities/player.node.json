@@ -1,0 +1,160 @@
+{
+  "name": "Player",
+  "script": "PlayerCharacter",
+  "tags": [
+    "player"
+  ],
+  "visual": {
+    "type": "atlas",
+    "texture": "player_idle",
+    "width": 120,
+    "height": 190,
+    "pivot": [
+      0.5,
+      1
+    ]
+  },
+  "animations": {
+    "default": "idle",
+    "clips": {
+      "idle": {
+        "frames": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "duration": 0.8,
+        "loop": true
+      },
+      "attack": {
+        "frames": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "duration": 0.34,
+        "loop": false,
+        "onFinish": "hold",
+        "source": {
+          "texture": "player_attack",
+          "type": "atlas"
+        }
+      },
+      "hurt": {
+        "frames": [
+          "0",
+          "1"
+        ],
+        "duration": 0.18,
+        "loop": false,
+        "onFinish": "hold",
+        "source": {
+          "texture": "player_hurt",
+          "type": "atlas"
+        }
+      },
+      "die": {
+        "frames": [
+          "0",
+          "1",
+          "2",
+          "3"
+        ],
+        "duration": 0.4,
+        "loop": false,
+        "onFinish": "hold",
+        "source": {
+          "texture": "player_die",
+          "type": "atlas"
+        }
+      }
+    }
+  },
+  "animator": {
+    "defaultState": "idle",
+    "parameters": {
+      "attackTrigger": "trigger",
+      "attackDoneTrigger": "trigger",
+      "hurtTrigger": "trigger",
+      "hurtDoneTrigger": "trigger",
+      "dieTrigger": "trigger"
+    },
+    "states": {
+      "idle": {
+        "clip": "idle"
+      },
+      "attack": {
+        "clip": "attack"
+      },
+      "hurt": {
+        "clip": "hurt"
+      },
+      "die": {
+        "clip": "die"
+      }
+    },
+    "transitions": [
+      {
+        "from": "idle",
+        "to": "attack",
+        "when": [
+          {
+            "trigger": "attackTrigger"
+          }
+        ]
+      },
+      {
+        "from": "attack",
+        "to": "idle",
+        "when": [
+          {
+            "trigger": "attackDoneTrigger"
+          }
+        ]
+      },
+      {
+        "from": "attack",
+        "to": "idle",
+        "hasExitTime": true
+      },
+      {
+        "from": "idle",
+        "to": "hurt",
+        "when": [
+          {
+            "trigger": "hurtTrigger"
+          }
+        ]
+      },
+      {
+        "from": "hurt",
+        "to": "idle",
+        "when": [
+          {
+            "trigger": "hurtDoneTrigger"
+          }
+        ]
+      },
+      {
+        "from": "hurt",
+        "to": "idle",
+        "hasExitTime": true
+      },
+      {
+        "from": "Any",
+        "to": "die",
+        "when": [
+          {
+            "trigger": "dieTrigger"
+          }
+        ]
+      }
+    ]
+  },
+  "config": {
+    "x": 220,
+    "y": 500
+  }
+}
