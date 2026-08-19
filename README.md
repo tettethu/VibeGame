@@ -12,7 +12,7 @@
     &nbsp;·&nbsp;
     <a href="https://vibegame.tettet.org/#demos"><strong>Watch Demos</strong></a>
     &nbsp;·&nbsp;
-    <a href="https://vibegame.tettet.org/technical_report.pdf"><strong>Technical Report</strong></a>
+    <a href="./technical_report.pdf"><strong>Technical Report</strong></a>
     &nbsp;·&nbsp;
     <a href="https://discord.gg/Ec6d9wx8sU"><strong>Discord</strong></a>
     &nbsp;·&nbsp;
@@ -23,7 +23,7 @@
 
 ## News
 
-- **[2026.08]** 🚀 We release VibeGame: Prompt-to-Game Development with AI-Native Engine and Self-Evolving Adversarial Agent Team! Check our [Project Page](https://vibegame.tettet.org) and [Technical Report](https://vibegame.tettet.org/technical_report.pdf)
+- **[2026.08]** 🚀 We release VibeGame: Prompt-to-Game Development with AI-Native Engine and Self-Evolving Adversarial Agent Team! Check our [Project Page](https://vibegame.tettet.org) and [Technical Report](./technical_report.pdf)
 
 ## Demos
 
