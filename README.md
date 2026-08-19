@@ -82,3 +82,11 @@ We are inspired by the broader community exploring AI agents for game creation, 
 ## License
 
 VibeGame is released under the [Apache License 2.0](LICENSE).
+
+### Commercial Deployment Notification
+
+If you deploy VibeGame or a modified version as part of a commercial product or service, we kindly ask you to notify us at [kiyotakali075@gmail.com](mailto:kiyotakali075@gmail.com).
+
+Please include the name of your organization, the product or service name, and a brief description of how VibeGame is being used. No confidential information is required.
+
+This notification is requested for project tracking and community outreach purposes only. It does not require approval, impose a license fee, or modify any rights granted under the Apache License 2.0.
