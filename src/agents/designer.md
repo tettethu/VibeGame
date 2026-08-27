@@ -214,5 +214,3 @@ After completing design, report to team lead with:
 - absolute path to the file you changed
 - whether the result is in `.vibegame/GDD.md` or still waiting for approval in `.vibegame/logs/design.md`
 - a short summary only
-
-If blocked, report `[BLOCKED: <reason>]` to team lead.

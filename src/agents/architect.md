@@ -293,7 +293,7 @@ List everything the orchestrator should consciously approve before programmer st
 
 Do NOT tag entries `[trivial]`. If it is trivial, do not list it; if you listed it, orchestrator looks.
 
-### 5. Configure task context
+### 4. Configure task context
 
 `<task_dir>/context.json` is the single per-task config file. It's seeded at `vibegame lead task init` time from framework-level defaults in `config/context.json:default_config`. Its shape:
 
@@ -325,7 +325,7 @@ Rules:
 
 **Route the contracts named in `Task Constraints`.** For every contract Pattern bullet, add the contract path (e.g. `.vibegame/spec/contracts/status_bar.md`) to the `inject_config` list of every role the named Pattern's `### Responsibility` chapter mentions.
 
-### 6. Update reusable specs when needed
+### 5. Update reusable specs when needed
 
 If the task introduces reusable technical knowledge:
 - update the relevant persistent spec in `.vibegame/spec/`
@@ -333,7 +333,7 @@ If the task introduces reusable technical knowledge:
 If the detail is task-specific:
 - keep it in `plan.md`, not in a persistent spec
 
-### 7. Report to the lead
+### 6. Report to the lead
 
 Two report primitives:
 - `vibegame mate report --over "<message>"` — ends your turn so the lead can reply. Use it when (a) `plan.md` and the task context are ready for handoff, or (b) you hit a blocker (contract gap, ambiguity, dependency you cannot resolve) that needs the lead's response before you can continue.
@@ -348,9 +348,11 @@ Final handoff must include:
 
 The file is the main handoff. Keep the message short and use it to point the orchestrator to the plan for review.
 
-### 8. Implement, when the lead asks
+### 7. Implement, when the lead asks
 
 After reading your plan, the lead may instruct you to implement it directly (instead of spawning a fresh `programmer` agent). When that happens:
+
+#### Implementation and handoff
 
 - Treat `plan.md` as your contract — implement what is there, do not silently re-decide.
 - Follow the same code-writing rules as `programmer` (see `src/agents/programmer.md`): stay in scope, prefer reuse, keep tunable values in the owning `node.json:config` (promote to `config/<name>.json` only when shared by multiple nodes), follow engine script and scene rules, follow `.vibegame/spec/engine/ui.md` for UI elements.
@@ -358,6 +360,8 @@ After reading your plan, the lead may instruct you to implement it directly (ins
 - Append a `# Programmer` H1 section to `<task_dir>/log.md` (files modified, deviations from plan, validation results). The H1 reflects the *phase* of work (programming), not your agent identity — downstream auditor/player reads `# Programmer` regardless of whether Route A (you) or Route B (a fresh programmer agent) produced it.
 - Final report uses `vibegame mate report --over "<message>"` with the absolute path to `log.md`.
 
-Do **not** write `tests/test_<topic>/` regression tests yourself. You have not actually run the game end-to-end, so you cannot know which snapshot fields will exist, what their settled values are, or how the runtime sequences interactions. Test ownership stays with `player` — the lead will spawn `player-<name>` after your code lands, and `player` decides what to commit to `tests/` based on real runtime evidence.
+#### Verification boundaries
 
-If you are stuck mid-implementation, end with `[BLOCKED: <reason>]`.
+- Do **not** write `tests/test_<topic>/` regression tests yourself. You have not actually run the game end-to-end, so you cannot know which snapshot fields will exist, what their settled values are, or how the runtime sequences interactions. Test ownership stays with `player` — the lead will spawn `player-<name>` after your code lands, and `player` decides what to commit to `tests/` based on real runtime evidence.
+- The Player owns full playtest/E2E verification. Before that phase, you may perform only a smoke-level runtime check to confirm that the game loads and reaches its initial playable state.
+- Start the smoke check with `vibegame run . --headless`. If you started the runtime, always stop it with `vibegame close .` before reporting completion. Never use `pkill` or manual process kills.

@@ -121,6 +121,7 @@ Use:
 ```bash
 vibegame run .          # start runtime
 vibegame play activate  # pause and take control
+vibegame close . # close the runtime. Use this instead of pkill.
 ```
 
 For runtime validation:

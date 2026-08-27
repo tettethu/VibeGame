@@ -54,10 +54,15 @@ def cmd_report(args: argparse.Namespace) -> int:
     if not content:
         print("No report content provided.", file=sys.stderr)
         return 1
-    # only update status to can-stop when --over is set
+    if args.over and args.wait:
+        print("--over and --wait are mutually exclusive.", file=sys.stderr)
+        return 1
+    # status only changes on --over (can-stop) or --wait (waiting); a plain report keeps it
     updates = {"last_report": content}
     if args.over:
         updates["status"] = "can-stop"
+    elif args.wait:
+        updates["status"] = "waiting"
     update_agent(name, str(_runtime_dir()), **updates)
     append_message(
         from_role="agent",
@@ -67,8 +72,9 @@ def cmd_report(args: argparse.Namespace) -> int:
         content=content,
         explicit_team_dir=str(_runtime_dir()),
     )
-    status_hint = " (status -> can-stop)" if args.over else ""
-    log.command("mate", f"report --name {name}{' --over' if args.over else ''}", f"sent")
+    status_hint = " (status -> can-stop)" if args.over else (" (status -> waiting)" if args.wait else "")
+    flags = ' --over' if args.over else (' --wait' if args.wait else '')
+    log.command("mate", f"report --name {name}{flags}", f"sent")
     print(f"Report sent from '{name}'{status_hint}.")
     return 0
 

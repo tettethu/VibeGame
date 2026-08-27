@@ -39,9 +39,10 @@ Orchestrator Priority Checks (in order):
 6. All checks pass → APPROVE stop
 
 Mate Rules:
-- Agent must set status to "can-stop" via report before stop is allowed.
+- Agent must set status to "can-stop" or "waiting" via report before stop is allowed.
 - Use `vibegame mate report "[summary]"` for progress updates.
 - Use `vibegame mate report --over "[summary]"` only when work is complete and this is the final handoff.
+- Use `vibegame mate report --wait "[summary]"` when the turn is done but background jobs are still running; the lead's stop hook counts "waiting" as in-flight.
 """
 
 from __future__ import annotations
@@ -264,11 +265,12 @@ def check_mate_stop(team_dir: str, mate_name: str) -> tuple[bool, str]:
     for hook in hooks:
         if hook.get("type") != "check":
             continue
-        if hook.get("check") == "agent-reported" and agent.get("status") != "can-stop":
+        if hook.get("check") == "agent-reported" and agent.get("status") not in ("can-stop", "waiting"):
             return False, (
                 f"Report your progress before stopping.\n"
                 "Use `vibegame mate report \"[summary]\"` — progress update when you should keep working now.\n"
-                "Use `vibegame mate report --over \"[summary]\"` — when current turn/task/preparation is done, and you will stop and wait for new instructions."
+                "Use `vibegame mate report --over \"[summary]\"` — when current turn/task/preparation is done, and you will stop and wait for new instructions.\n"
+                "Use `vibegame mate report --wait \"[summary]\"` — when your turn is done but background jobs you started are still running, stop now and handle the results when they finish."
             )
     return True, "mate stop allowed"
 
@@ -278,7 +280,9 @@ def check_mate_stop(team_dir: str, mate_name: str) -> tuple[bool, str]:
 def current_working_agents(team_dir: str) -> list[str]:
     state = load_state(team_dir)
     agents = state.get("agents", {})
-    return [name for name, agent in agents.items() if agent.get("status") == "working"]
+    # "waiting" counts as in-flight: the mate stopped but its background jobs are
+    # still running, so the lead should idle-wait, not fall through to later gates.
+    return [name for name, agent in agents.items() if agent.get("status") in ("working", "waiting")]
 
 
 def format_messages_summary(messages: list[dict]) -> str:

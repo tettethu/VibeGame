@@ -498,8 +498,9 @@ Skipping pivot on a VFX asset makes it render at bottom-center → it floats upw
 
 ## Phase 6: Report
 
-  Two report primitives:
+  Three report primitives:
   - `vibegame mate report --over "<message>"` — ends your turn so the lead can reply. Use it when (a) asset delivery is complete (manifest and `assets.md` updated), or (b) you hit a blocker (commission unclear, prompt instructions conflict, tool failure you cannot work around) that needs the lead's response.
+  - `vibegame mate report --wait "<message>"` — ends your turn while generation batches you launched are still running in the background. Use it instead of `--over` whenever jobs are still in flight, so the lead knows work is pending rather than done.
   - `vibegame mate report "<message>"` — sends a message without ending your turn. Use it when the lead pings you mid-work for a status check.
 
   Do not leave detailed delivery info only in the panel. Briefly report:

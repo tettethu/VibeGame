@@ -8,6 +8,7 @@
   - `index.html` — Game entry point
 3. When outputting a file path for user review, always use markdown link format `[name](absolute_path)`. Do not use relative paths or `[name](file://absolute_path)`
 4. Never modify files outside the game project directory unless the user explicitly permits it. When deleting files, prefer recoverable methods (e.g. `trash` on macOS) over `rm`.
+5. Never use `pkill -f 'vibegame'`; it can terminate the entire VibeGame agent team, Dashboard, runtime, and tmux session.
 
 ## User Interaction
 

@@ -149,5 +149,3 @@ Your final report must cover:
 - the verdict for the task: pass, or specific issues that block it
 
 If unresolved concerns, trade-offs, or notable hidden risks need more space than fits in your `# Auditor` log section, include them in that section directly — keep all your output in `log.md`.
-
-If you are stuck and cannot proceed without contract or environment changes, end with `[BLOCKED: <reason>]` so the lead routes accordingly.

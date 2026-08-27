@@ -53,6 +53,7 @@ def cmd_report(
     content: Optional[str] = typer.Argument(None, help="Report content. Reads from stdin if omitted."),
     name: Optional[str] = typer.Option(None, "--name", help="Mate name. Defaults to $VIBEGAME_MATE_NAME."),
     over: bool = typer.Option(False, "--over", help="Mark current work as over; status -> can-stop."),
+    wait: bool = typer.Option(False, "--wait", help="Turn done but background jobs still running; status -> waiting."),
 ):
     """Send a progress or completion report from a mate back to the lead."""
-    _exit(_mate_main.cmd_report(SimpleNamespace(content=content, name=name, over=over)))
+    _exit(_mate_main.cmd_report(SimpleNamespace(content=content, name=name, over=over, wait=wait)))

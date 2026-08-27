@@ -190,7 +190,7 @@ Do not leave final evidence only in `/tmp`.
 
 For tasks touching colliders, walls, platforms, hitboxes, hurtboxes, pickups, sensors, or visual/collider alignment, a normal screenshot is insufficient. Capture collider-debug evidence with physics bodies visible.
 
-In `log.md`, state whether the visible art and physics body match: feet line, platform top, wall edge, attack/hurtbox, pickup/sensor range. `vibegame run --debug` only enables physics bodies; it does not activate runtime control. If you need frame-0 pause as well, start with `vibegame run . -b --headless --activate --debug`. Never edit `project.json` only to enable debug evidence. If collider-debug evidence still cannot be captured, report `[BLOCKED: collider debug unavailable]`.
+In `log.md`, state whether the visible art and physics body match: feet line, platform top, wall edge, attack/hurtbox, pickup/sensor range. `vibegame run --debug` only enables physics bodies; it does not activate runtime control. If you need frame-0 pause as well, start with `vibegame run . -b --headless --activate --debug`. Never edit `project.json` only to enable debug evidence.
 
 Use `vibegame play` for everything: input, frame advance, snapshot, screenshot, eval, console, network. One session, both kinds of evidence.
 
@@ -368,15 +368,14 @@ PASS or FAIL — one line stating overall result
 
 `log.md` is append-only; no timestamps; if you re-run after fixes, append another `# Player` section.
 
-Two report primitives:
+Three report primitives:
 - `vibegame mate report --over "<message>"` — ends your turn so the lead can reply. Use it when (a) runtime verification is complete, or (b) you hit a structural blocker (wrong collider type, missing collider, runtime won't start, fine-tuning loop cannot resolve) that needs the lead's response before you can continue.
+- `vibegame mate report --wait "<message>"` — ends your turn while background runs you started (bot batches, long captures) are still executing. Use it instead of `--over` whenever such jobs are still in flight, so the lead knows results are pending rather than done.
 - `vibegame mate report "<message>"` — sends a message without ending your turn. Use it when the lead pings you mid-work for a status check.
 
 When verification is ready, use `vibegame mate report --over "<message>"` with:
 - the absolute path to `log.md`
 - the overall verdict (PASS / FAIL)
 - a short summary only — full evidence lives in the `# Player` section you appended
-
-If you are stuck and cannot proceed without contract or environment changes, end with `[BLOCKED: <reason>]` so the lead routes accordingly.
 
 For failures, include the relevant snapshot field or screenshot path in your `# Player` section and describe exactly what's wrong vs what was expected.

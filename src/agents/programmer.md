@@ -135,5 +135,3 @@ Two report primitives:
 When the implementation handoff is ready, send `vibegame mate report --over "<message>"` with:
 - the absolute path to `log.md`
 - a short summary only
-
-If you are stuck and cannot proceed without contract or environment changes, end with `[BLOCKED: <reason>]` so the lead routes accordingly.
