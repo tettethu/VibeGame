@@ -66,6 +66,20 @@ import cli.evolve  # noqa: F401
 # Allowed text file types for copying with template replacement / append.
 TEXT_FILE_EXTENSIONS = {".md", ".json", ".py", ".txt", ".yaml", ".yml", ".js", ".html", ".css", ".toml"}
 
+PROJECT_GITIGNORE_ENTRIES = (
+    "/.env",
+    "/.vibegame/settings.json",
+    "/.vibegame/dashboard/",
+    "/.vibegame/team/pids/",
+    # Task worktrees share root assets as a symlink.
+    "/assets",
+    "/skeletons/",
+    "tests/**/evidence/",
+    "**/node_modules/",
+    "**/__pycache__/",
+    "logs/",
+)
+
 ACTION_SKIP = "skip"
 ACTION_OVERWRITE = "overwrite"
 ACTION_APPEND = "append"
@@ -459,23 +473,10 @@ def _install_engine(src_root: Path, project_path: Path) -> list[str]:
 
 def _append_gitignore(project_path: Path):
     """Append vibegame-specific entries to .gitignore."""
-    entries = [
-        "/.env",
-        "/.vibegame/settings.json",
-        "/.vibegame/tasks/",
-        "/.vibegame/dashboard/",
-        "/.vibegame/team/pids/",
-        "/assets/",
-        "/skeletons/",
-        "tests/**/evidence/",
-        "**/node_modules/",
-        "**/__pycache__/",
-        "logs/",
-    ]
     gitignore = project_path / ".gitignore"
     existing = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
     existing_lines = set(line.strip() for line in existing.splitlines())
-    lines_to_add = [e for e in entries if e not in existing_lines]
+    lines_to_add = [e for e in PROJECT_GITIGNORE_ENTRIES if e not in existing_lines]
     if lines_to_add:
         with open(gitignore, "a", encoding="utf-8") as f:
             if existing and not existing.endswith("\n"):
