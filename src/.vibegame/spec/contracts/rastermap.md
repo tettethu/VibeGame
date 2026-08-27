@@ -14,6 +14,13 @@ Use when a level / arena is one bespoke image, not reusable tiles:
 
 Do not use for reusable tile grids or procedural room layouts; use [`tilemap.md`](tilemap.md).
 
+### Scrolling maps
+
+A scrolling camera (side-scroller, vertical descent) is still rastermap, but the background must cover everywhere the camera can reach — not just the first screen.
+
+- Anchor the image at the scroll-start edge: set its manifest `pivot` to that edge (`[0, 0.5]` for horizontal scroll, `[0.5, 0]` for vertical), then place the node at 0 on the scroll axis and at the canvas centerline on the other axis. Coverage then extends in the scroll direction. Example, a vertical shaft on a 1280-wide canvas: `pivot: [0.5, 0]` with `config: { x: 640, y: 0 }` covers y from 0 downward.
+- If one image is not long enough, lay several background nodes end-to-end — repeat the same image, or commission more segments from artist. Never stretch a single image to make up the distance; it only blurs.
+
 ### Responsibility
 
 #### Orchestrator
