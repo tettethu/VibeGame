@@ -944,6 +944,10 @@ def start(
             kill_pane(prev_orch_pane)
             orch_pane_alive = False
 
+        # Set by the fresh-launch path below; an already-running orchestrator has
+        # no launch to attach the request to.
+        launch_carries_message = False
+
         if orch_mode == "alive":
             input_target = prev_orch_pane
             logger.info("orchestrator_alive pane=%s skipping_spawn", prev_orch_pane)
@@ -977,7 +981,22 @@ def start(
             if sys_prompt_flag:
                 orch_base_cmd += f" {sys_prompt_flag} {shlex.quote(orchestrator_content)}"
 
+            # A fresh launch carries the request as part of its own launch argument.
+            # Pasting it into the pane instead races the startup turn: input that
+            # arrives mid-turn is queued, and a queued prompt reaches the agent as
+            # context rather than as a submission -- UserPromptSubmit never fires, so
+            # goal-capture misses it, and if the turn ends on a blocking Stop hook the
+            # request can sit in the queue undelivered. Resume keeps the paste: its
+            # command has no argument slot, and the pane is idle by then anyway.
+            launch_carries_message = (
+                bool(message)
+                and orch_mode == "fresh"
+                and orch_config.get("initial_prompt_mode") == "argument"
+            )
             fresh_prompt = skill_invocation(orch_cli, "vibegame-start")
+            if launch_carries_message:
+                # `message` is already in this CLI's skill form (rewritten above).
+                fresh_prompt = f"{fresh_prompt}\n\n{message}"
             fresh_orch_cmd = build_initial_prompt_command(orch_base_cmd, fresh_prompt, orch_config)
 
             # Resume first. Claude-family profile switches share Claude Code's
@@ -1078,11 +1097,12 @@ def start(
             logger.info("orchestrator_boot_ok pane=%s mode=%s reason=%s", orch_pane, orch_mode, orch_reason)
             _wait_for_expected_sessions(server_base_url, {"orchestrator"}, timeout=30.0)
 
-        if message:
-            # Every CLI takes the same two steps: the startup skill at launch,
-            # then the user's request as its own submission. Codex used to get
-            # both fused into one launch argument because send-keys split
-            # multi-line input; paste_prompt delivers it in one block instead.
+        if launch_carries_message:
+            print(f"  Initial input: launched with the orchestrator ({len(message)} chars)")
+            logger.info("initial_input_in_launch chars=%s", len(message))
+        elif message:
+            # Resumed or already-running orchestrator: no launch argument to use,
+            # so the request goes into the pane as its own submission.
             assert input_target, "Orchestrator pane unavailable for initial input."
             _send_initial_input(input_target, message)
             print(f"  Initial input: sent to orchestrator ({len(message)} chars)")
