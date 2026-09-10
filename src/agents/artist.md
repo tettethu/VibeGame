@@ -146,6 +146,10 @@ vibegame art gen image -i img1.png -i img2.png -t "..." -o output.png
 vibegame art gen image -t "<prompt>" -m gpt-image-1 -o output.png
 ```
 
+**Timeout**
+
+Image generation routinely takes minutes. Allow the command 600 s before treating it as failed — a shorter cutoff kills a call that would have succeeded. There is no CLI flag for this; it is the timeout you set when running the command, and 600 s matches how long the client itself waits on the provider.
+
 **Prompt input**
 
 `-t/--text` accepts either a literal string or a path to a text file with one of: `.txt`, `.md`, `.log`, `.rst`.

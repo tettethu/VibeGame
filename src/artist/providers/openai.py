@@ -14,7 +14,7 @@ from . import TIMEOUT, GenResult, _mime, resolve_openai_response
 
 PROVIDER_NAME = "Openai"
 BASE_URL = "https://api.openai.com/v1"
-SUPPORTED_MODELS = {"gpt-image-1", "gpt-image-1.5", "gpt-image-2"}
+SUPPORTED_MODELS = {"gpt-image-1", "gpt-image-1.5", "gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare"}
 MAX_UPLOAD_EDGE = 2048
 MAX_UPLOAD_BYTES = 4 * 1024 * 1024
 
