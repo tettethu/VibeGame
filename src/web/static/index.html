@@ -2991,7 +2991,7 @@
         let detailRequestVersion = 0;
         let detailRefreshTimers = [];
         let detailPollTimer = null;
-        const renderedMessageCounts = new Map();
+        let lastRenderedMessages = null;  // {id, messages} of the last renderDetail, baseline for sendPrompt
         let currentView = 'chats'; // 'chats' | 'assets' | 'objects' | 'play'
         let reviewSidebarOpen = false;
         let reviewPayload = null;
@@ -3693,6 +3693,26 @@
         }
 
         // ---- Detail ----
+        // A prompt sent from here reaches the transcript seconds later, so it is rendered
+        // optimistically until the real message shows up. Confirmation is "one more user
+        // message with this text than before the send" -- a count, not a position, so
+        // unrelated entries landing in the same turn, or an interrupted marker collapsing
+        // away, cannot make the check look past the message it is waiting for.
+        function promptMatchKey(text) {
+            // Whitespace-insensitive, and blind to the skill sigil: `/vibegame-build args`
+            // reaches the transcript rebuilt as `vibegame-build\nargs` (server.py
+            // `_normalize_claude_user_text`), which is the same prompt.
+            return String(text || '').trim().replace(/^[\/$]/, '').split(/\s+/).join(' ');
+        }
+
+        function countMatchingUserPrompts(messages, text) {
+            const key = promptMatchKey(text);
+            if (!key) return 0;
+            return (messages || []).filter(
+                m => m.role === 'user' && promptMatchKey(m.text) === key
+            ).length;
+        }
+
         function renderDetail(s) {
             const sel = window.getSelection();
             if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
@@ -3703,38 +3723,20 @@
             detailHeader.classList.add('visible');
             panelBody.classList.add('detail-active');
 
-            const messages = s.messages || [];
-            const chatHtml = buildChat(messages);
-            let pendingHtml = '';
+            const messages = (s.messages || []).slice();
+            lastRenderedMessages = { id: s.id, messages: s.messages || [] };
             if (pendingPrompt && pendingPrompt.sessionId === s.id && s.id === selectedId) {
-                const turnMessages = messages.slice(pendingPrompt.afterMessageIndex);
-                const userFound = turnMessages.some(
-                    m => m.role === 'user' && m.text && m.text.includes(pendingPrompt.text)
-                );
-                const assistantFound = turnMessages.some(
-                    m => m.role === 'assistant' && m.text
-                );
-                if (assistantFound) {
+                if (countMatchingUserPrompts(messages, pendingPrompt.text) > pendingPrompt.seenCount) {
                     pendingPrompt = null;
                     stopDetailPolling();
                     updateSendButton();
-                } else if (!userFound) {
-                    pendingHtml = `
-                    <div class="cm-user">
-                        <div class="cm-user-inner">
-                            <div class="cm-message-stack cm-message-stack-user">
-                                <div class="cm-user-bubble">${renderMarkdown(pendingPrompt.text)}</div>
-                                ${copyAction(pendingPrompt.text, 'user')}
-                            </div>
-                        </div>
-                    </div>`;
+                } else {
+                    // Rendered through the normal path so it carries the same bubble, copy
+                    // action and timestamp as a confirmed message.
+                    messages.push({ role: 'user', text: pendingPrompt.text, ts: pendingPrompt.ts });
                 }
             }
-            renderedMessageCounts.set(
-                s.id,
-                Math.max(renderedMessageCounts.get(s.id) || 0, messages.length)
-            );
-            panelBody.innerHTML = `<div class="chat">${chatHtml}${pendingHtml}${activityRow(s)}</div>`;
+            panelBody.innerHTML = `<div class="chat">${buildChat(messages)}${activityRow(s)}</div>`;
             if (wasAtBottom) panelBody.scrollTop = panelBody.scrollHeight;
 
             // Show input only when tmux pane is available
@@ -4445,20 +4447,43 @@
             return out.replace(/(<br>)+$/, '');
         }
 
+        // Split markdown into fenced code blocks and plain text. Follows CommonMark
+        // fencing: a block opened with N markers closes only on a line with >= N of
+        // the same marker, so a ```` block can contain ``` blocks. An unterminated
+        // fence runs to the end, which keeps streaming output stable.
+        function splitFences(raw) {
+            const lines = raw.split('\n');
+            const parts = [];
+            let text = [], i = 0;
+            const flushText = () => {
+                if (text.length) { parts.push({fence: false, s: text.join('\n')}); text = []; }
+            };
+            while (i < lines.length) {
+                const open = lines[i].match(/^( {0,3})(`{3,}|~{3,})[ \t]*(.*)$/);
+                // Backtick fences cannot carry a backtick in the info string
+                if (!open || (open[2][0] === '`' && open[3].includes('`'))) { text.push(lines[i++]); continue; }
+                const indent = open[1].length;
+                const closeRe = new RegExp(`^ {0,3}\\${open[2][0]}{${open[2].length},}[ \\t]*$`);
+                flushText();
+                const body = [];
+                i++;
+                while (i < lines.length && !closeRe.test(lines[i])) {
+                    // Strip up to the opening fence's indent, never more
+                    let k = 0;
+                    while (k < indent && lines[i][k] === ' ') k++;
+                    body.push(lines[i].slice(k));
+                    i++;
+                }
+                if (i < lines.length) i++; // consume the closing fence
+                parts.push({fence: true, s: body.join('\n')});
+            }
+            flushText();
+            return parts;
+        }
+
         function renderMarkdown(raw) {
             if (!raw) return '';
-            // Split fenced code blocks out first to protect them
-            const parts = [];
-            const fenceRe = /```(\w*)\n?([\s\S]*?)```/g;
-            let last = 0, m;
-            while ((m = fenceRe.exec(raw)) !== null) {
-                if (m.index > last) parts.push({fence: false, s: raw.slice(last, m.index)});
-                parts.push({fence: true, s: m[2]});
-                last = m.index + m[0].length;
-            }
-            if (last < raw.length) parts.push({fence: false, s: raw.slice(last)});
-
-            return parts.map(p => {
+            return splitFences(raw).map(p => {
                 if (p.fence) {
                     const code = p.s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
                     return `<pre class="md-pre"><button class="cm-copy-btn md-code-copy-btn" type="button" title="Copy code" aria-label="Copy code">${copyIcon()}</button><code>${code.trim()}</code></pre>`;
@@ -4577,6 +4602,19 @@
             // Length is enforced server-side; its 400 response surfaces through
             // the catch below with the same message, so no limit is duplicated here.
             sendBtn.disabled = true;
+            // Sampled before the request: delivery triggers UserPromptSubmit, whose event
+            // re-renders this session while the fetch is still open, so a baseline taken
+            // afterwards would already count the message we are waiting for.
+            const baseMessages = lastRenderedMessages?.id === sessionId ? lastRenderedMessages.messages : [];
+            const pending = {
+                sessionId,
+                text: prompt,
+                draft: prompt,
+                seenCount: countMatchingUserPrompts(baseMessages, prompt),
+                ts: Date.now(),
+                expiresAt: Date.now() + 5 * 60 * 1000,
+            };
+            pendingPrompt = pending;
             try {
                 const res = await fetch(`/sessions/${encodeURIComponent(sessionId)}/send`, {
                     method: 'POST',
@@ -4585,13 +4623,9 @@
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'Failed');
-                pendingPrompt = {
-                    sessionId,
-                    text: data.formatted_prompt || prompt,
-                    draft: prompt,
-                    afterMessageIndex: renderedMessageCounts.get(sessionId) || 0,
-                    expiresAt: Date.now() + 5 * 60 * 1000,
-                };
+                // The pane received the rewritten form; show that. `promptMatchKey` reads
+                // both forms the same way, so the baseline above still applies.
+                pending.text = data.formatted_prompt || prompt;
                 promptInput.value = '';
                 delete inputDrafts[sessionId];
                 autoResize(promptInput);
@@ -4604,6 +4638,11 @@
                 scheduleDetailRefresh(sessionId);
                 startDetailPolling(sessionId);
             } catch (e) {
+                // Nothing reached the pane, so the optimistic message must go with it.
+                if (pendingPrompt === pending) {
+                    pendingPrompt = null;
+                    loadDetail(sessionId);
+                }
                 toast(e.message, 'error');
             } finally {
                 sendBtn.disabled = false;
