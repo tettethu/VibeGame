@@ -911,7 +911,7 @@ def start(
         from team.settings import resolve_agent_settings
         from team.launch import prepare_launch, build_initial_prompt_command, runtime_env_values, resolve_env_value
 
-        _, orch_cli, orch_model = resolve_agent_settings(
+        _, orch_cli, orch_model, orch_effort = resolve_agent_settings(
             name="orchestrator", agent="orchestrator", model=None,
             explicit_team_dir=str(team_dir),
         )
@@ -973,6 +973,7 @@ def start(
             orch_base_cmd, orch_config, orch_model = prepare_launch(
                 orch_cli, orch_model, agent="orchestrator",
                 name="orchestrator", team_root=str(project_path),
+                effort=orch_effort,
             )
 
             # Append system prompt (orchestrator.md)
@@ -1123,7 +1124,9 @@ def start(
             agent_state = prev_agents.get(role)
             if role == "reviewer" and agent_state is None:
                 agent_state = reviewer_start
-            _, configured_cli, configured_model = resolve_agent_settings(
+            # effort is unused here: mates launch through `vibegame lead agent`,
+            # which resolves settings again in its own process.
+            _, configured_cli, configured_model, _ = resolve_agent_settings(
                 name=role, agent=role, model=None,
                 explicit_team_dir=str(team_dir),
             )

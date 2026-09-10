@@ -474,7 +474,7 @@ def cmd_agent(args: argparse.Namespace) -> int:
         else:
             print("Run 'vibegame lead start' first.", file=sys.stderr)
         return 1
-    resolved_name, resolved_cli, resolved_model = resolve_agent_settings(
+    resolved_name, resolved_cli, resolved_model, resolved_effort = resolve_agent_settings(
         name=args.name,
         agent=args.agent_type,
         model=args.model,
@@ -600,6 +600,7 @@ def cmd_agent(args: argparse.Namespace) -> int:
             args.agent_type,
             resolved_name,
             team_root=team_root,
+            effort=resolved_effort,
         )
     except ValueError as exc:
         print(str(exc), file=sys.stderr)

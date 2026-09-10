@@ -2,6 +2,7 @@
   "claude": {
     "command": "claude",
     "models": ["fable", "fable[1m]", "opus[1m]", "opus", "sonnet", "sonnet[1m]", "haiku"],
+    "efforts": ["low", "medium", "high", "xhigh", "max"],
     "default_model": "sonnet",
     "trust_enter": true,
     "system_prompt_flag": "--append-system-prompt",
@@ -10,6 +11,7 @@
     "default_params": {"skip_permissions": true, "verbose": true},
     "flags": {
       "model": ["--model", true],
+      "effort": ["--effort", true],
       "name": ["--name", true],
       "agent": ["--agent", true],
       "skip_permissions": "--dangerously-skip-permissions",
@@ -22,6 +24,7 @@
   "claude-thirdparty": {
     "command": "claude",
     "models": ["opus[1m]", "opus", "sonnet", "haiku"],
+    "efforts": ["low", "medium", "high", "xhigh", "max"],
     "default_model": "sonnet",
     "trust_enter": true,
     "system_prompt_flag": "--append-system-prompt",
@@ -30,6 +33,7 @@
     "default_params": {"skip_permissions": true, "verbose": true},
     "flags": {
       "model": ["--model", true],
+      "effort": ["--effort", true],
       "name": ["--name", true],
       "agent": ["--agent", true],
       "skip_permissions": "--dangerously-skip-permissions",
@@ -45,7 +49,8 @@
   },
   "codex": {
     "command": "codex",
-    "models": ["gpt-5.6-sol","gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5","gpt-5.4", "gpt-5.4-mini", "gpt-5.1-mini"],
+    "models": ["gpt-6-astra", "gpt-5.6-sol","gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5","gpt-5.4", "gpt-5.4-mini", "gpt-5.1-mini"],
+    "efforts": ["low", "medium", "high", "xhigh", "max"],
     "default_model": "gpt-5.6-sol",
     "trust_enter": true,
     "system_prompt_flag": null,
@@ -60,6 +65,7 @@
   "glm": {
     "command": "claude",
     "models": ["glm-5.1"],
+    "efforts": ["low", "medium", "high", "xhigh", "max"],
     "default_model": "glm-5.1",
     "trust_enter": true,
     "system_prompt_flag": "--append-system-prompt",
@@ -68,6 +74,7 @@
     "default_params": {"skip_permissions": true, "verbose": true},
     "flags": {
       "model": ["--model", true],
+      "effort": ["--effort", true],
       "name": ["--name", true],
       "agent": ["--agent", true],
       "skip_permissions": "--dangerously-skip-permissions",

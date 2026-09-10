@@ -142,12 +142,37 @@ def append_codex_model_instructions(command: str, role_doc: Path) -> str:
     return f"{command} -c {shlex.quote(override)}"
 
 
+def append_codex_effort(command: str, effort: str) -> str:
+    override = f'model_reasoning_effort="{effort}"'
+    return f"{command} -c {shlex.quote(override)}"
+
+
+def resolve_effort(cli: str, effort: str | None) -> str | None:
+    """Validate a thinking-effort level, or None to leave the CLI default alone.
+
+    Raises rather than warning (unlike the model check above) because neither CLI
+    rejects a bad level: claude prints a warning and silently runs at its default,
+    codex forwards the string untouched. A typo would otherwise cost a full run
+    whose output is indistinguishable from a correct one.
+    """
+    if effort is None:
+        return None
+    supported = CLI_CONFIGS[cli].get("efforts", [])
+    if effort not in supported:
+        raise ValueError(
+            f"Unsupported effort '{effort}' for {cli}. "
+            f"Supported: {', '.join(supported) if supported else '(none)'}"
+        )
+    return effort
+
+
 def prepare_launch(
     cli: str,
     model: str | None,
     agent: str | None,
     name: str | None = None,
     team_root: str | None = None,
+    effort: str | None = None,
 ) -> tuple[str, dict, str]:
     config = CLI_CONFIGS[cli]
     resolved_model = model or config.get("default_model")
@@ -157,16 +182,23 @@ def prepare_launch(
             file=sys.stderr,
         )
     params = {**config.get("default_params", {}), "model": resolved_model}
+    # Unset is a real choice: no flag at all, so the CLI keeps its own default.
+    resolved_effort = resolve_effort(cli, effort)
+    if resolved_effort and cli != "codex":
+        params["effort"] = resolved_effort
     if name and cli != "codex":
         params["name"] = name
     # Orchestrator uses orchestrator.md as its system prompt, not a CLI agent.
     if cli != "codex" and agent and agent != "orchestrator":
         params["agent"] = agent
     command = build_launch_command(cli, params)
-    if cli == "codex" and agent:
-        if not team_root:
-            raise ValueError("team_root is required for codex role injection")
-        command = append_codex_model_instructions(command, ensure_codex_role_doc(team_root, agent))
+    if cli == "codex":
+        if resolved_effort:
+            command = append_codex_effort(command, resolved_effort)
+        if agent:
+            if not team_root:
+                raise ValueError("team_root is required for codex role injection")
+            command = append_codex_model_instructions(command, ensure_codex_role_doc(team_root, agent))
     return command, config, resolved_model
 
 

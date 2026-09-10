@@ -72,7 +72,7 @@ def resolve_agent_settings(
     agent: str | None,
     model: str | None,
     explicit_team_dir: str | None = None,
-) -> tuple[str | None, str | None, str | None]:
+) -> tuple[str | None, str | None, str | None, str | None]:
     settings = load_settings(explicit_team_dir)
     agents = settings.get("agents", {})
     docs = agent_doc_map(explicit_team_dir)
@@ -92,7 +92,10 @@ def resolve_agent_settings(
         resolved_cli = DEFAULT_CLAUDE_CLI
     if resolved_model is None and resolved_cli in CLI_CONFIGS:
         resolved_model = CLI_CONFIGS[resolved_cli]["default_model"]
-    return resolved_name, resolved_cli, resolved_model
+    # Optional on purpose: absent means "pass no effort flag", so the CLI's own
+    # default applies. No default is filled in here -- see docs/SETUP.md.
+    resolved_effort = config.get("effort")
+    return resolved_name, resolved_cli, resolved_model, resolved_effort
 
 
 def stop_hooks_for_role(role: str, explicit_team_dir: str | None = None) -> list[dict]:
