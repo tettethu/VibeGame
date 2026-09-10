@@ -76,8 +76,8 @@ PROVIDER_REGISTRY = {
 }
 
 
-def _load_models_json(repo_root: Path) -> dict[str, list[str]]:
-    """Load cli_key -> models list from models.json."""
+def _read_models_config(repo_root: Path) -> dict:
+    """Parse models.json, the single source of what each CLI accepts."""
     path = repo_root / "src" / ".vibegame" / "team" / "models.json"
     if not path.exists():
         return {}
@@ -85,7 +85,17 @@ def _load_models_json(repo_root: Path) -> dict[str, list[str]]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {}
-    return {key: entry.get("models", []) for key, entry in data.items() if isinstance(entry, dict)}
+    return {key: entry for key, entry in data.items() if isinstance(entry, dict)}
+
+
+def _load_models_json(repo_root: Path) -> dict[str, list[str]]:
+    """Load cli_key -> models list from models.json."""
+    return {key: entry.get("models", []) for key, entry in _read_models_config(repo_root).items()}
+
+
+def _load_efforts_json(repo_root: Path) -> dict[str, list[str]]:
+    """Load cli_key -> thinking-effort levels from models.json."""
+    return {key: entry.get("efforts", []) for key, entry in _read_models_config(repo_root).items()}
 
 def _discover_image_providers(repo_root: Path) -> dict:
     """Discover image providers from src/artist/providers/."""
@@ -130,6 +140,9 @@ AGENT_ROLES = [
 
 # Orchestrator only supports Claude Code CLI
 ORCHESTRATOR_DEFAULTS = {"cli": "claude", "model": "opus"}
+
+# Sentinel for "write no effort key", which leaves the CLI's own default in place.
+EFFORT_UNSET = "__unset__"
 
 
 # === File I/O ===
@@ -437,11 +450,49 @@ def _build_model_choices(providers: list[ProviderConfig]) -> list[dict]:
     return choices
 
 
+def _with_effort(
+    mapping: dict[str, str],
+    effort: str | None,
+    efforts_json: dict[str, list[str]],
+) -> dict[str, str]:
+    """Attach an effort only when the resolved CLI offers that level."""
+    if effort and effort in efforts_json.get(mapping["cli"], []):
+        mapping["effort"] = effort
+    return mapping
+
+
+def _prompt_effort(
+    role: str,
+    cli: str,
+    efforts_json: dict[str, list[str]],
+    current: str | None,
+) -> str | None:
+    """Ask one agent's thinking effort. None means no key is written at all.
+
+    Defaults to whatever settings.json already holds for this agent, so pressing
+    Enter through the wizard reproduces the existing configuration unchanged.
+    """
+    levels = efforts_json.get(cli, [])
+    if not levels:
+        return None
+    choices = [questionary.Choice("Not set (use the CLI default)", value=EFFORT_UNSET)]
+    choices += [questionary.Choice(level, value=level) for level in levels]
+    result = questionary.select(
+        f"Effort [{role}]:",
+        choices=choices,
+        default=current if current in levels else EFFORT_UNSET,
+    ).ask()
+    if result is None:
+        raise WizardCancelled
+    return None if result == EFFORT_UNSET else result
+
+
 def _prompt_orchestrator(
     providers: list[ProviderConfig],
     current_mappings: dict[str, dict[str, str]],
+    efforts_json: dict[str, list[str]],
 ) -> dict[str, str]:
-    """Prompt for orchestrator CLI/model."""
+    """Prompt for orchestrator CLI/model/effort."""
     model_choices = _build_model_choices(providers)
     if not model_choices:
         return dict(ORCHESTRATOR_DEFAULTS)
@@ -459,18 +510,21 @@ def _prompt_orchestrator(
         raise WizardCancelled
 
     match = next((mc for mc in model_choices if mc["key"] == result), model_choices[0])
-    return {"cli": match["cli"], "model": match["model"]}
+    mapping = {"cli": match["cli"], "model": match["model"]}
+    effort = _prompt_effort("orchestrator", match["cli"], efforts_json, existing.get("effort"))
+    return _with_effort(mapping, effort, efforts_json)
 
 
 def _prompt_agent_mappings(
     providers: list[ProviderConfig],
     current_mappings: dict[str, dict[str, str]],
+    efforts_json: dict[str, list[str]],
 ) -> dict[str, dict[str, str]]:
-    """Step 4: Per-agent CLI/model mapping."""
+    """Step 4: Per-agent CLI/model/effort mapping."""
     mappings: dict[str, dict[str, str]] = {}
 
     # Orchestrator is always configured (it's always a Claude Code session)
-    mappings["orchestrator"] = _prompt_orchestrator(providers, current_mappings)
+    mappings["orchestrator"] = _prompt_orchestrator(providers, current_mappings, efforts_json)
 
     model_choices = _build_model_choices(providers)
     if not model_choices:
@@ -481,11 +535,16 @@ def _prompt_agent_mappings(
     mate_roles = [r for r in AGENT_ROLES if r != "orchestrator"]
 
     for role in mate_roles:
+        existing = current_mappings.get(role, {})
         if use_default_all:
-            mappings[role] = {"cli": default_model["cli"], "model": default_model["model"]}
+            # Effort was never asked for this role, so keep what it already had.
+            mappings[role] = _with_effort(
+                {"cli": default_model["cli"], "model": default_model["model"]},
+                existing.get("effort"),
+                efforts_json,
+            )
             continue
 
-        existing = current_mappings.get(role, {})
         default_key = f"{existing.get('cli', default_model['cli'])}-{existing.get('model', default_model['model'])}"
 
         choices = []
@@ -503,13 +562,20 @@ def _prompt_agent_mappings(
             raise WizardCancelled
 
         if result == "use-default-all":
-            mappings[role] = {"cli": default_model["cli"], "model": default_model["model"]}
+            match = default_model
             use_default_all = True
-        elif result == "use-default" or result is None:
-            mappings[role] = {"cli": default_model["cli"], "model": default_model["model"]}
+        elif result == "use-default":
+            match = default_model
         else:
             match = next((mc for mc in model_choices if mc["key"] == result), default_model)
-            mappings[role] = {"cli": match["cli"], "model": match["model"]}
+
+        mapping = {"cli": match["cli"], "model": match["model"]}
+        if use_default_all:
+            # This answer also covers the remaining roles, so skip the question.
+            mappings[role] = _with_effort(mapping, existing.get("effort"), efforts_json)
+            continue
+        effort = _prompt_effort(role, match["cli"], efforts_json, existing.get("effort"))
+        mappings[role] = _with_effort(mapping, effort, efforts_json)
 
     return mappings
 
@@ -731,7 +797,7 @@ def _print_summary(config: SetupConfig) -> None:
 
     if config.agent_mappings:
         mappings_str = ", ".join(
-            f"{role}: {m['cli']}/{m['model']}"
+            f"{role}: {m['cli']}/{m['model']}" + (f"/{m['effort']}" if m.get("effort") else "")
             for role, m in config.agent_mappings.items()
         )
         print(f"  Agent mapping:  {mappings_str}")
@@ -786,7 +852,7 @@ def _run_wizard_steps(repo_root: Path) -> None:
 
     # Step 3: Agent mapping
     agent_mappings = _prompt_agent_mappings(
-        providers, current_mappings,
+        providers, current_mappings, _load_efforts_json(repo_root),
     )
 
     # Step 4: VLM

@@ -32,7 +32,7 @@ Help the user set up VibeGame as follows:
 
 ### `src/.vibegame/settings.json`
 
-This file selects the CLI harness and model for each agent. When editing `agents`, preserve the existing `hooks` configuration.
+This file selects the CLI harness, model, and thinking effort for each agent. When editing `agents`, preserve the existing `hooks` configuration.
 
 The built-in CLI harnesses are:
 
@@ -70,6 +70,26 @@ To use a third-party Claude-compatible provider, select `claude-thirdparty` in `
 ```
 
 These examples show only the `agents` section. Merge it into the existing file without replacing `hooks`. The model value is a VibeGame alias. Map that alias to the provider's actual model ID in `.env`, as shown below.
+
+#### Thinking effort
+
+`effort` sets how much reasoning the CLI spends per turn. It is optional and unset by default: with no `effort` key, VibeGame passes no effort argument at all and the CLI applies whatever default the user's own environment has. Set it per agent to override that:
+
+```json
+{
+  "agents": {
+    "programmer": {
+      "cli": "claude",
+      "model": "opus[1m]",
+      "effort": "xhigh"
+    }
+  }
+}
+```
+
+The accepted levels are `low`, `medium`, `high`, `xhigh`, and `max`, for every harness. They are declared per harness under `efforts` in `src/.vibegame/team/models.json`. Claude Code receives `--effort <level>` and Codex receives `-c model_reasoning_effort="<level>"`.
+
+An unrecognised level stops the launch with an error rather than falling back to a default. Neither CLI rejects one on its own -- Claude Code warns and then runs at its default, Codex forwards the string to the server untouched -- so a typo would otherwise produce a full run at the wrong effort with no visible sign of it.
 
 ### `src/.vibegame/defaults.json`
 
