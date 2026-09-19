@@ -47,6 +47,67 @@ Watch the demos and explore more project details on the [Project Page](https://v
   </tr>
 </table>
 
+## Installation
+
+Prerequisites:
+
+- Python 3.12 or newer.
+- [`uv`](https://docs.astral.sh/uv/getting-started/installation/).
+- `tmux`.
+- At least one supported agent CLI: [Claude Code](https://www.anthropic.com/claude-code) or [Codex](https://github.com/openai/codex).
+
+Node.js and npm are not required for the standard VibeGame setup.
+
+> **First-time Claude Code users**: VibeGame launches agents with `claude --dangerously-skip-permissions`. If you have never used this flag before, run it once in a terminal and accept the confirmation prompt — the first-run consent screen cannot be completed inside VibeGame's managed session, and agent startup will fail without it.
+
+> **Codex users**: after `setup.sh`, run `vibegame setup codex-hooks` once, then open Codex, enter `/hooks`, and trust the newly added VibeGame hooks. The command writes `~/.codex/hooks.json`; the trust step is what actually enables them. Until both are done Codex agents still run, but they never register: the Dashboard stays empty and startup keeps waiting for a session that never appears.
+
+```sh
+git clone https://github.com/tettethu/VibeGame
+cd VibeGame
+```
+
+Tell your agent (Claude Code or Codex):
+
+```text
+Read and follow the instructions in @docs/SETUP.md to set up this project for me.
+```
+
+Or set it up manually:
+
+```sh
+./setup.sh
+```
+
+`setup.sh` links the installed `vibegame` command to this checkout so the CLI can use the bundled engine, templates, and Dashboard. Keep the checkout available; pulling updates changes the installed CLI without reinstalling it.
+
+## Quick Start
+
+```sh
+mkdir my-game && cd my-game
+vibegame init
+vibegame start
+```
+
+Or start an existing project from another directory:
+
+```sh
+vibegame start --project ./my-game "Continue polishing the boss fight"
+```
+
+Use VibeGame's standard build workflow for an end-to-end game development goal:
+
+```text
+/vibegame-build Build a compact roguelike dungeon with one boss encounter
+```
+
+Run or close the game directly:
+
+```sh
+vibegame run --port auto
+vibegame close
+```
+
 ## VibeGame Dashboard
 
 We provide a web dashboard for interacting more freely with the agent team and manually editing game properties.
