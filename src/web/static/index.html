@@ -39,6 +39,9 @@
             --code-bg:      #eeece4;
             --code-border:  #d8d5ca;
             --code-action-bg: rgba(255,255,255,0.55);
+            /* inline code: tint relative to whatever surface it sits on */
+            --inline-code-bg:     rgba(11,11,11,0.07);
+            --inline-code-border: rgba(11,11,11,0.10);
             --sidebar-w:    280px;
             --header-h:     52px;
             --session-font:  'Playfair Display', Georgia, 'Times New Roman', serif;
@@ -73,6 +76,8 @@
             --code-bg:      #171614;
             --code-border:  #37342f;
             --code-action-bg: rgba(255,255,255,0.07);
+            --inline-code-bg:     rgba(255,255,255,0.10);
+            --inline-code-border: rgba(255,255,255,0.13);
             --bg:           var(--parchment);
             --text:         var(--charcoal);
             /* chat bubbles */
@@ -1941,6 +1946,13 @@
         }
         .cm-assistant-bubble li,
         .cm-user-bubble li { margin: 0.15rem 0; }
+        /* nested lists hug their parent item */
+        .cm-assistant-bubble li > ul, .cm-assistant-bubble li > ol,
+        .cm-user-bubble li > ul, .cm-user-bubble li > ol,
+        .preview-markdown li > ul, .preview-markdown li > ol {
+            margin: 0.15rem 0;
+            padding-left: 1.25rem;
+        }
 
         .md-pre {
             position: relative;
@@ -1993,9 +2005,10 @@
         }
 
         .md-code {
-            background: rgba(255,255,255,0.1);
+            background: var(--inline-code-bg);
+            border: 1px solid var(--inline-code-border);
             border-radius: 4px;
-            padding: 0.1em 0.38em;
+            padding: 0.05em 0.34em;
             font-family: 'SFMono-Regular', Consolas, monospace;
             font-size: 0.82em;
         }
@@ -2023,7 +2036,6 @@
             overflow-x: auto;
             white-space: nowrap;
         }
-        .cm-user-bubble .md-code { background: rgba(255,255,255,0.18); }
         .md-file-link,
         .md-external-link {
             color: var(--terracotta);
@@ -4390,11 +4402,32 @@
 
         function mdText(raw) {
             const lines = String(raw).split('\n');
-            let out = '', inUl = false, inOl = false, inTable = false;
+            let out = '', inTable = false;
 
+            // Open list levels, outermost first. Every level has one <li> still
+            // open, so a deeper level nests inside it as valid HTML.
+            const listStack = [];
+            const indentOf = l => l.match(/^[ \t]*/)[0].replace(/\t/g, '    ').length;
+            const listMatch = l => {
+                const m = l.match(/^([ \t]*)(?:([-*+])|(\d+)[.)])\s+(.*)$/);
+                return m ? { indent: indentOf(l), tag: m[2] ? 'ul' : 'ol', content: m[4] } : null;
+            };
             const closeList = () => {
-                if (inUl) { out += '</ul>'; inUl = false; }
-                if (inOl) { out += '</ol>'; inOl = false; }
+                while (listStack.length) out += `</li></${listStack.pop().tag}>`;
+            };
+            const addListItem = ({ indent, tag, content }) => {
+                while (listStack.length) {
+                    const top = listStack[listStack.length - 1];
+                    if (top.indent < indent || (top.indent === indent && top.tag === tag)) break;
+                    out += `</li></${listStack.pop().tag}>`;
+                }
+                const top = listStack[listStack.length - 1];
+                if (top && top.indent === indent) {
+                    out += `</li><li>${applyInline(content)}`;
+                } else {
+                    out += `<${tag}><li>${applyInline(content)}`;
+                    listStack.push({ tag, indent });
+                }
             };
             const closeTable = () => {
                 if (inTable) { out += '</tbody></table>'; inTable = false; }
@@ -4425,17 +4458,16 @@
                 if (inTable) { closeTable(); }
 
                 const heading = line.match(/^(#{1,6})\s+(.+)$/);
+                const item = heading ? null : listMatch(line);
                 if (heading) {
                     closeList();
                     const level = heading[1].length;
                     out += `<h${level} class="md-h${level}">${applyInline(heading[2])}</h${level}>`;
-                } else if (/^[-*] /.test(line)) {
-                    if (!inUl) { closeList(); out += '<ul>'; inUl = true; }
-                    out += `<li>${applyInline(line.slice(2))}</li>`;
-                } else if (/^\d+\. /.test(line)) {
-                    if (!inOl) { closeList(); out += '<ol>'; inOl = true; }
-                    out += `<li>${applyInline(line.replace(/^\d+\.\s+/, ''))}</li>`;
+                } else if (item) {
+                    addListItem(item);
                 } else if (line.trim() === '') {
+                    // A blank line between items keeps a loose list open
+                    if (listStack.length && listMatch(lines[i + 1] || '')) continue;
                     closeList();
                     out += '<br>';
                 } else {
