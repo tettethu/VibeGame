@@ -74,9 +74,51 @@ function resolveFpsLimit(searchParams, settings, runtimeToken) {
     const n = Number(raw)
     if (Number.isFinite(n) && n >= 0) return Math.floor(n)
   }
-  const proj = Number(settings?.fpsLimit)
-  if (Number.isFinite(proj) && proj > 0) return Math.floor(proj)
+  const proj = settings?.fpsLimit
+  if (Number.isFinite(proj) && proj >= 0) return Math.floor(proj)
   return runtimeToken ? 60 : 0
+}
+
+// Query keys the engine owns. KEEP IN SYNC with RESERVED_QUERY_KEYS in
+// src/cli/run.py, which refuses them as game parameters.
+const RESERVED_PARAMS = ['runtime', 'activate', 'debug', 'physicsDebug', 'renderer', 'fps']
+const RESERVED_STORE_KEY = 'vibegame.reservedParams'
+
+/**
+ * Keep a runtime session's engine parameters across in-tab navigation.
+ *
+ * `vibegame run` opens the page with `?runtime=<token>`, the token that connects
+ * it to `vibegame play`. An agent switching scenarios by setting location.href
+ * to `?scenario=X` builds a URL without it, and the reloaded page used to come
+ * up disconnected until the runtime was restarted. The parameters are recorded
+ * in sessionStorage -- scoped to this tab, cleared when it closes -- and written
+ * back into the address bar when a reload arrives without them, so everything
+ * downstream reads them from location.search as before. Only a URL carrying
+ * `runtime` records anything, so a player's page never persists state.
+ */
+function restoreReservedParams() {
+  const params = new URLSearchParams(location.search)
+  if (params.has('runtime')) {
+    const kept = {}
+    for (const key of RESERVED_PARAMS) {
+      if (params.has(key)) kept[key] = params.get(key)
+    }
+    sessionStorage.setItem(RESERVED_STORE_KEY, JSON.stringify(kept))
+    return
+  }
+  let stored
+  try {
+    stored = sessionStorage.getItem(RESERVED_STORE_KEY)
+  } catch {
+    // A sandboxed embed denies storage outright; such a page was never opened
+    // by `vibegame run`, so there is no session to restore.
+    return
+  }
+  if (!stored) return
+  for (const [key, value] of Object.entries(JSON.parse(stored))) {
+    if (!params.has(key)) params.set(key, value)
+  }
+  history.replaceState(history.state, '', `${location.pathname}?${params}${location.hash}`)
 }
 
 /**
@@ -91,6 +133,7 @@ export async function boot(container, options = {}) {
   })
 
   try {
+    restoreReservedParams()
     const projRes = await fetch(resourceUrl('project.json'))
     if (!projRes.ok) { onError('project.json not found'); return }
     const proj = await projRes.json()
@@ -239,14 +282,16 @@ export async function boot(container, options = {}) {
       // in bot mode without forcing runtime control (which would pause the game).
       // Only activate it (pause + step semantics) when the URL flag asks for it.
       sceneTree.runtimeController = new RuntimeController(sceneTree)
+      host.game.events.on('poststep', () => sceneTree.runtimeController.postFrame())
       if (runtimeActivate) {
         sceneTree.runtimeController.activate()
       }
 
       // Connect RuntimeBridge when launched with runtime token (by Playwright)
+      let bridge = null
       if (runtimeToken) {
         const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-        const bridge = new RuntimeBridge(host, sceneTree)
+        bridge = new RuntimeBridge(host, sceneTree)
         bridge.connect(`${proto}//${location.host}${appBasePath()}/ws/runtime?token=${runtimeToken}`)
       }
 
@@ -256,19 +301,28 @@ export async function boot(container, options = {}) {
       // and the runner flips engine into stepped runtime-control mode.
       window.__vibegameTest = {
         snapshot: () => sceneTree.runtimeController.snapshot(),
-        activate: () => sceneTree.runtimeController.activate(),
+        activate: async () => {
+          const clock = window.__vibegameClock
+          if (clock) await clock.acquire()
+          try {
+            sceneTree.runtimeController.activate()
+          } finally {
+            if (clock) await clock.release()
+          }
+        },
         gameToClient: (x, y) => {
           const cam = host.phaserScene.cameras.main
-          const cx = (x - cam.scrollX) * cam.zoom
-          const cy = (y - cam.scrollY) * cam.zoom
+          const point = cam.matrix.transformPoint(x - cam.scrollX, y - cam.scrollY)
           const rect = host.game.canvas.getBoundingClientRect()
           const scale = host.game.scale.displayScale
           return {
-            x: cx * scale.x + rect.left,
-            y: cy * scale.y + rect.top,
+            x: point.x / scale.x + rect.left,
+            y: point.y / scale.y + rect.top,
           }
         },
       }
+
+      if (window.__vibegameClock) window.__vibegameClock.attach(host, sceneTree, bridge)
 
       // Signal that the engine is fully ready (used by Playwright wait)
       window.__vibegame_ready = true

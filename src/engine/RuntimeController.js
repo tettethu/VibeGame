@@ -11,6 +11,7 @@ export class RuntimeController {
   constructor(sceneTree) {
     this.sceneTree = sceneTree
     this.enabled = false
+    this.session = 0
     this.mode = 'paused'    // 'paused' | 'stepping' | 'play'
     this.frameCount = 0
     this.stepsRemaining = 0
@@ -20,14 +21,19 @@ export class RuntimeController {
 
   /** Activate runtime control mode (pauses immediately) */
   activate() {
+    if (this.enabled) { this.pause(); return }
+    this.session++
     this.enabled = true
     this.mode = 'paused'
     this.frameCount = 0
-    this._pausePhysics()
   }
 
   /** Deactivate runtime control mode */
   deactivate() {
+    if (!this.enabled) return
+    this.session++
+    this.sceneTree.inputMap?.clearAllInjections()
+    this.sceneTree.phaserScene?.input?.keyboard?.resetKeys()
     this.enabled = false
     this.mode = 'paused'
     this.frameCount = 0
@@ -36,7 +42,6 @@ export class RuntimeController {
       this._resolveStep = null
     }
     this._breakpointHit = null
-    this._resumePhysics()
   }
 
   /**
@@ -45,8 +50,10 @@ export class RuntimeController {
    * @returns {Promise<{status: string, frame: number, node?: string, reason?: string}>}
    */
   continue(frames) {
+    if (!this.enabled) throw new Error('No runtime session. Call activate first.')
+    if (!Number.isInteger(frames) || frames <= 0) throw new Error('frames must be a positive integer')
+    if (this._resolveStep) throw new Error('A continue command is already in progress')
     return new Promise(resolve => {
-      this._resumePhysics()
       this.mode = 'stepping'
       this.stepsRemaining = frames
       this._resolveStep = resolve
@@ -55,71 +62,49 @@ export class RuntimeController {
 
   /** Resume free-running play (non-blocking) */
   play() {
+    if (this._resolveStep) this._finishStep({status: 'playing', frame: this.frameCount})
     this.mode = 'play'
-    this._resumePhysics()
   }
 
   /** Pause immediately */
   pause() {
     this.mode = 'paused'
     this.stepsRemaining = 0
-    this._pausePhysics()
     if (this._resolveStep) {
       this._resolveStep({ status: 'paused', frame: this.frameCount })
       this._resolveStep = null
     }
   }
 
-  /**
-   * Called by SceneTree.update() before propagateUpdate.
-   * @returns {boolean} true if this frame should execute
-   */
+  /** Gate node updates; the game loop owns frame completion. */
   shouldUpdate() {
-    if (!this.enabled) return true
-
-    if (this.mode === 'paused') return false
-
-    if (this.mode === 'stepping') {
-      if (this.stepsRemaining <= 0) {
-        this.mode = 'paused'
-        this._pausePhysics()
-        if (this._resolveStep) {
-          this._resolveStep({ status: 'completed', frame: this.frameCount })
-          this._resolveStep = null
-        }
-        return false
-      }
-      this.stepsRemaining--
-      return true
-    }
-
-    return true // 'play' mode
+    return !this.enabled || this.mode !== 'paused'
   }
 
-  /** Called by SceneTree.update() after propagateUpdate */
-  postUpdate() {
-    this.frameCount++
+  _finishStep(result) {
+    const resolve = this._resolveStep
+    this._resolveStep = null
+    this.stepsRemaining = 0
+    if (resolve) resolve(result)
+  }
 
+  /** Called after the full game frame, including paused scenes. */
+  postFrame() {
+    if (this.enabled && this.mode === 'paused') return
+    this.frameCount++
     if (this._breakpointHit) {
       const bp = this._breakpointHit
       this._breakpointHit = null
       this.mode = 'paused'
-      this.stepsRemaining = 0
-      this._pausePhysics()
-      if (this._resolveStep) {
-        this._resolveStep({
-          status: 'breakpoint',
-          frame: this.frameCount,
-          node: bp.nodeName,
-          reason: bp.reason,
-        })
-        this._resolveStep = null
-      }
+      this._finishStep({status: 'breakpoint', frame: this.frameCount, node: bp.nodeName, reason: bp.reason})
+    } else if (this.mode === 'stepping' && --this.stepsRemaining === 0) {
+      this.mode = 'paused'
+      this._finishStep({status: 'completed', frame: this.frameCount})
     }
   }
 
   /**
-   * Called by Node.breakpoint(). Records hit for postUpdate processing.
+   * Called by Node.breakpoint(). Records hit for frame completion.
    * @param {import('./Node.js').Node} node
    * @param {string} reason
    */
@@ -185,11 +170,4 @@ export class RuntimeController {
     return { frame: this.frameCount, mode: this.mode, nodes }
   }
 
-  _pausePhysics() {
-    this.sceneTree.phaserScene?.physics?.world?.pause()
-  }
-
-  _resumePhysics() {
-    this.sceneTree.phaserScene?.physics?.world?.resume()
-  }
 }

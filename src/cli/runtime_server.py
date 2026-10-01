@@ -181,16 +181,40 @@ async def _runtime_send(cmd: str, **params) -> dict:
         return {"error": "Timeout waiting for engine response"}
 
 
+async def _host_command(cmd: str, params: object = None) -> JSONResponse:
+    """Forward time and input commands to the browser owner without blocking WS."""
+    import httpx
+
+    if params is None:
+        params = {}
+    if not isinstance(params, dict):
+        return JSONResponse({"error": "Runtime payload must be a JSON object"}, status_code=400)
+    broker_port = os.environ.get("VIBEGAME_PLAYWRIGHT_PORT")
+    if not broker_port:
+        return JSONResponse({"error": "Runtime control requires the vibegame run browser host"}, status_code=503)
+    url = f"http://127.0.0.1:{broker_port}/runtime"
+    logger.info("Browser host request: cmd=%s params=%s url=%s", cmd, params, url)
+    try:
+        async with httpx.AsyncClient(trust_env=False, timeout=305) as client:
+            response = await client.post(url, json={"cmd": cmd, "params": params})
+        result = response.json()
+        logger.info("Browser host response: cmd=%s status=%s result=%s", cmd, response.status_code, result)
+        return JSONResponse(result, status_code=response.status_code)
+    except (httpx.HTTPError, ValueError) as exc:
+        logger.exception("Browser host request failed: cmd=%s url=%s", cmd, url)
+        return JSONResponse({"error": f"Browser host unavailable: {exc}"}, status_code=503)
+
+
 @app.post("/api/runtime/activate")
 async def runtime_activate():
     """Start runtime control mode (pauses game immediately)."""
-    return JSONResponse(await _runtime_send("activate"))
+    return await _host_command("activate")
 
 
 @app.post("/api/runtime/deactivate")
 async def runtime_deactivate():
     """Stop runtime control mode."""
-    return JSONResponse(await _runtime_send("deactivate"))
+    return await _host_command("deactivate")
 
 
 @app.post("/api/runtime/continue")
@@ -198,19 +222,19 @@ async def runtime_continue(request: Request):
     """Run N frames then pause. Blocks until done or breakpoint hit."""
     body = await request.json()
     frames = body.get("frames", 60)
-    return JSONResponse(await _runtime_send("continue", frames=frames))
+    return await _host_command("continue", {"frames": frames})
 
 
 @app.post("/api/runtime/pause")
 async def runtime_pause():
     """Pause immediately."""
-    return JSONResponse(await _runtime_send("pause"))
+    return await _host_command("pause")
 
 
 @app.post("/api/runtime/play")
 async def runtime_play():
     """Resume free-running play (returns immediately)."""
-    return JSONResponse(await _runtime_send("play"))
+    return await _host_command("play")
 
 
 @app.get("/api/runtime/snapshot")
@@ -220,15 +244,15 @@ async def runtime_snapshot():
 
 
 @app.get("/api/runtime/screenshot")
-async def runtime_screenshot():
+def runtime_screenshot():
     """Capture viewport as PNG image via Playwright screenshot broker."""
     import urllib.request
     import urllib.error
 
-    broker_port = os.environ.get("VIBEGAME_SCREENSHOT_PORT")
+    broker_port = os.environ.get("VIBEGAME_PLAYWRIGHT_PORT")
     if not broker_port:
         return JSONResponse(
-            {"error": "Screenshots require foreground mode (vibegame run without -b)"},
+            {"error": "Screenshots require a Playwright broker from vibegame run"},
             status_code=503,
         )
     try:
@@ -249,15 +273,15 @@ async def runtime_screenshot():
 
 
 @app.post("/api/runtime/refresh")
-async def runtime_refresh():
+def runtime_refresh():
     """Reload the browser page via Playwright broker."""
     import urllib.request
     import urllib.error
 
-    broker_port = os.environ.get("VIBEGAME_SCREENSHOT_PORT")
+    broker_port = os.environ.get("VIBEGAME_PLAYWRIGHT_PORT")
     if not broker_port:
         return JSONResponse(
-            {"error": "Refresh requires foreground mode (vibegame run without -b)"},
+            {"error": "Refresh requires a Playwright broker from vibegame run"},
             status_code=503,
         )
     try:
@@ -281,7 +305,7 @@ async def runtime_refresh():
 async def runtime_input(request: Request):
     """Inject virtual input. {action, held?} - held=true to hold, omit for one-shot press."""
     body = await request.json()
-    return JSONResponse(await _runtime_send("input", **body))
+    return await _host_command("input", body)
 
 
 @app.post("/api/runtime/set")
@@ -295,28 +319,28 @@ async def runtime_set(request: Request):
 async def runtime_click(request: Request):
     """Simulate mouse click at game coordinates. {x, y, button?}."""
     body = await request.json()
-    return JSONResponse(await _runtime_send("click", **body))
+    return await _host_command("click", body)
 
 
 @app.post("/api/runtime/mousemove")
 async def runtime_mousemove(request: Request):
     """Move pointer to game coordinates. {x, y}."""
     body = await request.json()
-    return JSONResponse(await _runtime_send("mousemove", **body))
+    return await _host_command("mousemove", body)
 
 
 @app.post("/api/runtime/drag")
 async def runtime_drag(request: Request):
     """Drag from one point to another. {from: {x, y}, to: {x, y}, steps?, button?}."""
     body = await request.json()
-    return JSONResponse(await _runtime_send("drag", **body))
+    return await _host_command("drag", body)
 
 
 @app.post("/api/runtime/key")
 async def runtime_key(request: Request):
     """Simulate keyboard event. {key, type?}. type: press|down|up."""
     body = await request.json()
-    return JSONResponse(await _runtime_send("key", **body))
+    return await _host_command("key", body)
 
 
 @app.post("/api/runtime/eval")

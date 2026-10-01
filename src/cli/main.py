@@ -48,11 +48,15 @@ import os
 import re
 import sys
 import json
+import hashlib
+import logging
 import shutil
 import subprocess as sp
 import questionary
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
+from rich.console import Console
 import typer
 
 from cli.router import app
@@ -83,7 +87,15 @@ PROJECT_GITIGNORE_ENTRIES = (
 ACTION_SKIP = "skip"
 ACTION_OVERWRITE = "overwrite"
 ACTION_APPEND = "append"
+ACTION_REMOVE = "remove"
 InitChoice = Literal["ask", "skip", "overwrite"]
+ENGINE_IGNORE_PATTERNS = ("*.pyc", "__pycache__", ".DS_Store")
+
+
+@dataclass(frozen=True)
+class _FileResult:
+    rel_path: str
+    action: str
 
 
 def _ask_conflict(rel_path: str) -> tuple[str, bool]:
@@ -107,6 +119,25 @@ def _ask_conflict(rel_path: str) -> tuple[str, bool]:
     return choice
 
 
+def _ask_deprecated(rel_path: str) -> tuple[str, bool]:
+    """Ask whether an installed deprecated path should be removed."""
+    try:
+        choice = questionary.select(
+            f"Deprecated path exists: {rel_path}",
+            choices=[
+                questionary.Choice("skip", value=(ACTION_SKIP, False)),
+                questionary.Choice("remove", value=(ACTION_REMOVE, False)),
+                questionary.Choice("always skip", value=(ACTION_SKIP, True)),
+                questionary.Choice("always remove", value=(ACTION_REMOVE, True)),
+            ],
+        ).ask()
+    except KeyboardInterrupt:
+        raise typer.Exit(1)
+    if choice is None:
+        raise typer.Exit(1)
+    return choice
+
+
 def _strip_yaml_frontmatter(content: str) -> str:
     """Strip leading YAML frontmatter when present."""
     lines = content.splitlines(keepends=True)
@@ -118,7 +149,7 @@ def _strip_yaml_frontmatter(content: str) -> str:
     return content
 
 
-def _generate_codex_roles(project_path: Path) -> list[str]:
+def _generate_codex_roles(project_path: Path) -> list[_FileResult]:
     """Generate static Codex role docs from project role sources."""
     roles_dir = project_path / ".codex" / "roles"
     roles_dir.mkdir(parents=True, exist_ok=True)
@@ -130,12 +161,12 @@ def _generate_codex_roles(project_path: Path) -> list[str]:
         for agent_file in sorted(agents_dir.glob("*.md")):
             sources[agent_file.stem] = agent_file
 
-    written: list[str] = []
+    written: list[_FileResult] = []
     for role, source_path in sorted(sources.items()):
         content = _strip_yaml_frontmatter(source_path.read_text(encoding="utf-8"))
         destination = roles_dir / f"{role}.md"
         destination.write_text(content, encoding="utf-8")
-        written.append(f"✓ .codex/roles/{role}.md")
+        written.append(_FileResult(f".codex/roles/{role}.md", "generated"))
 
     return written
 
@@ -162,8 +193,6 @@ def _codex_hooks_feature_key() -> str:
 # ============================================================================
 # File Installation System
 # ============================================================================
-
-from dataclasses import dataclass
 
 CONFLICT_SKIP = "skip"  # Skip if exists (user files)
 CONFLICT_ASK = "ask"    # Ask user on conflict
@@ -347,13 +376,39 @@ def _write_file_task(
         shutil.copyfile(task.src, task.dst)
 
 
+def _summarize_init_files(results: list[_FileResult]) -> list[str]:
+    """Group directory results while keeping individual warnings visible."""
+    groups: dict[str, dict[str, int]] = {}
+    for result in results:
+        parts = Path(result.rel_path).parts
+        depth = 2 if parts[0].startswith(".") else 1
+        grouped = len(parts) > depth and result.action != "binary append unsupported"
+        label = "/".join(parts[:depth]) + "/" if grouped else result.rel_path
+        counts = groups.setdefault(label, {})
+        counts[result.action] = counts.get(result.action, 0) + 1
+
+    lines: list[str] = []
+    for label, counts in groups.items():
+        details = ", ".join(
+            f"{count} {action}" if label.endswith("/") else action
+            for action, count in counts.items()
+        )
+        all_skipped = all(
+            action in {"protected", "skipped", "binary append unsupported"}
+            for action in counts
+        )
+        mark = "⊙" if all_skipped else "✓"
+        lines.append(f"{mark} {label} ({details})")
+    return lines
+
+
 def _install_files(
     tasks: list[_FileTask],
     lang_preset: dict,
     project_name: str,
     project_root: Path,
     choice: InitChoice = "ask",
-) -> tuple[list[str], list[str]]:
+) -> tuple[list[_FileResult], list[_FileResult]]:
     """
     Install files by onConflict:
     - skip -> auto skip if exists (user config files)
@@ -361,8 +416,8 @@ def _install_files(
 
     Returns (written, skipped) lists.
     """
-    written: list[str] = []
-    skipped: list[str] = []
+    written: list[_FileResult] = []
+    skipped: list[_FileResult] = []
 
     # Group by onConflict
     skip_tasks = [t for t in tasks if t.onConflict == CONFLICT_SKIP]
@@ -382,31 +437,23 @@ def _install_files(
                 existing.pop("team_mode", None)
                 existing.pop("developer", None)
                 task.dst.write_text(json.dumps(existing, indent=2, ensure_ascii=False), encoding="utf-8")
-                written.append(f"✓ {task.rel_path} (merged)")
+                written.append(_FileResult(task.rel_path, "merged"))
                 continue
             except (json.JSONDecodeError, KeyError):
                 pass  # Fall through to normal handling
 
         if task.dst.exists():
-            skipped.append(f"⊙ {task.rel_path} (user file)")
+            skipped.append(_FileResult(task.rel_path, "protected"))
         else:
             _write_file_task(task, lang_preset, project_name, project_root)
-            written.append(f"✓ {task.rel_path}")
-
-    # --- Show skip results before asking ---
-    if skipped:
-        print("\nSkipped user files (auto-protected):")
-        for s in skipped:
-            print(f"  {s}")
+            written.append(_FileResult(task.rel_path, "created"))
 
     # --- Batch 2: ask (prompt user on conflict) ---
-    ask_results: list[str] = []
     always_action: str | None = None
     for task in ask_tasks:
         if not task.dst.exists():
             _write_file_task(task, lang_preset, project_name, project_root)
-            written.append(f"✓ {task.rel_path}")
-            ask_results.append(f"✓ {task.rel_path} (created)")
+            written.append(_FileResult(task.rel_path, "created"))
             continue
 
         # File exists, need to decide
@@ -421,12 +468,10 @@ def _install_files(
 
         if action == ACTION_OVERWRITE:
             _write_file_task(task, lang_preset, project_name, project_root)
-            written.append(f"✓ {task.rel_path}")
-            ask_results.append(f"✓ {task.rel_path} (overwritten)")
+            written.append(_FileResult(task.rel_path, "overwritten"))
         elif action == ACTION_APPEND:
             if not _is_text_task(task):
-                skipped.append(f"⊙ {task.rel_path}")
-                ask_results.append(f"⊙ {task.rel_path} (binary append unsupported)")
+                skipped.append(_FileResult(task.rel_path, "binary append unsupported"))
                 continue
             content = _prepare_content(task, lang_preset, project_name, project_root)
             existing = task.dst.read_text(encoding="utf-8")
@@ -434,41 +479,141 @@ def _install_files(
                 if existing and not existing.endswith("\n"):
                     f.write("\n")
                 f.write(content)
-            written.append(f"✓ {task.rel_path}")
-            ask_results.append(f"✓ {task.rel_path} (appended)")
+            written.append(_FileResult(task.rel_path, "appended"))
         else:  # skip
-            skipped.append(f"⊙ {task.rel_path}")
-            ask_results.append(f"⊙ {task.rel_path} (skipped)")
-
-    # --- Show ask results ---
-    if ask_results:
-        print("\nConflict resolution:")
-        for r in ask_results:
-            print(f"  {r}")
+            skipped.append(_FileResult(task.rel_path, "skipped"))
 
     return written, skipped
 
 
+def _process_deprecated_entries(registry: dict, project_path: Path) -> None:
+    """Prompt before removing deprecated files or directories in a project."""
+    always_action: str | None = None
+
+    for src_path_str, entry in registry.items():
+        if src_path_str in ("_comment", "_deprecated"):
+            continue
+        if not isinstance(entry, dict) or entry.get("moveTo") != "deprecated":
+            continue
+
+        target = project_path / src_path_str
+        if not target.exists() and not target.is_symlink():
+            continue
+
+        if always_action is None:
+            action, is_always = _ask_deprecated(src_path_str)
+            if is_always:
+                always_action = action
+        else:
+            action = always_action
+
+        if action == ACTION_REMOVE:
+            if target.is_dir() and not target.is_symlink():
+                shutil.rmtree(target)
+                print(f"Removed deprecated directory: {src_path_str}")
+            else:
+                target.unlink()
+                print(f"Removed deprecated file: {src_path_str}")
+        else:
+            print(f"Skipped deprecated path: {src_path_str}")
+
+
+def _engine_hash(engine_root: Path) -> str:
+    """Hash copied paths and contents, including empty directories."""
+    digest = hashlib.sha256()
+    ignore = shutil.ignore_patterns(*ENGINE_IGNORE_PATTERNS)
+    logger = logging.getLogger(__name__)
+    logger.info("Hashing engine directory: %s", engine_root)
+
+    def visit(directory: Path, ancestors: frozenset[Path]) -> None:
+        resolved = directory.resolve(strict=True)
+        if resolved in ancestors:
+            raise ValueError(f"Recursive engine directory symlink: {directory}")
+        entries = sorted(directory.iterdir(), key=lambda entry: entry.name)
+        ignored = ignore(str(directory), [entry.name for entry in entries])
+        for entry in entries:
+            if entry.name in ignored:
+                continue
+            relative = entry.relative_to(engine_root).as_posix().encode("utf-8")
+            if entry.is_dir():
+                digest.update(b"D")
+            elif entry.is_file():
+                digest.update(b"F")
+            else:
+                raise ValueError(f"Unsupported engine entry: {entry}")
+            digest.update(len(relative).to_bytes(8, "big"))
+            digest.update(relative)
+            if entry.is_dir():
+                visit(entry, ancestors | {resolved})
+            else:
+                logger.debug("Reading engine file for hash: %s", entry)
+                with entry.open("rb") as file:
+                    digest.update(hashlib.file_digest(file, "sha256").digest())
+
+    visit(engine_root, frozenset())
+    result = digest.hexdigest()
+    logger.info("Engine hash calculated: directory=%s sha256=%s", engine_root, result)
+    return result
+
+
+def _ask_engine_replacement() -> Literal["skip", "overwrite"]:
+    """Ask once for the whole engine, independently of file conflict choices."""
+    if not sys.stdin.isatty():
+        raise RuntimeError(
+            "Engine contents differ. Run init interactively to choose replacement, "
+            "or use --no-engine to keep the existing engine."
+        )
+    choice = questionary.select(
+        "engine/ differs from bundled engine. Replacement removes all local engine changes.",
+        choices=[
+            questionary.Choice("Keep existing engine", value=ACTION_SKIP),
+            questionary.Choice("Replace entire engine", value=ACTION_OVERWRITE),
+        ],
+        default=ACTION_SKIP,
+    ).ask()
+    if choice is None:
+        raise RuntimeError("Engine replacement cancelled; engine was not changed.")
+    if choice not in (ACTION_SKIP, ACTION_OVERWRITE):
+        raise ValueError(f"Invalid engine replacement choice: {choice!r}")
+    return choice
+
+
 def _install_engine(src_root: Path, project_path: Path) -> list[str]:
-    """Install engine code to project directory. Returns description lines."""
+    """Copy engine only when absent or explicitly approved after comparison."""
     engine_src = src_root / "engine"
     engine_dst = project_path / "engine"
-    results: list[str] = []
-
+    logger = logging.getLogger(__name__)
     if not engine_src.is_dir():
-        return [f"engine source not found: {engine_src}"]
+        raise FileNotFoundError(f"Engine source directory not found: {engine_src}")
 
+    source_hash = _engine_hash(engine_src)
+    replacing = engine_dst.exists() or engine_dst.is_symlink()
+    if replacing:
+        if not engine_dst.is_dir():
+            raise NotADirectoryError(f"Project engine is not a directory: {engine_dst}")
+        target_hash = _engine_hash(engine_dst)
+        logger.info(
+            "Comparing engine directories: source=%s target=%s equal=%s",
+            engine_src, engine_dst, source_hash == target_hash,
+        )
+        if source_hash == target_hash:
+            return ["✓ engine/ (unchanged)"]
+        action = _ask_engine_replacement()
+        logger.info("Engine replacement choice: target=%s action=%s", engine_dst, action)
+        if action == ACTION_SKIP:
+            return ["⊙ engine/ (kept)"]
+
+    logger.info("Copying engine directory: source=%s target=%s", engine_src, engine_dst)
     if engine_dst.is_symlink():
         engine_dst.unlink()
     elif engine_dst.is_dir():
         shutil.rmtree(engine_dst)
     shutil.copytree(
         engine_src, engine_dst,
-        ignore=shutil.ignore_patterns("*.pyc", "__pycache__", ".DS_Store"),
+        ignore=shutil.ignore_patterns(*ENGINE_IGNORE_PATTERNS),
     )
-    results.append("✓ engine/ (copied)")
-
-    return results
+    logger.info("Engine directory copied: target=%s", engine_dst)
+    return [f"✓ engine/ ({'overwritten' if replacing else 'created'})"]
 
 
 def _append_gitignore(project_path: Path):
@@ -557,11 +702,11 @@ LANGUAGE_PRESETS: dict[str, dict[str, str]] = {
 def init(
     path: str = typer.Argument(default=".", help="Project path (default: current dir)"),
     lang: str | None = typer.Option(None, "--lang", help="Language: zh-CN / en"),
-    engine: bool = typer.Option(True, "--engine/--no-engine", "-e", help="Copy engine code to project dir (default: yes)"),
+    engine: bool = typer.Option(True, "--engine/--no-engine", "-e", help="Install engine; confirm replacement when contents differ (default: enabled)"),
     choice: InitChoice = typer.Option(
         "ask",
         "--choice",
-        help="Conflict handling for prompted files: ask, skip, or overwrite (default: ask)",
+        help="Conflict handling for framework files: ask, skip, or overwrite (default: ask); engine replacement is confirmed separately",
     ),
     no_commit: bool = typer.Option(
         False,
@@ -634,16 +779,7 @@ def init(
         registry = json.loads(registry_path.read_text(encoding="utf-8"))
         _validate_registry_sources(registry, src_root)
 
-        # Process deprecated entries: remove stale files from project
-        for src_path_str, entry in registry.items():
-            if src_path_str == "_comment":
-                continue
-            if not isinstance(entry, dict) or entry.get("moveTo") != "deprecated":
-                continue
-            target = project_path / src_path_str
-            if target.exists() or target.is_symlink():
-                target.unlink()
-                print(f"Removed deprecated file: {src_path_str}")
+        _process_deprecated_entries(registry, project_path)
 
         # === Unified installation (copy-only mode) ===
         project_name = project_path.name
@@ -670,7 +806,7 @@ def init(
         project_env_path = project_path / ".env"
         if not project_env_path.exists() and git_root_env.exists():
             shutil.copy(git_root_env, project_env_path)
-            written.append(".env (from git root)")
+            written.append(_FileResult(".env", "copied from git root"))
 
         _append_gitignore(project_path)
         written.extend(_generate_codex_roles(project_path))
@@ -678,19 +814,22 @@ def init(
         # Build summary
         skip_note = f"\nSkipped: {len(skipped)}" if skipped else ""
         summary = f"Copied: {len(written)}{skip_note}\n"
-        if written:
-            summary += "\nCopied files:\n" + "\n".join(f"  {w}" for w in written)
+        if written or skipped:
+            summary += "\nFiles:\n" + "\n".join(
+                f"  {line}" for line in _summarize_init_files(written + skipped)
+            )
         if engine_results:
             summary += "\n\nEngine:\n" + "\n".join(f"  {r}" for r in engine_results)
 
         launch_hint = "vibegame start"
-        print("=== Vibegame Init Success ===")
-        print(f"  Game project initialized (copy mode)\n")
-        print(f"  Project path: {project_path}")
-        print(f"  Language: {lang}\n")
-        print(f"  {summary}\n")
-        print(f"  Start session: {launch_hint}")
-        print(f"  Suggested first message: use the `vibegame-start` skill")
+        console = Console(soft_wrap=True)
+        console.print("=== Vibegame Init Success ===")
+        console.print("  Game project initialized (copy mode)\n")
+        console.print(f"  Project path: {project_path}", markup=False, highlight=False)
+        console.print(f"  Language: {lang}\n")
+        console.print(f"  {summary}\n", markup=False, highlight=False)
+        console.print(f"  Start session: {launch_hint}")
+        console.print("  Suggested first message: use the `vibegame-start` skill")
         if no_commit:
             print("git: skipped vibegame init commit (--no-commit)")
         else:

@@ -78,9 +78,8 @@ lead_app.add_typer(task_app, name="task")
 
 @lead_app.callback()
 def _lead_callback():
-    """Reject mate-role invocations then bootstrap the team path."""
+    """Reject mate-role invocations without requiring a project for help."""
     _reject_inside_mate()
-    _bootstrap()
 
 
 def _exit(rc: int) -> None:
@@ -96,12 +95,14 @@ def _exit(rc: int) -> None:
 @lead_app.command("start")
 def cmd_start():
     """Start the team's tmux session."""
+    _bootstrap()
     _exit(_lead_main.cmd_start(SimpleNamespace()))
 
 
 @lead_app.command("status")
 def cmd_status():
     """Show team and agent status."""
+    _bootstrap()
     _exit(_lead_main.cmd_status(SimpleNamespace()))
 
 
@@ -115,6 +116,7 @@ def cmd_agent(
     resume: Optional[str] = typer.Option(None, "--resume", help="Resume previous Claude/Codex session by id."),
 ):
     """Spawn a teammate in a new tmux pane."""
+    _bootstrap()
     _exit(_lead_main.cmd_agent(SimpleNamespace(
         prompt=prompt, name=name, workdir=workdir, model=model,
         agent_type=agent_type, resume=resume,
@@ -124,15 +126,17 @@ def cmd_agent(
 @lead_app.command("send")
 def cmd_send(
     name: str = typer.Option(..., "--name", help="Target agent name."),
-    message: str = typer.Argument(..., help="Message body."),
+    message: Optional[str] = typer.Argument(None, help="Message body. Reads from stdin if omitted."),
 ):
     """Send a message to a teammate."""
+    _bootstrap()
     _exit(_lead_main.cmd_send(SimpleNamespace(name=name, message=message)))
 
 
 @lead_app.command("inbox")
 def cmd_inbox():
     """Show unread message counts per agent."""
+    _bootstrap()
     _exit(_lead_main.cmd_inbox(SimpleNamespace()))
 
 
@@ -141,6 +145,7 @@ def cmd_read(
     name: str = typer.Option(..., "--name", help="Agent name, or 'ALL' for every unread message."),
 ):
     """Read messages and mark them as read."""
+    _bootstrap()
     _exit(_lead_main.cmd_read(SimpleNamespace(name=name)))
 
 
@@ -151,6 +156,7 @@ def cmd_log(
     tmux: bool = typer.Option(False, "--tmux", help="Read the tmux pane instead of the transcript."),
 ):
     """Read an agent's transcript, or its tmux pane with --tmux."""
+    _bootstrap()
     _exit(_lead_main.cmd_log(SimpleNamespace(name=name, lines=lines, tmux=tmux)))
 
 
@@ -160,6 +166,7 @@ def cmd_kill(
     force: bool = typer.Option(False, "-f", "--force", help="Force-remove even if pane is still alive."),
 ):
     """Kill a teammate pane and remove its state entry."""
+    _bootstrap()
     _exit(_lead_main.cmd_kill(SimpleNamespace(name=name, force=force)))
 
 
@@ -175,6 +182,7 @@ def cmd_task_create(
     blocked_by: Optional[List[str]] = typer.Option(None, "--blocked-by", help="Task names this depends on. Pass multiple times."),
 ):
     """Create a new task entry in tasks.jsonl."""
+    _bootstrap()
     _exit(_task_main.cmd_create(SimpleNamespace(
         description=description, name=name, blocked_by=blocked_by or [],
     )))
@@ -184,9 +192,19 @@ def cmd_task_create(
 def cmd_task_init(
     name: str = typer.Argument(..., help="Task name to initialize."),
     use_worktree: bool = typer.Option(False, "--use-worktree", help="Create a git worktree for this task."),
+    reuse_workspace_from: Optional[str] = typer.Option(
+        None,
+        "--reuse-workspace-from",
+        help="Reuse the effective workspace of an earlier task.",
+    ),
 ):
     """Initialize a task dir (prd.md from stdin, context.json seeded from defaults)."""
-    _exit(_task_main.cmd_init(SimpleNamespace(name=name, use_worktree=use_worktree)))
+    _bootstrap()
+    _exit(_task_main.cmd_init(SimpleNamespace(
+        name=name,
+        use_worktree=use_worktree,
+        reuse_workspace_from=reuse_workspace_from,
+    )))
 
 
 @task_app.command("modify")
@@ -196,12 +214,14 @@ def cmd_task_modify(
     value: List[str] = typer.Option(..., "--value", "-v", help="New value(s)."),
 ):
     """Modify an arbitrary task field. Auto-unlocks dependents when status=done."""
+    _bootstrap()
     _exit(_task_main.cmd_modify(SimpleNamespace(name=name, key=key, value=value)))
 
 
 @task_app.command("list")
 def cmd_task_list():
     """List all tasks."""
+    _bootstrap()
     _exit(_task_main.cmd_list(SimpleNamespace()))
 
 
@@ -211,4 +231,5 @@ def cmd_task_archive(
     all_done: bool = typer.Option(False, "--all", help="Archive every task that still needs archiving."),
 ):
     """Archive one task, or all tasks that still need archiving."""
+    _bootstrap()
     _exit(_task_main.cmd_archive(SimpleNamespace(name=name, all=all_done)))

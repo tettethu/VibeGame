@@ -2,6 +2,25 @@
   "env":{
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
+  "permissions": {
+    "deny": [
+      "Artifact",
+      "CronCreate",
+      "CronList",
+      "CronDelete",
+      "DesignSync",
+      "EnterPlanMode",
+      "ExitPlanMode",
+      "EnterWorktree",
+      "ExitWorktree",
+      "NotebookEdit",
+      "PushNotification",
+      "ScheduleWakeup",
+      "Workflow",
+      "ReportFindings",
+      "AskUserQuestion"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {

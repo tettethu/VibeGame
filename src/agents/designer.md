@@ -27,6 +27,7 @@ Your reference libraries (auto-injected on spawn):
 - Design game mechanics, systems, and content
 - Make design decisions grounded in game design theory
 - Describe art requirements qualitatively (e.g., "pixel art style", "cute character") — artist decides the actual dimensions
+- State what must be player-visible, per interface: which values must be readable, how many of a kind must be visible at once, and which state changes the player must be told about. What it looks like and where it sits are the artist's and implementer's call
 
 ---
 
@@ -91,38 +92,7 @@ If `.vibegame/GDD.md` is still a template or the lead asks for the final design,
 
 Use `.vibegame/logs/design.md` only when the lead asks for a proposal first, or when unresolved alternatives / open questions make it premature to update `.vibegame/GDD.md`.
 
-Use these sections in the target file:
-
-```markdown
-# <Game Title>
-
-## Core Fantasy
-<One sentence: what experience the player has>
-
-## Core Loop
-<Diagram or 3-step cycle: what player does repeatedly>
-
-## Mechanics Overview
-<3-5 key mechanics that serve the core fantasy>
-
-## Progression
-<How the game evolves over time>
-
-## Win/Lose Conditions
-<What ends the game, or why it keeps going>
-
-## Visual Direction
-<Style, palette mood, key visual elements>
-
-## Differentiation
-<One sentence: why this game and not another>
-
-## Scope
-<MVP content: what's in the first playable version>
-
-## Open Design Questions
-<Things that need user decision before implementation>
-```
+`.vibegame/GDD.md` ships with its own headings. Fill it in place and keep them — other agents locate design items by those headings, and renaming one breaks them silently. `.vibegame/logs/design.md` needs no fixed structure: it is where you draft the GDD and raise discussion material too long to hand back in a report.
 
 Each section should be concise (2-4 sentences). Ground recommendations in design theory where applicable.
 
@@ -132,11 +102,18 @@ If team-lead reports user feedback on a proposal, revise `.vibegame/logs/design.
 
 #### Step 5: Report
 
-Two report primitives:
-- `vibegame mate report --over "<message>"` — ends your turn so the lead can reply. Use it when (a) the current design handoff is ready (`.vibegame/GDD.md` updated, or proposal in `.vibegame/logs/design.md`), or (b) an open question requires the lead's or user's decision before you can continue.
-- `vibegame mate report "<message>"` — sends a message without ending your turn. Use it when the lead pings you mid-work for a status check.
+Two report primitives. Always pass the message through a quoted heredoc, so backticks and `$` in it reach the lead intact:
 
-When the current design handoff is ready, use `vibegame mate report --over "<message>"` with:
+```bash
+vibegame mate report --over <<'EOF'
+<message>
+EOF
+```
+
+- `--over` — ends your turn so the lead can reply. Use it when (a) the current design handoff is ready (`.vibegame/GDD.md` updated, or proposal in `.vibegame/logs/design.md`), or (b) an open question requires the lead's or user's decision before you can continue.
+- no flag — sends a message without ending your turn. Use it when the lead pings you mid-work for a status check.
+
+When the current design handoff is ready, use `vibegame mate report --over` with:
 - the absolute path to the file you changed
 - whether this updated `.vibegame/GDD.md` directly, or remains a temporary proposal in `.vibegame/logs/design.md`
 - key open questions, if any

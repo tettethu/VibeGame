@@ -5,8 +5,6 @@
  * Protocol: backend sends { id, cmd, ...params }, bridge responds { id, result }.
  */
 
-import { RuntimeController } from './RuntimeController.js'
-
 export class RuntimeBridge {
   /** Reconnect interval in ms */
   static RECONNECT_INTERVAL = 3000
@@ -137,10 +135,11 @@ export class RuntimeBridge {
     this.host = host
     this.sceneTree = sceneTree
     this.ws = null
-    this.runtimeController = sceneTree.runtimeController || null
+    this.runtimeController = sceneTree.runtimeController
     this._wsUrl = null
-    this._pingTimer = null
-    this._reconnectTimer = null
+    this._controlTime = 0
+    this._nextPing = 0
+    this._reconnectAt = null
     this._intentionalClose = false
   }
 
@@ -157,11 +156,8 @@ export class RuntimeBridge {
     }
     this.ws = new WebSocket(this._wsUrl)
     this.ws.onopen = () => {
-      this._startPing()
-      if (this._reconnectTimer) {
-        clearTimeout(this._reconnectTimer)
-        this._reconnectTimer = null
-      }
+      this._nextPing = this._controlTime + RuntimeBridge.PING_INTERVAL
+      this._reconnectAt = null
     }
     this.ws.onmessage = (e) => {
       if (e.data === '__ping__') {
@@ -171,52 +167,33 @@ export class RuntimeBridge {
       this._handleMessage(JSON.parse(e.data))
     }
     this.ws.onclose = () => {
+      this._cmdDeactivate()
       this.ws = null
-      this._stopPing()
-      if (!this._intentionalClose) this._scheduleReconnect()
+      if (!this._intentionalClose) this._reconnectAt = this._controlTime + RuntimeBridge.RECONNECT_INTERVAL
     }
     this.ws.onerror = () => {
       // onclose will fire after onerror, reconnect handled there
     }
   }
 
-  _startPing() {
-    this._stopPing()
-    this._pingTimer = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.send('__ping__')
-      }
-    }, RuntimeBridge.PING_INTERVAL)
-  }
-
-  _stopPing() {
-    if (this._pingTimer) {
-      clearInterval(this._pingTimer)
-      this._pingTimer = null
-    }
-  }
-
-  _scheduleReconnect() {
-    if (this._reconnectTimer) return
-    this._reconnectTimer = setTimeout(() => {
-      this._reconnectTimer = null
+  /** Called by the host wall clock, including while game time is frozen. */
+  poll(time) {
+    this._controlTime = time
+    if (this._reconnectAt !== null && time >= this._reconnectAt) {
+      this._reconnectAt = null
       this._connect()
-    }, RuntimeBridge.RECONNECT_INTERVAL)
+    }
+    if (this.ws?.readyState === WebSocket.OPEN && time >= this._nextPing) {
+      this.ws.send('__ping__')
+      this._nextPing = time + RuntimeBridge.PING_INTERVAL
+    }
   }
 
   /** Disconnect and clean up */
   disconnect() {
     this._intentionalClose = true
-    if (this._reconnectTimer) {
-      clearTimeout(this._reconnectTimer)
-      this._reconnectTimer = null
-    }
-    this._stopPing()
-    if (this.runtimeController) {
-      this.runtimeController.deactivate()
-      this.sceneTree.runtimeController = null
-      this.runtimeController = null
-    }
+    this._reconnectAt = null
+    this._cmdDeactivate()
     if (this.ws) {
       this.ws.close()
       this.ws = null
@@ -253,15 +230,6 @@ export class RuntimeBridge {
           break
         case 'set':
           result = this._cmdSet(params)
-          break
-        case 'click':
-          result = this._cmdClick(params)
-          break
-        case 'mousemove':
-          result = this._cmdMousemove(params)
-          break
-        case 'drag':
-          result = await this._cmdDrag(params)
           break
         case 'key':
           result = this._cmdKey(params)
@@ -303,11 +271,6 @@ export class RuntimeBridge {
   // --- Command handlers ---
 
   _cmdActivate() {
-    if (!this.sceneTree.runtimeController) {
-      this.sceneTree.runtimeController = new RuntimeController(this.sceneTree)
-    }
-    this.runtimeController = this.sceneTree.runtimeController
-    this.sceneTree.running = true
     if (!this.runtimeController.enabled) {
       this.runtimeController.activate()
     } else {
@@ -317,11 +280,8 @@ export class RuntimeBridge {
   }
 
   _cmdDeactivate() {
-    if (this.runtimeController) {
+    if (this.runtimeController.enabled) {
       this.runtimeController.deactivate()
-      this.sceneTree.runtimeController = null
-      this.sceneTree.running = true
-      this.runtimeController = null
     }
     return { status: 'ok' }
   }
@@ -389,8 +349,7 @@ export class RuntimeBridge {
   async _cmdEval({ code }) {
     if (!code) return { error: 'Missing code' }
     try {
-      const fn = new Function('sceneTree', 'host', 'runtime',
-        `"use strict"; return (async () => { ${code} })()`)
+      const fn = compileEval(code)
       const ret = await fn(this.sceneTree, this.host, this.runtimeController)
       return { result: ret === undefined ? null : ret }
     } catch (err) {
@@ -438,97 +397,6 @@ export class RuntimeBridge {
 
   _cmdNetworkClear() {
     if (window.__vibegameRuntime) window.__vibegameRuntime.network = []
-    return { status: 'ok' }
-  }
-
-  // --- Coordinate conversion ---
-
-  /** Convert game-world coordinates to canvas DOM clientX/clientY */
-  _gameToClient(x, y) {
-    const cam = this.host.phaserScene.cameras.main
-    // World -> camera-relative (accounts for scroll + zoom)
-    const cx = (x - cam.scrollX) * cam.zoom
-    const cy = (y - cam.scrollY) * cam.zoom
-    // Camera-relative -> DOM client coordinates
-    const canvas = this.host.game.canvas
-    const rect = canvas.getBoundingClientRect()
-    const scale = this.host.game.scale.displayScale
-    return {
-      clientX: cx * scale.x + rect.left,
-      clientY: cy * scale.y + rect.top,
-    }
-  }
-
-  // --- Raw input simulation ---
-
-  /** Convert button index (0=left,1=mid,2=right) to buttons bitmask */
-  _buttonBitmask(button) { return [1, 4, 2][button] ?? 1 }
-
-  _cmdClick(params) {
-    const { x, y, button = 0 } = params
-    if (x == null || y == null) return { error: 'Missing x or y' }
-
-    const canvas = this.host.game.canvas
-    const { clientX, clientY } = this._gameToClient(x, y)
-    const buttons = this._buttonBitmask(button)
-
-    canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX, clientY, button, buttons, bubbles: true }))
-    canvas.dispatchEvent(new PointerEvent('pointerup', { clientX, clientY, button, buttons: 0, bubbles: true }))
-    return { status: 'ok' }
-  }
-
-  _cmdMousemove(params) {
-    const { x, y } = params
-    if (x == null || y == null) return { error: 'Missing x or y' }
-
-    const canvas = this.host.game.canvas
-    const { clientX, clientY } = this._gameToClient(x, y)
-
-    canvas.dispatchEvent(new PointerEvent('pointermove', { clientX, clientY, bubbles: true }))
-    return { status: 'ok' }
-  }
-
-  async _cmdDrag(params) {
-    const from = params.from || (
-      params.fromX != null && params.fromY != null
-        ? { x: params.fromX, y: params.fromY }
-        : null
-    )
-    const to = params.to || (
-      params.toX != null && params.toY != null
-        ? { x: params.toX, y: params.toY }
-        : null
-    )
-    const { steps = 10, button = 0 } = params
-    if (!from || !to) return { error: 'Missing from or to' }
-    if (from.x == null || from.y == null) return { error: 'Missing from.x or from.y' }
-    if (to.x == null || to.y == null) return { error: 'Missing to.x or to.y' }
-
-    const canvas = this.host.game.canvas
-    const start = this._gameToClient(from.x, from.y)
-    const end = this._gameToClient(to.x, to.y)
-    const buttons = this._buttonBitmask(button)
-
-    // Press at start position
-    canvas.dispatchEvent(new PointerEvent('pointerdown', {
-      clientX: start.clientX, clientY: start.clientY, button, buttons, bubbles: true,
-    }))
-
-    // Interpolate movement (button held)
-    for (let i = 1; i <= steps; i++) {
-      const t = i / steps
-      const cx = start.clientX + (end.clientX - start.clientX) * t
-      const cy = start.clientY + (end.clientY - start.clientY) * t
-      canvas.dispatchEvent(new PointerEvent('pointermove', {
-        clientX: cx, clientY: cy, button: -1, buttons, bubbles: true,
-      }))
-      await new Promise((r) => setTimeout(r, 16))
-    }
-
-    // Release at end position
-    canvas.dispatchEvent(new PointerEvent('pointerup', {
-      clientX: end.clientX, clientY: end.clientY, button, buttons: 0, bubbles: true,
-    }))
     return { status: 'ok' }
   }
 
@@ -598,5 +466,25 @@ export class RuntimeBridge {
       dispatch('keyup')
     }
     return { status: 'ok' }
+  }
+}
+
+const EVAL_PARAMS = ['sceneTree', 'host', 'runtime']
+
+/**
+ * Compile `play eval` code, returning the value of a bare expression.
+ *
+ * Code that parses as one expression (`1+1`, `sceneTree.nodes.size`) returns its
+ * value, as a browser console does. Anything else runs as an async function body
+ * and returns only what it `return`s. Body-only compilation made a bare
+ * expression come back as a silent null, which reads as a real null value.
+ */
+function compileEval(code) {
+  const expr = code.trim().replace(/;+$/, '')
+  try {
+    return new Function(...EVAL_PARAMS, `"use strict"; return (async () => (${expr}\n))()`)
+  } catch (err) {
+    if (!(err instanceof SyntaxError)) throw err
+    return new Function(...EVAL_PARAMS, `"use strict"; return (async () => { ${code}\n })()`)
   }
 }

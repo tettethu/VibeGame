@@ -290,7 +290,7 @@ Scan task artifacts (`plan.md` and the `# Auditor` / `# Player` sections of each
 
 ### Basic Knowledge
 
-<Use this when this pattern needs extra prior common knowledge to exactly know **WHY need to do this**. Task contracts/tilemap.md for example, which demonstrates why we need prior knowledge otherwise nobody knows why face/top split.>
+<Use this when this pattern needs extra prior common knowledge to exactly know **WHY need to do this**. Task contracts/map.md for example, which demonstrates why we need prior knowledge otherwise nobody knows why face/top split.>
 
 ### Responsibility
 

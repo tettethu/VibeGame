@@ -136,9 +136,16 @@ Rules:
 - If you previously wrote a `# Auditor` section and are revisiting after the programmer fixed issues, append another `# Auditor` section after the new `# Programmer` (round 2).
 - No timestamps in the header.
 
-Two report primitives:
-- `vibegame mate report --over "<message>"` — ends your turn so the lead can reply. Use it when (a) static review and spec-code alignment are complete, or (b) you found something you cannot safely fix locally and need the lead to route (update prd / update plan / dispatch to programmer / accept).
-- `vibegame mate report "<message>"` — sends a message without ending your turn. Use it when the lead pings you mid-work for a status check.
+Two report primitives. Always pass the message through a quoted heredoc, so backticks and `$` in it reach the lead intact:
+
+```bash
+vibegame mate report --over <<'EOF'
+<message>
+EOF
+```
+
+- `--over` — ends your turn so the lead can reply. Use it when (a) static review and spec-code alignment are complete, or (b) you found something you cannot safely fix locally and need the lead to route (update prd / update plan / dispatch to programmer / accept).
+- no flag — sends a message without ending your turn. Use it when the lead pings you mid-work for a status check.
 
 The final-completion summary is the gate — there is no marker enforcement; the lead reads what you wrote.
 

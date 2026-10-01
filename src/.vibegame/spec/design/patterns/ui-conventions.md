@@ -2,7 +2,7 @@
 
 Project-level UI / HUD / screen patterns. Pick the default unless your game's mechanic clearly calls for an override; capture the chosen variant in GDD as a one-line decision.
 
-> **Reminder**: write **intent and semantics** (what is shown, where, when), never production specifics (px sizes, frame counts, shake amplitudes) and never implementation form (placeholder, CSS, or authored asset). Both are programmer / artist's call. Whether a screen needs authored art is decided during implementation against `engine/ui.md`, not here and not in the GDD.
+> **Reminder**: write **intent and semantics** (what is shown, where, when), never production specifics (px sizes, frame counts, shake amplitudes) and never implementation form (placeholder, CSS, or authored asset). Both are programmer / artist's call. Whether a screen needs authored art is decided during implementation against `engine/index.md#ui`, not here and not in the GDD.
 
 ---
 

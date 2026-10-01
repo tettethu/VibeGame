@@ -17,8 +17,11 @@ CODEX_PREFIX = "$"
 
 
 def skill_prefix(cli: str) -> str:
-    """The form to write for `cli`. Anything not Claude is addressed as Codex."""
-    return CLAUDE_PREFIX if str(cli or "").startswith("claude") else CODEX_PREFIX
+    """Return skill syntax for an actual CLI command, not a provider profile."""
+    prefix = _recognised_prefix(cli)
+    if prefix is None:
+        raise ValueError(f"Unsupported skill CLI: {cli!r}")
+    return prefix
 
 
 def skill_invocation(cli: str, skill: str) -> str:

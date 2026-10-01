@@ -8,11 +8,14 @@ from cli.vlm import cmd_vlm
 
 from cli.play import play_app
 
+HELP_CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
+
 app = typer.Typer(
     name="vibegame",
     help="VibeGame CLI - Game development tool command-line interface",
     add_completion=False,
     no_args_is_help=True,
+    context_settings=HELP_CONTEXT_SETTINGS,
     rich_markup_mode=None,
     pretty_exceptions_enable=False,
 )

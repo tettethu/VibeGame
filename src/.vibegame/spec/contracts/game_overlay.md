@@ -19,7 +19,9 @@ Do **not** use this pattern when the menu is part of normal HUD that does not pa
 
 Do **not** use this pattern when the project explicitly wants a Phaser-rendered modal (text on canvas, pixel-art panel inside the game world). For those, build a Phaser scene with `scene.scene.launch` and a dedicated pause scene — that is a different contract not covered here.
 
-The critical correctness property: this pattern halts BOTH `sceneTree.running` AND `scene.scene.pause()`. Anything halting only one will leak — `sceneTree.running = false` alone leaves Phaser physics / anims / timers running; `scene.scene.pause()` alone leaves vibegame `Node.update(dt)` ticking. The module bakes the correct two-line pause into a single `showMenu` call.
+This module chooses one game-pause policy: pause the Phaser gameplay scene and keep a DOM menu responsive. It sets `sceneTree.running = false` and calls `scene.scene.pause()`; the scene pause stops physics, animations, timers and calls to SceneTree.update. The running flag alone does not stop nodes in the boot-created controller's update path. Browser timers, CSS animations and audio outside Phaser are not paused by this module. The menu uses DOM listeners so it can resume while scene updates are stopped. Games that need selected node updates during game pause should implement that policy in their own gameplay logic instead of pausing the whole scene.
+
+Runtime activate/deactivate preserve the game's running, scene pause and physics pause states. Runtime continue counts game-loop frames and can finish while the gameplay scene is paused. A resume click/key sent during runtime pause is queued; continue/play delivers it to the DOM menu before advancing frames, allowing the menu to resume its scene. Runtime pause also freezes page timers, CSS and playing audio; game pause retains this module's selective behavior.
 
 ### Responsibility
 
@@ -44,7 +46,7 @@ Architect/Programmer owns wiring and configuration:
 
 5. **Style** the overlay via `config.style`. If `panelTexture` / `buttonIdleTex` are present in the asset manifest, the module uses them as `background-image`. If absent, the module falls back to plain dark divs.
 
-   Those divs are a placeholder for development only and must not ship: see `engine/ui.md`, which requires UI to match the project's art from its first version. Panel art is not the only way to satisfy that — subclass the module and restyle the DOM it returns, which reaches shippable quality with CSS alone:
+   Those divs are a placeholder for development only and must not ship: see `engine/index.md#ui`, which requires UI to match the project's art from its first version. Panel art is not the only way to satisfy that — subclass the module and restyle the DOM it returns, which reaches shippable quality with CSS alone:
 
    ```js
    _buildMenu(menu) {
@@ -124,7 +126,7 @@ this.findByTag('overlay')[0]?.flashHurt()
 
 Common mistakes:
 
-- Calling `this.sceneTree.running = false` directly to pause. Use `overlay.showMenu(id)` with `pausesGame: true` — the module handles both clocks.
+- Relying on `this.sceneTree.running = false` to pause gameplay. For this contract, use `overlay.showMenu(id)` with `pausesGame: true` to pause the gameplay scene while keeping the DOM menu responsive.
 - Using `engine.SceneTree.changeScene` for "restart". It does NOT reload assets/scripts. The `'restart'` action correctly uses `window.location.reload()`.
 - Baking button labels into the panel art. Buttons are DOM elements composited on top of the panel image; the panel should be just the frame.
 - Showing a pause menu while another `pausesGame: true` menu is already open. The module does not stack — call `hideMenu(otherId)` first, or treat menus as mutually exclusive.
@@ -140,7 +142,7 @@ Player owns runtime verification:
 - Verify hurt flash is brief (~150ms) and does not interfere with subsequent input.
 
 Use Runtime API:
-- `vibegame play input --key Escape` to send the pause key.
+- `vibegame play key -c Escape`, followed by `vibegame play continue -f 1` when runtime is paused to send the pause key.
 - `vibegame play screenshot` before and during pause to confirm freeze.
 - `vibegame play snapshot` to compare positions.
 

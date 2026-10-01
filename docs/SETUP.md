@@ -21,6 +21,12 @@ The supported installation path is a cloned repository installed in editable
 mode. The CLI reads the engine, templates, Dashboard, and init sources from that
 checkout. A non-editable wheel is not currently self-contained.
 
+## Updating an existing project
+
+Pull the update in your VibeGame checkout. In each existing game project, save local changes, run `vibegame init --no-commit`, and review the framework updates. Choose `Replace entire engine` to install the bundled engine, then review the diff before committing. Engine replacement removes local engine modifications and requires a separate confirmation, even with `--choice overwrite`.
+
+The updated `vibegame run` requires the updated engine; it reports an error when runtime clock support is missing. `vibegame play` uses a runtime started by `run`. Dashboard Play is a static preview and does not use this check.
+
 ## For Agents
 
 Help the user set up VibeGame as follows:
@@ -136,6 +142,7 @@ IMAGE_MODEL=gpt-image-2
 # Base URL ends at /v1, not /chat/completions.
 VLM_BASE_URL=https://api.example.com/v1
 VLM_API_KEY=sk-xxxx
+# Required: replace with a model ID from your provider. There is no built-in default.
 VLM_MODEL=provider-vlm-model-id
 
 # === Third-Party Claude-Compatible Provider ===

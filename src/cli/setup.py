@@ -609,7 +609,7 @@ def _prompt_vlm(current_env: dict[str, str]) -> tuple[str, str, str]:
         raise WizardCancelled
 
     model = questionary.text(
-        "VLM model:",
+        "VLM model ID (required; use your provider's ID):",
         default=current_env.get("VLM_MODEL", ""),
     ).ask()
     if model is None:

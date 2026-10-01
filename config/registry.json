@@ -1,5 +1,17 @@
 {
-    "_comment": "Registry of all files installed by 'vibegame init'. onConflict: skip (auto-skip if exists), ask (prompt user).",
+    "_comment": "Registry of all files installed by 'vibegame init'. onConflict: skip (auto-skip if exists), ask (prompt user). Entries with moveTo=deprecated migrate old installed files.",
+
+    ".vibegame/spec/engine/animation-guide.md": { "moveTo": "deprecated" },
+    ".vibegame/spec/engine/collision-guide.md": { "moveTo": "deprecated" },
+    ".vibegame/spec/engine/engine-internals.md": { "moveTo": "deprecated" },
+    ".vibegame/spec/engine/entity-guide.md": { "moveTo": "deprecated" },
+    ".vibegame/spec/engine/modules.md": { "moveTo": "deprecated" },
+    ".vibegame/spec/engine/project-setup.md": { "moveTo": "deprecated" },
+    ".vibegame/spec/engine/runtime.md": { "moveTo": "deprecated" },
+    ".vibegame/spec/engine/script-rules.md": { "moveTo": "deprecated" },
+    ".vibegame/spec/engine/ui.md": { "moveTo": "deprecated" },
+    ".vibegame/spec/contracts/rastermap.md": { "moveTo": "deprecated" },
+    ".vibegame/spec/contracts/tilemap.md": { "moveTo": "deprecated" },
 
     "agents": {
         "type": "dir",
@@ -269,7 +281,11 @@
         "type": "dir",
         "moveTo": ".vibegame/spec/engine",
         "onConflict": "ask",
-        "scan": "*.md"
+        "content": [
+            { "file": "index.md" },
+            { "file": "tilemap-guide.md" },
+            { "file": "deployment.md" }
+        ]
     },
     ".vibegame/spec/contracts": {
         "type": "dir",

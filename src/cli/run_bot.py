@@ -4,7 +4,7 @@ Bot runner for `vibegame run --bot <path>`.
 Loads a Python bot file in-process via importlib, drives a Playwright-controlled
 browser through a decide() loop, records trace + writes a verdict.
 
-User-facing contract lives in `src/.vibegame/spec/engine/runtime.md` `## Runtime bot`.
+User-facing contract lives in `src/.vibegame/spec/engine/index.md#runtime-bot`.
 This file is the implementation; do not duplicate the spec here.
 """
 
@@ -36,7 +36,9 @@ TAP_HOLD_S = 0.04         # internal down->up hold for "tap" kind
 TAP_HOLD_MIN_S = 0.02
 
 TERMINAL_KINDS = {"done", "fail", "breakpoint"}
-EXECUTE_KINDS = {"wait", "tap", "hold", "down", "up", "mousemove", "click", "drag"}
+POINTER_KINDS = {"mousemove", "click", "drag"}
+EXECUTE_KINDS = {"wait", "tap", "hold", "down", "up", *POINTER_KINDS}
+POINTER_BUTTONS = {0: "left", 1: "middle", 2: "right"}
 
 
 def load_bot(bot_path: Path) -> tuple[Callable, dict, Callable]:
@@ -109,6 +111,19 @@ def _normalize_keys(key: Any) -> list[str]:
     raise TypeError(f"action key must be str or list[str], got {type(key).__name__}")
 
 
+def _normalize_button(value: Any) -> str:
+    """Accept Playwright names and the Runtime API's legacy numeric buttons."""
+    if isinstance(value, bool):
+        raise TypeError("pointer button must be left, middle, right, or 0..2")
+    if isinstance(value, int):
+        if value in POINTER_BUTTONS:
+            return POINTER_BUTTONS[value]
+        raise ValueError(f"pointer button index must be 0..2, got {value}")
+    if value in POINTER_BUTTONS.values():
+        return str(value)
+    raise ValueError(f"pointer button must be left, middle, or right, got {value!r}")
+
+
 def _normalize_point(value: Any, label: str = "point") -> dict[str, Any]:
     """Convert {x,y} or [x,y] into a pointer target."""
     if isinstance(value, dict):
@@ -129,7 +144,7 @@ def _normalize_point(value: Any, label: str = "point") -> dict[str, Any]:
         raise TypeError(f"{label}.x and {label}.y must be numbers")
     if space not in {"game", "client"}:
         raise ValueError(f"{label}.space must be 'game' or 'client', got {space!r}")
-    out = {"x": float(x), "y": float(y), "space": space, "button": button}
+    out = {"x": float(x), "y": float(y), "space": space, "button": _normalize_button(button)}
     if steps is not None:
         out["steps"] = int(steps)
     return out
@@ -175,12 +190,36 @@ def _normalize_drag(value: Any) -> dict[str, Any]:
     return {
         "from": _normalize_point(from_value, "drag.from"),
         "to": _normalize_point(to_value, "drag.to"),
-        "button": value.get("button", "left"),
+        "button": _normalize_button(value.get("button", "left")),
         "steps": int(value.get("steps", 10)),
     }
 
 
-def translate_action(page, action: tuple) -> str | None:
+def execute_pointer_action(page, kind: str, payload: Any) -> None:
+    """Execute one pointer action through Chromium's input pipeline."""
+    if kind == "mousemove":
+        point = _normalize_point(payload)
+        x, y = _point_to_client(page, point)
+        page.mouse.move(x, y)
+        return
+    if kind == "click":
+        point = _normalize_point(payload)
+        x, y = _point_to_client(page, point)
+        page.mouse.click(x, y, button=point["button"])
+        return
+    if kind == "drag":
+        drag = _normalize_drag(payload)
+        start_x, start_y = _point_to_client(page, drag["from"])
+        end_x, end_y = _point_to_client(page, drag["to"])
+        page.mouse.move(start_x, start_y)
+        page.mouse.down(button=drag["button"])
+        page.mouse.move(end_x, end_y, steps=drag["steps"])
+        page.mouse.up(button=drag["button"])
+        return
+    raise ValueError(f"unknown pointer action kind: {kind!r}")
+
+
+def translate_action(page, action: tuple, *, wait=time.sleep) -> str | None:
     """Execute one Action via Playwright. Returns terminal kind or None.
 
     Synchronous Playwright API. Raises on unknown kind.
@@ -199,7 +238,7 @@ def translate_action(page, action: tuple) -> str | None:
 
     if kind == "wait":
         if duration > 0:
-            time.sleep(duration)
+            wait(duration)
         return None
 
     if kind == "tap":
@@ -207,12 +246,12 @@ def translate_action(page, action: tuple) -> str | None:
         for k in keys:
             page.keyboard.down(k)
         hold = min(TAP_HOLD_S, max(duration / 2, TAP_HOLD_MIN_S))
-        time.sleep(hold)
+        wait(hold)
         for k in keys:
             page.keyboard.up(k)
         remainder = duration - hold
         if remainder > 0:
-            time.sleep(remainder)
+            wait(remainder)
         return None
 
     if kind == "hold":
@@ -220,7 +259,7 @@ def translate_action(page, action: tuple) -> str | None:
         for k in keys:
             page.keyboard.down(k)
         if duration > 0:
-            time.sleep(duration)
+            wait(duration)
         for k in keys:
             page.keyboard.up(k)
         return None
@@ -233,35 +272,13 @@ def translate_action(page, action: tuple) -> str | None:
         for k in keys:
             page.keyboard.down(k)
         if duration > 0:
-            time.sleep(duration)
+            wait(duration)
         return None
 
-    if kind == "mousemove":
-        point = _normalize_point(key)
-        x, y = _point_to_client(page, point)
-        page.mouse.move(x, y)
+    if kind in POINTER_KINDS:
+        execute_pointer_action(page, kind, key)
         if duration > 0:
-            time.sleep(duration)
-        return None
-
-    if kind == "click":
-        point = _normalize_point(key)
-        x, y = _point_to_client(page, point)
-        page.mouse.click(x, y, button=point["button"])
-        if duration > 0:
-            time.sleep(duration)
-        return None
-
-    if kind == "drag":
-        drag = _normalize_drag(key)
-        start_x, start_y = _point_to_client(page, drag["from"])
-        end_x, end_y = _point_to_client(page, drag["to"])
-        page.mouse.move(start_x, start_y)
-        page.mouse.down(button=drag["button"])
-        page.mouse.move(end_x, end_y, steps=drag["steps"])
-        page.mouse.up(button=drag["button"])
-        if duration > 0:
-            time.sleep(duration)
+            wait(duration)
         return None
 
     # kind == "up"
@@ -269,7 +286,7 @@ def translate_action(page, action: tuple) -> str | None:
     for k in keys:
         page.keyboard.up(k)
     if duration > 0:
-        time.sleep(duration)
+        wait(duration)
     return None
 
 
@@ -278,12 +295,9 @@ def make_run_id(bot_path: Path) -> str:
     return f"{ts}-{bot_path.stem}"
 
 
-def _enter_breakpoint(page, server_url: str | None, reason: str) -> None:
+def _enter_breakpoint(page, server_url: str | None, reason: str, *, wait=time.sleep) -> None:
     """Activate engine runtime control mode and block until SIGINT/SIGTERM."""
-    try:
-        page.evaluate("window.__vibegameTest.activate()")
-    except Exception as e:
-        print(f"warning: breakpoint activate failed: {e}")
+    page.evaluate("window.__vibegameTest.activate()")
 
     print()
     print(f"BREAKPOINT: {reason}")
@@ -298,7 +312,7 @@ def _enter_breakpoint(page, server_url: str | None, reason: str) -> None:
     prev_term = signal.signal(signal.SIGTERM, lambda *_: stop.set())
     try:
         while not stop.is_set():
-            stop.wait(timeout=0.5)
+            wait(0.05)
     finally:
         signal.signal(signal.SIGINT, prev_int)
         signal.signal(signal.SIGTERM, prev_term)
@@ -312,6 +326,7 @@ def run_bot(
     *,
     server_url: str | None = None,
     out_dir: Path | None = None,
+    wait=time.sleep,
 ) -> dict:
     """Run a bot loop against a ready Playwright page. Returns result dict.
 
@@ -411,7 +426,7 @@ def run_bot(
             decisions_recorded += 1
 
             try:
-                terminal = translate_action(page, action)
+                terminal = translate_action(page, action, wait=wait)
             except Exception:
                 status = "crash"
                 error_str = traceback.format_exc()
@@ -423,7 +438,7 @@ def run_bot(
                 status = terminal
                 reason = str(action[3]) if len(action) > 3 else terminal
                 if terminal == "breakpoint":
-                    _enter_breakpoint(page, server_url, reason)
+                    _enter_breakpoint(page, server_url, reason, wait=wait)
                 break
 
             ctx.tick += 1

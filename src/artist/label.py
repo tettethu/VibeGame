@@ -30,7 +30,7 @@ import typer
 from PIL import Image, ImageDraw, ImageFont
 
 
-# Visual conventions (kept in sync with rastermap.md docs)
+# Visual conventions (kept in sync with map.md docs)
 BBOX_COLOR = (255, 32, 32, 255)     # red
 MARK_Y_COLOR = (32, 200, 32, 255)   # green
 MARK_X_COLOR = (32, 96, 255, 255)   # blue

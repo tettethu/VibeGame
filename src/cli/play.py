@@ -180,6 +180,18 @@ def _base_url(project_path: str = ".") -> str:
     from cli.run import _prune_stale_servers
 
     p = _resolve_path(project_path)
+    # The trailing positional of every play subcommand is the project path, and
+    # the registry lookup below creates .vibegame/logs/runtime/ under it. A path
+    # meant as something else -- `screenshot /tmp/x.png` -- would otherwise leave
+    # directories under that name and then report "no running server".
+    if not (p / "project.json").is_file():
+        typer.echo(
+            f"Not a game project: {p} (no project.json). The last argument of a "
+            "`vibegame play` subcommand is the project path (default: current "
+            "directory). To choose a screenshot file, use `screenshot -o <file>`.",
+            err=True,
+        )
+        raise typer.Exit(1)
     servers = _prune_stale_servers(p)
     if not servers:
         typer.echo("No running server found. Start with: vibegame run", err=True)

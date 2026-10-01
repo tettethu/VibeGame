@@ -1,6 +1,6 @@
 # vibegame vlm — Vision Language Model Query
 
-Call a Vision Language Model via any OpenAI-compatible endpoint. Supports text-only questions or text + one/more images.
+Call your configured Vision Language Model through an OpenAI-compatible Chat Completions endpoint. Supports text-only questions or text + one/more images. Image queries require vision support from the configured model and endpoint.
 
 ---
 
@@ -11,7 +11,7 @@ Call a Vision Language Model via any OpenAI-compatible endpoint. Supports text-o
 - Detailed pixel-level quality assessment of generated assets
 - Side-by-side comparison of many variants (batch critique)
 - Structured scoring / rubric-based evaluation that must be repeatable
-- Asking a *different* model for a second opinion (e.g. Gemini vs. GPT-4o)
+- Asking a *different* model for a second opinion
 - Automated pipelines where a human-in-the-loop isn't available
 
 **Do NOT use it for normal image viewing.** Your own vision capability is enough for:
@@ -45,15 +45,15 @@ This is why visual fine-tuning is a **binary search loop** (player edits a value
 
 ## Environment
 
-Requires two env vars (read from `<git_root>/.env`):
+Configure the endpoint, API key, and model ID in `<git_root>/.env`:
 
 ```
-VLM_BASE_URL=https://api.openai.com/v1              # end at /v1, NOT /chat/completions
+VLM_BASE_URL=https://api.example.com/v1             # API base URL, not /chat/completions
 VLM_API_KEY=sk-xxxxxxxxxxxxxxxxxxxx
-VLM_MODEL=gpt-5-mini                                # optional model id
+VLM_MODEL=your-provider-model-id                   # required unless --model is passed
 ```
 
-Any OpenAI-compatible provider works (OpenAI, local Ollama with OpenAI shim, or any other endpoint you choose).
+Replace the placeholders with your own provider configuration. The model ID must be valid for `VLM_BASE_URL`. There is no built-in default model. `--model` overrides `VLM_MODEL` for one call; if neither supplies a non-empty model ID, the command fails before sending a request.
 
 ---
 
@@ -64,7 +64,7 @@ Any OpenAI-compatible provider works (OpenAI, local Ollama with OpenAI shim, or 
 | `-t`, `--text` | *Required.* User prompt. Plain text, or a path to a text file (auto-loaded). |
 | `-i`, `--image` | Image path, URL, or folder (folders are expanded to all contained images). Repeatable. Omit for text-only queries. |
 | `-s`, `--system` | System prompt — role / format / persona. Plain text or a path to a text file (auto-loaded). |
-| `-m`, `--model` | Override `VLM_MODEL` for this call. |
+| `-m`, `--model` | Your provider's model ID. Overrides `VLM_MODEL` for this call. One must be configured; there is no built-in default. |
 | `--add-background` | Composite local images onto a solid background before sending them to the VLM. Useful for reviewing transparent sprites, halos, and background-removal artifacts. Accepts `white`, `black`, `magenta`, `green`, `cyan`, `#RRGGBB`, or `R,G,B`. `magenta` means `#FF00FF`. |
 
 ### Background compositing
@@ -119,9 +119,9 @@ vibegame vlm \
   -i assets/hero/run_0.png \
   -t prompts/critique_rubric.md
 
-# Use a different model than default
-vibegame vlm -i shot.png -t "describe this image" -m gpt-4o
 ```
+
+To override the configured model for one call, add `--model` with a model ID from your provider.
 
 ---
 
@@ -130,5 +130,5 @@ vibegame vlm -i shot.png -t "describe this image" -m gpt-4o
 - Output is printed to stdout — pipe or redirect as needed.
 - `max_tokens` is fixed at 4096.
 - Default timeout is 120s.
-- The CLI fails loudly if `VLM_BASE_URL` or `VLM_API_KEY` is missing; it does not fall back to other env vars.
+- The CLI fails if `VLM_BASE_URL` or `VLM_API_KEY` is missing, or if no non-empty model is configured through `--model` or `VLM_MODEL`. An explicitly empty `--model` is an error even when `VLM_MODEL` is set.
 - `--add-background` writes temporary PNGs and does not modify source images. It supports local image paths and folders, not image URLs.

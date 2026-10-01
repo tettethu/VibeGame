@@ -1,6 +1,6 @@
 # Modules Index
 
-Reusable Node scripts shipped with vibegame. Each module is loadable directly from scene JSON via `script: "<Name>Module"` (see [`spec/engine/modules.md`](../.vibegame/spec/engine/modules.md) for the routing rule), or subclassable from `scripts/`.
+Reusable Node scripts shipped with vibegame. Each module is loadable directly from scene JSON via `script: "<Name>Module"` (see [`spec/engine/index.md#modules`](../.vibegame/spec/engine/index.md#modules) for the routing rule), or subclassable from `scripts/`.
 
 One line description + one line interface per module. For full docs, open the matching `spec/contracts/<topic>.md` (when one exists) or read the module's source header.
 

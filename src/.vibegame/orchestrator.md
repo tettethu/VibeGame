@@ -34,7 +34,7 @@ Team lifecycle:
 - Task-scoped: `architect-<task>`, `programmer-<task>`, `auditor-<task>`, `player-<task>`.
 - Goal-scoped: `reviewer`.
 
-Task-scoped agents stay alive until the task is done. Route fixes back through the same instance that owns that stage. If Route A was used, `architect-<task>` also owns the `# Programmer` fix loop. Kill and respawn only when an agent is stuck or off-rails.
+Do not kill task-scoped agents before their task is done. Once it is done, either reuse its agents for a later dependent task in the same workspace or kill them before spawning task-scoped agents for that later task.
 
 Reality rules:
 - Rebuild from current code, current specs, and fresh verification.
@@ -48,7 +48,7 @@ Agent-team operations are exposed via the `vibegame lead` and `vibegame mate` CL
 
 - `vibegame lead start` — create the team's tmux session (required before spawning any member)
 - `vibegame lead agent --agent-type <type> --name <name> --prompt "<prompt>"` — spawn a teammate in a new pane
-- `vibegame lead send --name <name> "<message>"` — send a message to a specific teammate
+- `vibegame lead send --name <name>` — send a message to a specific teammate, the text in a quoted heredoc (`<<'EOF'`) so backticks and `$` in it arrive intact. It marks the teammate `working`, and the teammate cannot stop until it reports back, so send only when you have work for it. Acknowledgements and "nothing for you" messages each cost it a report and a turn; do not send them.
 - `vibegame lead read --name ALL` — read pending messages from teammates
 - `vibegame lead kill --name <name>` — kill a teammate pane
 - `vibegame lead status` — check current team status (alive agents, working/idling)
@@ -83,7 +83,6 @@ For routine progress handoff after actual work, steps 1-2 may compress to one li
 
 All agents run inside tmux. When an agent stalls on an interactive prompt waiting for stdin:
 - **Self-resolvable — drive the pane yourself.** Get the pane id from `vibegame lead status`, then `tmux send-keys -t <pane_id> '<input>' Enter`. Common cases:
-  - CLI asks whether to trust the current workspace — send Enter.
   - "An image in the conversation exceeds the dimension limit for many-image requests (2000px). Run /compact ..." — send `/compact` then Enter to drop stale images.
   After resolving, the prompt queued by `vibegame lead agent` resumes automatically; do not re-send it.
 - **Needs user judgment — guide the user.** Paste the command they should run or name the option they should pick, instead of waiting silently.
@@ -93,7 +92,7 @@ All agents run inside tmux. When an agent stalls on an interactive prompt waitin
 ## Quality Rules
 
 - Games shown to the user must not contain placeholders (solid-color rectangles, primitive shapes used as stand-ins for missing art). No programmatically-drawn raster output (PIL or similar) for in-game visuals — SVG icons are fine, but do not script raster pixel art.
-- The game must be openable before delivering changed game behavior, changed game content, generated assets meant for runtime, or task completion. A `player` or `reviewer` runtime check counts. If neither has run, at minimum open the build yourself with `vibegame run . -b --headless`, take a screenshot, and confirm the game loads without errors. Runtime flags: `.vibegame/spec/engine/runtime.md`.
+- The game must be openable before delivering changed game behavior, changed game content, generated assets meant for runtime, or task completion. A `player` or `reviewer` runtime check counts. If neither has run, at minimum open the build yourself with `vibegame run . -b --headless`, take a screenshot, and confirm the game loads without errors. A `-b` runtime keeps running after the command returns, so stop it with `vibegame close . --port <N>` on the port the run reported, once you have the screenshot. Never use `pkill` or manual process kills. Runtime flags: `.vibegame/spec/engine/index.md#runtime-control`.
 - Startup reconnects, status answers, document-only discussion, and team-management messages are not game deliveries. Do not run Play, start a temporary HTTP server, take screenshots, or create QA artifacts for those cases unless the user asks.
 
 ---
@@ -108,7 +107,7 @@ Context is not injected by `session-start.py`; the fresh-session `vibegame-start
 - `.vibegame/goal.md` -- current development goal
 - `.vibegame/GDD.md` -- global gameplay truth
 - `.vibegame/orchestrator.md` -- this workflow
-- `.vibegame/spec/engine/index.md` -- engine quick guide
+- `.vibegame/spec/engine/index.md` -- complete game development guide
 - `.vibegame/spec/contracts/index.md` -- cross-role contract index
 - `.vibegame/spec/test/index.md` -- regression suite contract (you may run tests, do **not** delegate runs to `auditor`)
 
@@ -165,7 +164,7 @@ Use this workflow for non-trivial code work.
 >
 > **Trust agent capacity**: Naive logic and characters can be handled by one agent. Let `auditor` and `player` catch issues at the back; do not over-split such that each agent does only a sliver of work but has to learn the whole project — that wastes context and tokens.
 >
-> **Parallelism is your superpower**: Once the interfaces are defined and agreed (events, tags, file ownership, shared contracts), most things in game development can be built in parallel — e.g. player and boss are implemented as separate nodes by parallel programmer agents, then composed into the same scene at the end. Art and code are fully parallel during prototype: code references manifest `placeholder_atlas` / `placeholder_image` entries from day 1 while artist generates real assets concurrently; the polish task replaces manifest entries with real atlases / images without rewriting node texture or frame names. See [`.vibegame/spec/contracts/prototype_polish.md`](.vibegame/spec/contracts/prototype_polish.md).
+> **Parallelism is your superpower**: Once the interfaces are defined and agreed (events, tags, file ownership, shared contracts), most things in game development can be built in parallel — e.g. player and boss are implemented as separate nodes by parallel programmer agents, then composed into the same scene at the end. Art and code are fully parallel during prototype: code references manifest `placeholder_atlas` / `placeholder_image` entries from the start of prototype implementation while artist generates real assets concurrently; the polish task replaces manifest entries with real atlases / images without rewriting node texture or frame names. See [`.vibegame/spec/contracts/prototype_polish.md`](.vibegame/spec/contracts/prototype_polish.md) and [`.vibegame/spec/contracts/map.md`](.vibegame/spec/contracts/map.md).
 
 ### First Baseline Task
 
@@ -187,13 +186,13 @@ If the outcome is unclear, keep talking with the user. Do not delegate ambiguity
 
 Before opening a task, scan what is already available to reuse on THIS task. Two per-task surfaces:
 
-**`modules/index.md`** — catalog of installed `*Module.js` Node scripts (one-line description + interface per module). Scan every task. Anything you can wire in directly via `script: "XxxModule"` or extend by subclassing is work architect / programmer does not have to redo. For full mechanics of how a module pairs with a contract, see [`.vibegame/spec/engine/modules.md`](.vibegame/spec/engine/modules.md).
+**`modules/index.md`** — catalog of installed `*Module.js` Node scripts (one-line description + interface per module). Scan every task. Anything you can wire in directly via `script: "XxxModule"` or extend by subclassing is work architect / programmer does not have to redo. For full mechanics of how a module pairs with a contract, see [`.vibegame/spec/engine/index.md#modules`](.vibegame/spec/engine/index.md#modules).
 
 **`.vibegame/spec/contracts/`** — cross-role collaboration contracts. Each file declares one or more Patterns (e.g. `Pattern 1: sprite-backed-status-bar`, `Pattern 2: fighting-hud-dom`). For any contract that applies to this task, pick exactly one Pattern via its `### When to use`. Contracts are feature-specific workflows layered on top of each agent's default workflow.
 
 Some contracts deserve special attention because they affect more than a single feature:
 
-- **map architecture** — `rastermap.md` and `tilemap.md` are two competing contracts for the same role: defining how levels / arenas / scene backgrounds are structured. The first task that touches a map picks ONE contract Pattern; every subsequent map-touching task inherits that choice through `Task Constraints`. Switching mid-project is a project-wide refactor, not a per-task choice.
+- **map architecture** — `map.md` groups the Patterns for defining how levels / arenas / scene backgrounds are structured. The first task that touches a map picks ONE contract Pattern; every subsequent map-touching task inherits that choice through `Task Constraints`. Switching mid-project is a project-wide refactor, not a per-task choice.
 - **prototype_polish** — the commonly-used two-task asset workflow: a `prototype` task ships gameplay on manifest `placeholder_atlas` / `placeholder_image` entries, a follow-up `polish` task swaps those entries to real art. Not inherited — each task in the workflow independently states the chosen Pattern in `Task Constraints`. Especially common in early project.
 
 These decisions are **yours alone** — `designer`, `architect`, and the task-scoped teammates do not pick. If a contract applies but you are unsure which Pattern, resolve it here — do not punt to architect.
@@ -209,15 +208,21 @@ vibegame lead task create "<description>" --name <name>
 vibegame lead task create "<description>" --name <name> --blocked-by <dep1> --blocked-by <dep2>
 ```
 
-Initialize to start work (commit any in-progress changes first — worktree-mode tasks snapshot the repo at init time):
+Initialize to start work:
 
 ```bash
-vibegame lead task init "<name>" --use-worktree << 'EOF'
+vibegame lead task init "<name>" [--use-worktree | --reuse-workspace-from "<previous-task>"] << 'EOF'
 <prd.md content — see template below>
 EOF
 ```
 
-Drop `--use-worktree` for tasks that share the main repo. If `prd.md` already exists from a prior run, use plain `vibegame lead task init <name>` and edit `prd.md` directly.
+Choose the workspace and task-scoped agents before running this command:
+
+- If there is no prior task to continue from, omit both `--use-worktree` and `--reuse-workspace-from`, and spawn new task-scoped agents.
+- If several tasks need to run concurrently, or the user wants to keep playing while development continues, commit the current development first, use `--use-worktree`, and spawn new task-scoped agents.
+- For a sequential dependent task such as prototype-polish, use `--reuse-workspace-from "<previous-task>"` and reuse the previous task's task-scoped agents so their context carries into the new task.
+
+If this task's `prd.md` already exists before initialization, use the same command without the `<< 'EOF' ... EOF` block, then edit that `prd.md` directly.
 
 #### prd.md content
 
@@ -248,8 +253,8 @@ Assets: <Use real | Use placeholder | No visual changes>.
 (Exactly one sentence. A task is fully real or fully placeholder, never mix.)
 
 Contracts:
-- <Use `<contract>` pattern `<pattern-slug>` because `<task-specific reason>` | No contract applies after scanning `.vibegame/spec/contracts/index.md`.>
-(Contracts are feature-specific workflows layered on top of each agent's default workflow. Include every applicable contract Pattern, e.g. `rastermap`, `tilemap`, or `prototype_polish`.)
+- <Use `.vibegame/spec/contracts/<contract>.md` pattern `<pattern-slug>` (lines <start>-<end>) because `<task-specific reason>` | No contract applies after scanning `.vibegame/spec/contracts/index.md`.>
+(Contracts are feature-specific workflows layered on top of each agent's default workflow. Include every applicable contract Pattern and its current inclusive line range on the same line.)
 
 Modules:
 - <ModuleA> | No reusable module applies after scanning `modules/index.md`.
@@ -273,7 +278,7 @@ Modules:
 
 - **Entrance sequence**: Any title card, intro animation, fade-in, or pre-gameplay UI between Trigger and actual player control? If yes, describe the sequence and state explicitly when gameplay begins. (Example: "Title 'The Lone Archer' fades in over 0.4s, holds 2s, fades out 0.6s. Player input is suppressed until fade-out completes; boss AI is paused too.")
 - **UI layout**: Enumerate every UI element visible at this moment. For each: which anchor on screen (top-left / top-center / top-right / center / bottom-center / etc.), screen-space or world-space, and any symmetry / alignment with other UI (mirrored on both sides, vertical stack centered, etc.). UI absent at this moment but appearing later goes in `Flow` instead.
-- **Map**: Which map pattern is in use — `rastermap` or `tilemap`? What slice of the map is the camera showing (full map / partial slice / specific region)? Default camera zoom value if relevant.
+- **Map**: Which map pattern is in use — `image-first`, `sketch-first`, or `tilemap`? What slice of the map is the camera showing (full map / partial slice / specific region)? Default camera zoom value if relevant.
 - **Characters, enemies, props**: For every visible entity in the world: initial position (absolute coords when known, or relative like "boss directly above player at top-third"), facing direction, and composition relationship to other entities (symmetric across center, distance gap, layering order).>
 
 ## 3. Flow
@@ -322,15 +327,9 @@ Do not mention skeletons in `prd.md`. Skeletons are orchestrator-only Project Se
 
 ### 4. Architect
 
-Spawn `architect-<name>` for every code task, naive or not. `architect` produces `plan.md`, configures `<task_dir>/context.json` (the downstream agents' inject lists), updates spec under `.vibegame/spec/` and reports back. You always review the plan before any code is written.
+Use a new or reused `architect` for every code task, naive or not, as decided during task initialization. `architect` produces `plan.md`, configures `<task_dir>/context.json` (the downstream agents' inject lists), updates spec under `.vibegame/spec/` and reports back. You always review the plan before any code is written.
 
 Why always: vibegame is a custom engine without public training data. An agent that jumps straight into code reflexively reaches for stock Phaser patterns and gets the engine wrong. `architect` reads the engine specs and the existing code first; that research is the cheapest way to avoid mid-task rewrites.
-
-Spawn:
-
-```bash
-vibegame lead agent --agent-type architect --name architect-<name> --prompt "Follow your system prompt, relevant context instructions, and finish your job."
-```
 
 In task worktrees, `.vibegame/tasks/` is a symlink back to the main repo, so `architect` can work inside the worktree while you still review the same `plan.md` from the main session.
 
@@ -346,7 +345,7 @@ Before writing `plan.md`, architect checks PRD -> GDD consistency. Then architec
 - `Runtime State Contract` exposes the fields the tests need
 - every `Risks / Implicit Decisions` item is resolved from `prd.md`, code, or product judgment. If the gap is PRD/GDD-related, fix `prd.md` or update GDD first; do not let architect fill product gaps from GDD during planning
 
-If new bot/test files are needed, spawn `player-<task>` for Phase A only: write tests, do not run runtime. Runtime execution waits until Phase B after implementation and auditor.
+If new bot/test files are needed, use the new or reused `player` for Phase A only: write tests, do not run runtime. Runtime execution waits until Phase B after implementation and auditor.
 
 ### 5. Implementation route
 
@@ -357,28 +356,20 @@ Count how many times you sent `plan.md` back to `architect` for substantive revi
 - **0-2 revisions** -> Route A.
 - **More than 2 revisions** -> Route B.
 
-Route B is for context cleanliness, not task size. If architect produced an accepted plan with little revision, they already hold the best implementation context. If the plan needed many substantive back-loops, architect's context is polluted by discarded alternatives and review chatter; a fresh `programmer` loaded with only the final `prd.md`, `plan.md`, and `context.json` is cleaner.
+Route B is for context cleanliness, not task size. If architect produced an accepted plan with little revision, they already hold the best implementation context. If the plan needed many substantive back-loops, architect's context is polluted by discarded alternatives and review chatter; `programmer` avoids that planning-loop context and implements from the final `prd.md`, `plan.md`, and `context.json`.
 
-- **Route A**: send `Follow your system prompt, relevant context instructions, and finish your job.` to `architect-<name>`. It writes code, runs `vibegame check .`, and appends `# Programmer` to `<task_dir>/log.md`. No runtime sanity check.
-- **Route B**: spawn `programmer-<name>` with the final `prd.md`, `plan.md`, and `context.json` only. See Step 6.
+- **Route A**: send `Follow your system prompt, relevant context instructions, and finish your job.` to the `architect` used for this task. It writes code, runs `vibegame check .`, and appends `# Programmer` to `<task_dir>/log.md`. No runtime sanity check.
+- **Route B**: use the new or reused `programmer` with the final `prd.md`, `plan.md`, and `context.json`. See Step 6.
 
 ### 6. Programmer
 
-When you chose Route B in Step 5, spawn `programmer-<name>`:
+When you chose Route B in Step 5, use a new or reused `programmer` as decided during task initialization.
 
-```bash
-vibegame lead agent --agent-type programmer --name programmer-<name> --prompt "Follow your system prompt, relevant context instructions, and finish your job."
-```
-
-Do not restate product behavior, constraints, risks, or implementation steps from `prd.md` / `plan.md`; those files are the contract and are injected automatically.
+Do not restate product behavior, constraints, risks, or implementation steps from `prd.md` / `plan.md`; those files are the contract.
 
 ### 7. Auditor
 
-Spawn `auditor-<name>`:
-
-```bash
-vibegame lead agent --agent-type auditor --name auditor-<name> --prompt "Follow your system prompt, relevant context instructions, and finish your job."
-```
+Use a new or reused `auditor` as decided during task initialization.
 
 Auditor owns static review only:
 - Reviews implementation against `prd.md` / `plan.md` / the per-task `context.json` references for auditor / `log.md`'s `# Programmer` section
@@ -390,16 +381,14 @@ Auditor owns static review only:
 
 ### 8. Player and Accept
 
-Spawn/send `player-<name>`:
+Use a new or reused `player` as decided during task initialization.
+
+If the `player` used for this task already completed Phase A, `send` to the same instance for Phase B so it retains Phase A context:
 
 ```bash
-vibegame lead agent --agent-type player --name player-<name> --prompt "Follow your system prompt, relevant context instructions, and finish your job."
-```
-
-If you already spawned `player-<name>` in Step 4.5 (Phase A bot authoring), do **not** spawn again — `send` to the same instance instead so it retains Phase A context:
-
-```bash
-vibegame lead send --name player-<name> "Follow your system prompt, relevant context instructions, and finish your job."
+vibegame lead send --name <player-name> <<'EOF'
+Follow your system prompt, relevant context instructions, and finish your job.
+EOF
 ```
 
 Player owns the running game: drives it through Runtime API, runs the Phase A bots and test.sh files (if any), collects state snapshots and screenshots, and asserts every claim from `plan.md` `Verification Plan` against the matching evidence type (state, visual, or both). Appends a `# Player` section to `<task_dir>/log.md`.
@@ -465,17 +454,25 @@ Category-specific requirements:
 
 ### Artist Usage Rules
 
-- `designer` owns visual intent: fantasy, mood, readability, gameplay semantics, and special notes for important actions or objects.
-- You own asset planning: decide the asset kind, subject, role, view, style/reference source, priority, map pattern, and runtime consumption shape before commissioning `artist`.
-- `artist` owns asset production: prompts, model/tool choice, frame counts, sheet layout, cleanup, atlas/spritesheet packaging, manifest entries, and `.vibegame/assets.md` handoff.
-- External asset packs are artist-owned processing work. Send only source paths. Do not assert row/column meaning, direction order, tile identity, or collision semantics; pass user / README claims as hints. Downstream tasks should consume only registered manifest keys and the Phase 5 asset handoff, not raw pack assumptions.
-- Do not ask `artist` to infer missing game design. If the visual intent is not settled in `.vibegame/GDD.md`, a user-provided reference, or your commission message, resolve it before commissioning canonical runtime art.
-- For character animation commissions, name the asset plan explicitly. Example: `action_set` means multiple action assets; `directional_walk_sheet` means a direction sheet; `single_sprite` means one static sprite. Do not use vague wording like "full sprite sheet" without an asset kind.
-- Do not tell artist how to make assets, specify frame counts, or prescribe production details. Artist owns the generation and post-processing workflow.
-- All assets should have transparent background except pure background image; if not, ask artist to process it
-- All used assets must be registered in a `manifest.json` (listed in `project.json.manifests`) and recorded in `.vibegame/assets.md`
-- **Map commissions must name the map pattern.** `artist` does not see `prd.md` (it has no task dir), so it learns the map architecture only from your commissioning message. When you commission a level / arena / scene background, state explicitly which pattern applies — `rastermap` (single PNG; artist also appends image-pixel landmark estimates to the asset's `.vibegame/assets.md` block per `spec/contracts/rastermap.md`) or `tilemap` (artist ships a tileset PNG matching the registered `tileSize` per `spec/contracts/tilemap.md`, which references `spec/engine/tilemap-guide.md` for the runtime format). Without this, artist defaults to a plain background and the downstream agents lose the landmark / tileset shape they need.
-- **Fonts are not artist work**. When the design needs a stylized web font, you (orchestrator) source it: search Google Fonts / a font CDN / a licensed font site (downloads are usually `.ttf`), then either link the CDN's stylesheet URL or commit the font file into the project. Hand the result to `programmer` so they wire it into the page CSS. Do not delegate font search to `artist` — `artist`'s pipeline produces images, not typography.
+#### Responsibilities
+
+- **Designer** owns visual intent: fantasy, mood, readability, gameplay semantics, and special notes for important actions or objects.
+- **You** own asset planning: decide the asset kind, subject, role, view, style/reference source, priority, map pattern, and runtime consumption shape before commissioning `artist`.
+- **Artist** owns asset production: prompts, model/tool choice, frame counts, sheet layout, cleanup, atlas/spritesheet packaging, manifest entries, and `.vibegame/assets.md` handoff.
+
+#### Commissioning
+
+- **Maps**: Specify the map pattern when commissioning `artist`: `image-first`, `sketch-first`, or `tilemap`. Artist does not see `prd.md`, so include the map requirements and any existing layout information in your message. See `spec/contracts/map.md` for details.
+- **External asset packs**: These are artist-owned processing work. Send only source paths. Do not assert row/column meaning, direction order, tile identity, or collision semantics; pass user / README claims as hints. Downstream tasks should consume only registered manifest keys and the Phase 5 asset handoff, not raw pack assumptions.
+- **Character animations**: Name the asset plan explicitly. Example: `action_set` means multiple action assets; `directional_walk_sheet` means a direction sheet; `single_sprite` means one static sprite. Do not use vague wording like "full sprite sheet" without an asset kind.
+- **Production details**: Do not tell artist how to make assets, specify frame counts, or prescribe production details. Artist owns the generation and post-processing workflow.
+- **Fonts**: Fonts are not artist work. When the design needs a stylized web font, you (orchestrator) source it: search Google Fonts / a font CDN / a licensed font site (downloads are usually `.ttf`), then either link the CDN's stylesheet URL or commit the font file into the project. Hand the result to `programmer` so they wire it into the page CSS. Do not delegate font search to `artist` — `artist`'s pipeline produces images, not typography.
+
+#### Review and Handoff
+
+- **Transparency**: All assets should have transparent background except pure background image; if not, ask artist to process it.
+- **Registration**: All used assets must be registered in a `manifest.json` (listed in `project.json.manifests`) and recorded in `.vibegame/assets.md`.
+- **Sketches**: Artist may provide a sketch: a layout drawn with colored placeholders as a reference for image generation. Pass its directory, containing the drawing code, `layout.json`, and `sketch.png`, to architect or programmer so they can refer to it during planning or implementation.
 
 ## Use designer to clarify game design and content
 
@@ -491,6 +488,7 @@ When `designer` returns a draft (in `.vibegame/logs/design.md` or directly in `.
 - **No visual specifics** — no asset dimensions (16x16, 32x32, ...), no screen layout sizes, no specific motion direction (upward slash / downward slash / uppercut arc), no per-frame role within a single sheet, no exact pose details.
 - Art needs stay qualitative (style, mood, semantic action names like `attack` / `cast` / `hurt`); production specifics are artist's call.
 - Non-obvious design decisions trace to a design theory or pattern, not personal preference.
+- **Every decision a screen asks for has its input on that screen** — `### Player Visible` pairs each decision the player makes with what they must be able to read to make it. A decision whose input is named nowhere on that screen is the defect, not a gap to be filled later.
 
 If any of the above is violated, send back to `designer` with the specific line(s) to remove or rephrase before the draft can land in `.vibegame/GDD.md`.
 
@@ -536,12 +534,46 @@ Follow your workflow strictly and start final review or re-review. Stop the mome
 
 Each teammate's system prompt is auto-loaded with their role, workflow, and tools.
 
-For task-scoped agents (`architect`, `programmer`, `auditor`, `player`), task artifacts are injected automatically. Use the standard dispatch prompt:
+For a new task-scoped agent (`architect`, `programmer`, `auditor`, or `player`), use:
 
-```text
-Follow your system prompt, relevant context instructions, and finish your job.
+```bash
+vibegame lead agent --agent-type <role> --name <role>-<task-name> --prompt "Follow your system prompt, relevant context instructions, and finish your job."
 ```
 
-Do not restate product behavior, constraints, risks, implementation steps, task dir, or worktree info from `prd.md` / `plan.md` / `context.json`. Those files are the contract.
+Task artifacts and workspace information are injected automatically.
+
+For a reused `architect`, use:
+
+```bash
+vibegame lead send --name <existing-architect-name> <<'EOF'
+Continue with task <task-name>.
+
+Task dir: <task-dir>
+
+The Task dir above replaces the Task dir in your original `Your Workspace` context. Restart your role workflow from its first step.
+
+Follow your system prompt, relevant context instructions, and finish your job.
+EOF
+```
+
+For a reused `programmer`, `auditor`, or `player`, replace `<role>` with the concrete role before sending:
+
+```bash
+vibegame lead send --name <existing-agent-name> <<'EOF'
+Continue with task <task-name>.
+
+You are the `<role>` for this task.
+
+Task dir: <task-dir>
+
+The Task dir above replaces the Task dir in your original `Your Workspace` context. Restart your role workflow from its first step.
+
+Read every file listed under `inject_config.all` and `inject_config.<role>` in the new Task dir's `context.json`.
+
+Follow your system prompt, relevant context instructions, and finish your job.
+EOF
+```
+
+Do not restate product behavior, constraints, risks, implementation steps, or worktree information from `prd.md`, `plan.md`, or `context.json`. Those files are the contract.
 
 For non-task agents (`designer`, `artist`, `reviewer`), write only the task-specific request and file references they need. Read worker findings yourself before issuing follow-up work. Do not push for speed.

@@ -40,9 +40,10 @@ Orchestrator Priority Checks (in order):
 
 Mate Rules:
 - Agent must set status to "can-stop" or "waiting" via report before stop is allowed.
-- Use `vibegame mate report "[summary]"` for progress updates.
-- Use `vibegame mate report --over "[summary]"` only when work is complete and this is the final handoff.
-- Use `vibegame mate report --wait "[summary]"` when the turn is done but background jobs are still running; the lead's stop hook counts "waiting" as in-flight.
+- Report with `vibegame mate report`, the text in a quoted heredoc (`<<'EOF'`).
+- No flag: progress update.
+- `--over`: work is complete and this is the final handoff.
+- `--wait`: the turn is done but background jobs are still running; the lead's stop hook counts "waiting" as in-flight.
 """
 
 from __future__ import annotations
@@ -267,10 +268,13 @@ def check_mate_stop(team_dir: str, mate_name: str) -> tuple[bool, str]:
             continue
         if hook.get("check") == "agent-reported" and agent.get("status") not in ("can-stop", "waiting"):
             return False, (
-                f"Report your progress before stopping.\n"
-                "Use `vibegame mate report \"[summary]\"` — progress update when you should keep working now.\n"
-                "Use `vibegame mate report --over \"[summary]\"` — when current turn/task/preparation is done, and you will stop and wait for new instructions.\n"
-                "Use `vibegame mate report --wait \"[summary]\"` — when your turn is done but background jobs you started are still running, stop now and handle the results when they finish."
+                f"Report your progress before stopping. Pass the text through a quoted heredoc, so backticks and $ in it reach the lead intact:\n"
+                "    vibegame mate report --over <<'EOF'\n"
+                "    [summary]\n"
+                "    EOF\n"
+                "--over: current turn/task/preparation is done, and you will stop and wait for new instructions.\n"
+                "no flag: progress update when you should keep working now.\n"
+                "--wait: your turn is done but background jobs you started are still running; stop now and handle the results when they finish."
             )
     return True, "mate stop allowed"
 

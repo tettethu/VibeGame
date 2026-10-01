@@ -5,7 +5,7 @@ i2i: POST /images/edits (multipart, binary upload)
 """
 import time
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 
 import requests
 from PIL import Image, ImageOps
@@ -15,17 +15,12 @@ from . import TIMEOUT, GenResult, _mime, resolve_openai_response
 PROVIDER_NAME = "Openai"
 BASE_URL = "https://api.openai.com/v1"
 SUPPORTED_MODELS = {"gpt-image-1", "gpt-image-1.5", "gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare"}
-MAX_UPLOAD_EDGE = 2048
+MAX_UPLOAD_EDGE = 3840
 MAX_UPLOAD_BYTES = 4 * 1024 * 1024
 
 
 def _prepare_upload(path: Path, temp_dir: Path) -> Path:
-    """Downsample oversized references before multipart upload.
-
-    Image models do not consume an 11k-wide reference at native resolution,
-    while sending it through an HTTP proxy/CDN can spend the whole request
-    timeout before the API handler is reached. Small inputs remain untouched.
-    """
+    """Limit reference dimensions and re-encode large files for upload."""
     with Image.open(path) as source:
         width, height = source.size
         if path.stat().st_size <= MAX_UPLOAD_BYTES and max(width, height) <= MAX_UPLOAD_EDGE:
@@ -33,7 +28,8 @@ def _prepare_upload(path: Path, temp_dir: Path) -> Path:
 
         image = ImageOps.exif_transpose(source)
         image.thumbnail((MAX_UPLOAD_EDGE, MAX_UPLOAD_EDGE), Image.Resampling.LANCZOS)
-        prepared = temp_dir / f"{path.stem}-upload.png"
+        with NamedTemporaryFile(dir=temp_dir, prefix=f"{path.stem}-upload-", suffix=".png", delete=False) as upload:
+            prepared = Path(upload.name)
         image.save(prepared, format="PNG", optimize=True)
         print(
             f"Resized reference for upload: {width}x{height} "

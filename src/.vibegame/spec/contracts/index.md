@@ -4,8 +4,7 @@ Cross-role collaboration contracts. Each file describes one production type and 
 
 | Contract | Production type | Patterns | Pick when |
 |---|---|---|---|
-| [`rastermap.md`](rastermap.md) | Level / arena layout | `rastermap` | Single bespoke background PNG with invisible explicit colliders — side-scroller backgrounds, boss arenas, fixed-screen platformer slices |
-| [`tilemap.md`](tilemap.md) | Level / arena layout | `tilemap` | Grid of reusable tiles with tile-level collision — Celeste-style levels, top-down dungeons, procedural maps. References `spec/engine/tilemap-guide.md` for the runtime API. |
+| [`map.md`](map.md) | Level / arena layout | `image-first`, `sketch-first`, `tilemap` | When a task involves creating or integrating a game map, including terrain layout, map assets, and collision |
 | [`status_bar.md`](status_bar.md) | UI status bar | `sprite-backed-status-bar`, `fighting-hud-dom`, `discrete-icon-meter` | Resource meters (HP, mana, stamina, shield, boss posture). Pick `sprite-backed-status-bar` for continuous-fill independent meters; `fighting-hud-dom` for a mirrored fighting-game match HUD; `discrete-icon-meter` when each unit is a distinct icon (mask / heart / pip) and partial fill is not meaningful |
 | [`game_overlay.md`](game_overlay.md) | Pause / death / victory / custom menu overlay | `dom-overlay-with-phaser-pause` | Single-screen game with full-screen menus (pause, death, victory, prompts). Pattern correctly halts BOTH `sceneTree.running` AND `scene.scene.pause()` so physics / anims / timers truly freeze. |
 | [`charge-family.md`](charge-family.md) | Hold-charge-release ability animation pack | `three-sheet-charge-release` | Any ability with three phases: build-up while held → looping peak swirl at max charge → committed release stroke. Examples: nail-charge (Hollow Knight), spin attack (Zelda), R2 heavy (Souls), charged buster (Megaman). |
@@ -21,9 +20,9 @@ Cross-role collaboration contracts. Each file describes one production type and 
 1. At the start of every new task, scan this table.
 2. For any contract whose production type matches the task's product description, open the contract and read its Patterns' `### When to use` sections.
 3. Pick exactly one Pattern per applicable contract.
-4. Write the decision into `prd.md` `Reuse / Constraints` as a sentence: `Use <contract> pattern <pattern-slug> because <task-specific reason>.`
+4. Write the decision into `prd.md` `Reuse / Constraints` on one line: `Use .vibegame/spec/contracts/<contract>.md pattern <pattern-slug> (lines <start>-<end>) because <task-specific reason>.` Include the current inclusive line range of the selected Pattern section.
 
-If no contract here matches the task, the default `spec/engine/` guides cover the case. Do not invent a contract file inline in `prd.md`; if a new production type recurs, raise it for the `self-evolve` workflow to capture as a real contract.
+If no contract here matches the task, the [game development guide](../engine/index.md) covers ordinary engine usage. Contracts assign production decisions and role handoffs; they do not duplicate the guide's API rules. Do not invent a contract file inline in `prd.md`; if a new production type recurs, raise it for the `self-evolve` workflow to capture as a real contract.
 
 ## Schema reminder
 

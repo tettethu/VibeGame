@@ -1,344 +1,155 @@
-# Tilemap System Reference
+# Tilemaps and tilesets
 
-Complete reference for the tilemap pipeline: tileset registration in manifest, tilemap data, and the TileMap Node script API.
+Use TileMap for editable semantic grids. For a generated raster background, use an image plus independent colliders as described in [the main guide](index.md). Tileset production belongs to the [map contract](../contracts/map.md#pattern-3-tilemap).
 
----
+## Register the tileset
 
-## manifest.json: tileset type
+Register the PNG and tile definitions together in assets/manifest.json. There is no separate .tileset.json file. The manifest key is the tileset name and its Phaser texture key. Paths are relative to the manifest directory.
 
-Tilesets are registered inline in `manifest.json`. No separate `.tileset.json` file is needed -- all tile definitions, collision shapes, and auto-tile rules live directly in the manifest entry.
-
-```json
+~~~json
 {
-  "forest": {
+  "dungeon": {
     "type": "tileset",
-    "path": "tilesets/forest.png",
+    "path": "tilesets/dungeon.png",
     "tileSize": 16,
     "tiles": {
-      "grass": { "index": 0, "collision": false },
-      "wall":  { "index": 16, "collision": true, "autotile": "bitmask-4" },
-      "spike": { "index": 48, "collision": true, "collisionShapes": [{ "type": "rect", "x": 2, "y": 8, "width": 12, "height": 8 }], "properties": { "damage": 1 } }
+      "floor": {"index": 0},
+      "wall": {"index": 1, "collision": true, "autotile": "walls"},
+      "spike": {
+        "index": 17,
+        "collision": true,
+        "collisionShapes": [{"type": "rect", "x": 2, "y": 8, "width": 12, "height": 8}],
+        "properties": {"damage": 1}
+      }
     },
     "autotile": {
-      "bitmask-4": {
-        "offsets": { "0000": 0, "1000": 1, "0100": 2, "1100": 3, "0010": 4, "1010": 5, "0110": 6, "1110": 7, "0001": 8, "1001": 9, "0101": 10, "1101": 11, "0011": 12, "1011": 13, "0111": 14, "1111": 15 }
+      "walls": {
+        "offsets": {
+          "0000": 0, "1000": 1, "0100": 2, "1100": 3,
+          "0010": 4, "1010": 5, "0110": 6, "1110": 7,
+          "0001": 8, "1001": 9, "0101": 10, "1101": 11,
+          "0011": 12, "1011": 13, "0111": 14, "1111": 15
+        }
       }
     },
     "stamps": {
-      "tree": { "width": 2, "height": 2, "data": [["tree_top_l","tree_top_r"],["tree_bot_l","tree_bot_r"]] }
+      "pillar": {"width": 1, "height": 2, "data": [["wall"], ["wall"]]}
     }
   }
 }
-```
+~~~
 
-### Fields
+Field -> Meaning:
+- type, tileSize, tiles: Required; type is tileset; tileSize is the square cell size
+- path: Required for real art; omit for color placeholders
+- tiles[name].index: Zero-based cell index in the PNG
+- tiles[name].collision: Solid tile, default false
+- tiles[name].collisionShapes: Rectangles in tile-local px; requires collision: true
+- tiles[name].autotile: Key in the entry's autotile object
+- tiles[name].properties: Gameplay metadata; the engine does not apply damage or movement effects
+- tiles[name].color: Placeholder CSS color when no PNG is loaded
+- autotile[rule].offsets: Bitmask string to offset added to the tile's base index
+- stamps[name]: Composite with width, height in cells and a rectangular data array
+- categories: Optional authoring metadata; not read by the engine
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `type` | `"tileset"` | yes | Asset type |
-| `path` | string | yes | Path to tileset PNG, relative to manifest's folder |
-| `tileSize` | number | yes | Display tile size in pixels (square tiles) |
-| `tiles` | object | yes | `{ semanticName: TileDef }` map |
-| `autotile` | object | no | Auto-tile rule definitions |
-| `stamps` | object | no | `{ stampName: StampDef }` composite tile structures |
-| `categories` | object | no | `{ categoryName: [tileName, ...] }` for grouping. Authoring metadata for agents and tools; the engine does not read it |
+The PNG grid and collision shapes must match tileSize. Changing it changes how the image is sliced, not just how large the old cells appear on screen. A solid tile without collisionShapes gets a full-cell static body. Multiple rectangles produce multiple static bodies. Other shape types are not supported here.
 
-The manifest key (e.g. `"forest"`) serves as both the tileset identifier and the Phaser texture key.
+For prototypes, omit path and give every tile a color. The engine generates a color texture; semantic names and collision rules remain unchanged when art arrives.
 
-### How it works
+Autotile masks test equal semantic tile names in top/right/bottom/left order. For example, 1010 means matching tiles above and below. Supply all 16 offsets for a four-neighbor rule. Stamps contain tile names or null, not PNG indices.
 
-1. Boot: engine extracts tileset entries from manifest into `sceneTree.tilesets[key]`
-2. Preload: PhaserHost loads the `path` as a Phaser texture keyed by the manifest entry name
-3. Runtime: TileMap script reads `sceneTree.tilesets[tilesetName]` for tile definitions
+## Define the map
 
----
+An external maps/room.tilemap.json contains a rectangular grid per layer:
 
-## TileDef (each entry in `tiles`)
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `index` | number | yes | Base tile index in the tileset image (grid position) |
-| `collision` | boolean | no | Whether this tile type has collision (default false) |
-| `collisionShapes` | CollisionShape[] | no | Custom collision regions within the tile |
-| `autotile` | string | no | Auto-tile rule name (e.g. "bitmask-4") |
-| `properties` | object | no | Arbitrary properties (damage, slowFactor, etc.) |
-
-### CollisionShape
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `type` | `"rect"` | Shape type (only rect supported currently) |
-| `x` | number | X offset from tile's top-left corner (px) |
-| `y` | number | Y offset from tile's top-left corner (px) |
-| `width` | number | Shape width (px) |
-| `height` | number | Shape height (px) |
-
-Collision shape rules:
-- `collisionShapes` defined: engine creates independent static bodies per shape
-- `collision: true` without `collisionShapes`: full-tile collision body
-- `collision: false` or omitted: no collision
-- Multiple shapes per tile are supported (creates one body per shape)
-
-### Auto-tile rules (bitmask-4)
-
-4-bit bitmask checking top/right/bottom/left neighbors for same type.
-The resolved index = `tiles[type].index + autotile.offsets[bitmask]`.
-
-```json
+~~~json
 {
-  "autotile": {
-    "bitmask-4": {
-      "offsets": {
-        "0000": 0, "1000": 1, "0100": 2, "1100": 3,
-        "0010": 4, "1010": 5, "0110": 6, "1110": 7,
-        "0001": 8, "1001": 9, "0101": 10, "1101": 11,
-        "0011": 12, "1011": 13, "0111": 14, "1111": 15
-      }
-    }
-  }
-}
-```
-
-### StampDef
-
-A composite tile structure -- multiple tiles that are always placed together as a unit.
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `width` | number | yes | Stamp width in tiles |
-| `height` | number | yes | Stamp height in tiles |
-| `data` | (string\|null)[][] | yes | 2D array of tile type names |
-
----
-
-## Tilemap Data (*.tilemap.json)
-
-Map data using semantic tile type names. Can be external file or inlined in scene JSON config.
-
-### Top-level structure
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `tileset` | string | yes | Tileset name (matches manifest entry key) |
-| `width` | number | yes | Map width in tiles |
-| `height` | number | yes | Map height in tiles |
-| `layers` | LayerDef[] | yes | Array of layer definitions |
-
-### LayerDef
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `name` | string | yes | Layer identifier |
-| `z` | number | no | Depth/z-index for rendering order (default 0) |
-| `data` | (string\|null)[][] | yes | 2D array of tile type names. `null` = empty cell. |
-| `collision` | boolean | no | Build collision bodies for this layer's solid tiles (default `true`). Set `false` for decorative layers such as a wall roof. |
-| `stamps` | StampPlacement[] | no | Pre-placed stamp instances. The engine writes them into this layer's `data` before auto-tiling, so stamped edges auto-tile against their neighbours. |
-
-### StampPlacement
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `stamp` | string | yes | Stamp name from the tileset's `stamps` |
-| `x` | integer | yes | Top-left tile X |
-| `y` | integer | yes | Top-left tile Y |
-
-Cells that fall outside the map are dropped rather than growing it. For stamps placed at runtime, call `placeStamp(layer, x, y, name)` instead.
-
-### StampPlacement
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `stamp` | string | yes | Stamp name (from tileset `stamps`) |
-| `x` | number | yes | Top-left tile X coordinate |
-| `y` | number | yes | Top-left tile Y coordinate |
-
-### Example
-
-```json
-{
-  "tileset": "forest",
-  "width": 10,
-  "height": 8,
+  "tileset": "dungeon",
+  "width": 5,
+  "height": 4,
   "layers": [
     {
-      "name": "ground",
-      "z": 0,
+      "name": "ground", "z": 0,
       "data": [
-        ["grass", "grass", "grass", null, null, null, null, "grass", "grass", "grass"],
-        ["grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass"]
+        ["floor", "floor", "floor", "floor", "floor"],
+        ["floor", "floor", "floor", "floor", "floor"],
+        ["floor", "floor", "floor", "floor", "floor"],
+        ["floor", "floor", "floor", "floor", "floor"]
       ]
     },
     {
-      "name": "walls",
-      "z": 1,
+      "name": "walls", "z": 1,
       "data": [
-        ["wall", "wall", null, null, null, null, null, null, "wall", "wall"],
-        ["wall", null, null, null, null, null, null, null, null, "wall"]
+        ["wall", "wall", "wall", "wall", "wall"],
+        ["wall", null, null, null, "wall"],
+        ["wall", null, null, null, "wall"],
+        ["wall", "wall", "wall", "wall", "wall"]
       ]
     }
   ]
 }
-```
+~~~
 
-### TileMap Node in scene JSON
+Reference it from a scene node:
 
-```json
-{
-  "name": "Map",
-  "script": "TileMap",
-  "tags": ["tilemap"],
-  "config": { "src": "maps/level1.tilemap.json" }
-}
-```
+~~~json
+{"id": "map", "name": "Map", "script": "TileMap", "config": {"src": "maps/room.tilemap.json"}}
+~~~
 
-Inline variant (small maps):
-```json
-{
-  "name": "Map",
-  "script": "TileMap",
-  "config": {
-    "tileset": "forest",
-    "layers": [
-      { "name": "ground", "z": 0, "data": [["grass","grass"],["grass","grass"]] }
-    ]
-  }
-}
-```
+Each layer has name, data, optional z (default 0), optional collision (default true), and optional stamps: [{"stamp": "pillar", "x": 2, "y": 1}]. Coordinates are zero-based cells. Null means empty. Stamp placements merge into data before autotiling; out-of-bounds cells are clipped.
 
-Empty map (procedural generation):
-```json
-{
-  "name": "Map",
-  "script": "TileMap",
-  "config": { "tileset": "forest" }
-}
-```
-Only loads the tileset. Call `init(width, height)` from your script to create the map at runtime, then build with `fill`/`setTile`/`placeStamp`:
-```javascript
+Set layer collision: false to omit its physical bodies. Note that isPassable still checks semantic solids on ALL layers, including decorative layers. If navigation should ignore a roof layer, query the gameplay layers yourself.
+
+Two other setups use the same TileMap script:
+
+- Small inline map: config contains tileset and layers; dimensions derive from the first layer's data.
+- Procedural map: config contains only tileset; call init after ready. A parent node's ready runs after its children, so it can initialize a child map.
+
+~~~js
 ready() {
-  const map = this.getNode('../Map')
-  map.init(20, 15)              // creates blank 20x15 "default" layer
-  map.fill('default', 'wall')   // fill all with wall
-  map.fillRect('default', 1, 1, 18, 13, 'floor')  // carve out rooms
+  const map = this.getNode('Map')
+  map.init(20, 15, { defaultLayer: 'walls' })
+  map.fill('walls', 'wall')
+  map.fillRect('walls', 1, 1, 18, 13, null)
+  this.scene.physics.add.collider(
+    this.getNode('Hero').physicsObject,
+    map.getCollisionLayer('walls')
+  )
 }
-```
+~~~
 
----
+Add maps/ to project.json.releaseExtraRoots when using external map files. It is not one of the default [release roots](deployment.md#release-payload).
 
-## TileMap Node API
+## TileMap API
 
-`script: "TileMap"` in scene JSON (loaded as engine script)
+All x/y parameters below are cell coordinates, not world px. For a map at the origin, convert world coordinates with floor(world / tileSize). Connect physics explicitly using the returned static groups.
 
-A Node script that manages semantic tilemaps. Agent writes tile type names ("grass", "wall"),
-the engine resolves them to visual tile indices via auto-tile and builds collision bodies
-from tileset-defined collision shapes.
+Method -> Result or effect:
+- init(width, height, options?): Reset a map; options.layers selects layer definitions, otherwise options.defaultLayer names one blank layer
+- getTile(layer, x, y): Semantic tile name or null
+- getTileProperties(layer, x, y): The tile definition's properties or null
+- isPassable(x, y): False outside the map or if any layer contains a solid tile
+- getCollisionLayer(layerName?): StaticGroup; omitted name selects the first collision group
+- setTile(layer, x, y, type): Set a cell to a tile name or null, update neighbors and collisions
+- fill(layer, type): Fill a whole layer
+- fillRect(layer, x1, y1, x2, y2, type): Fill inclusive endpoints, reordered and clipped to map bounds
+- placeStamp(layer, x, y, name): Write the named stamp's cells, including nulls
+- removeStamp(layer, x, y, name): Clear its footprint to null; does not restore previous terrain
+- toJSON(): Current tileset, width, height and layers with resolved semantic data
 
-### Data requirements
+Each collision body's gameObject carries Phaser data fields tileType, tileX and tileY. Use them in a collision callback to apply tile-specific behavior. Map edits update the affected cells' physical bodies.
 
-- Tileset must be registered in manifest.json with `type: "tileset"`
-- Tileset image is auto-loaded by the engine from the manifest `path` field
-- Three config modes:
-  1. **External file**: `config.src` points to a `.tilemap.json` file
-  2. **Inline layers**: `config.tileset` + `config.layers` with data arrays
-  3. **Tileset only**: `config.tileset` alone -- tileset loaded, map deferred. Call `init(width, height)` from script.
+toJSON does not preserve stamp instances or layer collision flags. Save these separately if your editor needs to round-trip authoring metadata.
 
-### Read methods
+## AutoTile utility
 
-```javascript
-isPassable(x, y)
-    // Check if a grid cell is passable (no collision tile on any layer).
-    // Returns false for out-of-bounds cells.
-    // Checks ALL layers -- if any tile at (x,y) has collision: true, returns false.
+For direct grid processing from a game script:
 
-getTile(layer, x, y)
-    // Returns tile type name (e.g. "grass") or null.
+~~~js
+import { AutoTile } from '../engine/utils/AutoTile.js'
 
-getTileProperties(layer, x, y)
-    // Returns the properties object from the tileset definition, or null.
-    // Example: { damage: 1, slowFactor: 0.5 }
+const indices = AutoTile.resolve(grid, tilesetDef)
+const changed = AutoTile.resolveLocal(grid, tilesetDef, x, y)
+~~~
 
-getCollisionLayer(layerName?)
-    // Returns Phaser.Physics.Arcade.StaticGroup containing collision bodies.
-    // If layerName is omitted, returns the first collision group found.
-    // Each body's gameObject has data: tileType, tileX, tileY.
-```
-
-### Write methods
-
-```javascript
-init(width, height, options?)
-    // Initialize the map with given dimensions (for procedural generation).
-    // Call after ready() when config only specifies tileset.
-    // options.defaultLayer: name for the initial blank layer (default "default").
-    // Can be called again to re-initialize (destroys existing layers/collision).
-
-setTile(layer, x, y, tileType)
-    // Update a single tile. Auto-resolves the cell + 4 neighbors.
-    // Rebuilds collision bodies for affected cells.
-
-fill(layer, tileType)
-    // Fill an entire layer with a tile type.
-
-fillRect(layer, x1, y1, x2, y2, tileType)
-    // Fill a rectangular region.
-```
-
-### Stamp methods
-
-```javascript
-placeStamp(layer, x, y, stampName)
-    // Place a composite tile structure at position (x, y).
-    // Expands the stamp definition from the tileset into individual setTile calls.
-    // Auto-resolves affected cells and rebuilds collision bodies.
-
-removeStamp(layer, x, y, stampName)
-    // Remove a previously placed stamp (sets all covered cells to null).
-```
-
-### Serialization
-
-```javascript
-toJSON()
-    // Returns tilemap.json format: { tileset, width, height, layers: [...] }
-```
-
-### Usage from other scripts
-
-```javascript
-ready() {
-  const map = this.getNode('../Map')
-
-  // Physics collision
-  const wallBodies = map.getCollisionLayer('walls')
-  this.scene.physics.add.collider(this.sprite, wallBodies)
-
-  // Query terrain
-  const tile = map.getTile('ground', tileX, tileY)
-  const props = map.getTileProperties('ground', tileX, tileY)
-  if (props?.slowFactor) this.speed *= props.slowFactor
-
-  // Modify terrain at runtime
-  map.setTile('walls', 5, 3, null)  // remove a wall
-
-  // Stamps
-  map.placeStamp('objects', 5, 3, 'tree')   // place a tree at tile (5,3)
-  map.removeStamp('objects', 5, 3, 'tree')  // remove it
-}
-```
-
----
-
-## AutoTile Utility
-
-`import { AutoTile } from '/engine/utils/AutoTile.js'`
-
-```javascript
-AutoTile.resolve(semanticGrid, tilesetDef)
-// semanticGrid: (string|null)[][] - 2D array of tile type names
-// tilesetDef: manifest tileset entry content
-// Returns number[][] - resolved tile indices (-1 for null cells)
-
-AutoTile.resolveLocal(grid, tilesetDef, x, y)
-// Resolve a single cell + its 4 neighbors (incremental update).
-// Returns [{ x, y, index }, ...]
-```
+resolve returns number[][] with -1 for empty cells. resolveLocal returns [{x, y, index}, ...] for the cell and its four in-bounds neighbors.
