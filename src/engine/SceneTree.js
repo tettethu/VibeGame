@@ -18,7 +18,7 @@ export class SceneTree {
   nodeDefinitions = {}    // srcPath -> loaded .node.json content
   inputMap = null          // InputMap instance
   running = false          // false = edit mode, true = play mode
-  runtimeController = null // RuntimeController instance (when runtime mode is active)
+  runtimeController = null // Attached by boot, retained outside runtime control.
   tilesets = {}            // tileset name -> tileset.json content
   tilemaps = {}            // src path -> tilemap.json content
   assetManifest = null     // { key: { type, path, sprites?, ... } }
@@ -417,7 +417,6 @@ export class SceneTree {
       if (!this.runtimeController.shouldUpdate()) return
       this.propagateUpdate(this.root, delta / 1000)
       this.inputMap?._advanceFrame()
-      this.runtimeController.postUpdate()
       return
     }
     // Normal mode: running flag controls

@@ -42,6 +42,11 @@
           "default": "FIT",
           "description": "Phaser scale mode."
         },
+        "fpsLimit": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Project frame-rate cap. 0 disables the cap; runtime --fps overrides it."
+        },
         "pixelArt": {
           "type": "boolean",
           "default": false,

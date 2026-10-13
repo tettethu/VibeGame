@@ -81,7 +81,7 @@ Default `host` mode applies `body.setSize` on the visual's gameObject, which the
 "collider": { "body": "static", "host": "separate", "width": 1440, "height": 20 }
 ```
 
-**Spec update**: Skeleton `scenes/main.scene.json` Ground / WallLeft / WallRight all use `host: "separate"`. Engine guide: [`collision-guide.md`](../../.vibegame/spec/engine/collision-guide.md).
+**Spec update**: Skeleton `scenes/main.scene.json` Ground / WallLeft / WallRight all use `host: "separate"`. See [Collisions](../../.vibegame/spec/engine/index.md#collisions).
 
 ---
 

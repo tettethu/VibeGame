@@ -39,10 +39,10 @@ from team.state import (  # noqa: E402
     init_state,
     is_state_error,
     load_state,
+    mutate_state,
     register_agent,
     remove_agent,
     require_agent,
-    save_state,
     update_agent,
 )
 from team.tmux import (  # noqa: E402
@@ -414,23 +414,29 @@ def cmd_status(args: argparse.Namespace) -> int:
     data = load_state(runtime_dir)
     session_name = data.get("session_name")
     session_alive = bool(session_name and session_exists(session_name))
-    changed = False
-    if session_name and not session_alive:
-        data["session_name"] = None
-        session_name = None
-        changed = True
-    stale_agents = []
+    stale_session = bool(session_name and not session_alive)
+    session_started_at = data["lead"].get("started_at")
+    stale_agents = {}
     for name, agent in data.get("agents", {}).items():
         pane_id = agent.get("pane_id") or "-"
         if pane_id != "-" and not pane_exists(pane_id):
-            stale_agents.append(name)
-    if stale_agents:
-        for name in stale_agents:
-            data.setdefault("agents", {}).pop(name, None)
-        changed = True
-    if changed:
-        save_state(data, runtime_dir)
-        data = load_state(runtime_dir)
+            stale_agents[name] = (pane_id, agent.get("created_at"))
+    if stale_session or stale_agents:
+        def cleanup(current: dict) -> None:
+            # tmux checks ran outside the lock; preserve restarted identities.
+            if (
+                stale_session
+                and current.get("session_name") == session_name
+                and current["lead"].get("started_at") == session_started_at
+            ):
+                current["session_name"] = None
+            agents = current["agents"]
+            for name, identity in stale_agents.items():
+                agent = agents.get(name)
+                if agent is not None and (agent.get("pane_id"), agent.get("created_at")) == identity:
+                    del agents[name]
+
+        data, _ = mutate_state(cleanup, runtime_dir)
         session_name = data.get("session_name")
         session_alive = bool(session_name and session_exists(session_name))
     agents = data.get("agents", {})
@@ -744,6 +750,11 @@ def cmd_agent(args: argparse.Namespace) -> int:
 
 
 def cmd_send(args: argparse.Namespace) -> int:
+    if not args.message:
+        args.message = sys.stdin.read().strip()
+    if not args.message:
+        print("No message provided.", file=sys.stderr)
+        return 1
     try:
         agent = require_agent(args.name, str(_runtime_dir()))
     except KeyError:
@@ -921,7 +932,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     send = sub.add_parser("send")
     send.add_argument("--name", required=True)
-    send.add_argument("message")
+    send.add_argument("message", nargs="?", default=None)
     send.set_defaults(func=cmd_send)
 
     inbox = sub.add_parser("inbox")

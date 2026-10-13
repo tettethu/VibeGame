@@ -65,6 +65,98 @@ DEFAULT_PORT = 8080
 AGENT_BOOT_STABLE_SECONDS = 1.5
 
 
+def _register_claude_project_trust(
+    project_path: Path,
+    *,
+    config_path: Path | None = None,
+) -> bool:
+    """Trust one project in Claude Code's existing user configuration."""
+    resolved_project = str(project_path.resolve())
+    target = config_path if config_path is not None else Path.home() / ".claude.json"
+    logger.info("claude_config_read path=%s project=%s", target, resolved_project)
+
+    if not target.is_file():
+        raise FileNotFoundError(
+            f"Claude Code config not found: {target}. "
+            "Run claude --dangerously-skip-permissions once and accept its global confirmation."
+        )
+
+    try:
+        config = json.loads(target.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        logger.error(
+            "claude_config_invalid_json path=%s line=%s column=%s",
+            target,
+            exc.lineno,
+            exc.colno,
+        )
+        raise ValueError(
+            f"Invalid Claude Code config JSON at {target}:{exc.lineno}:{exc.colno}"
+        ) from exc
+
+    if not isinstance(config, dict):
+        raise ValueError(f"Invalid Claude Code config at {target}: expected a JSON object")
+
+    if "projects" not in config:
+        projects = {}
+        config["projects"] = projects
+    else:
+        projects = config["projects"]
+    if not isinstance(projects, dict):
+        raise ValueError(
+            f"Invalid Claude Code config at {target}: 'projects' must be a JSON object"
+        )
+
+    if resolved_project not in projects:
+        project_config = {}
+        projects[resolved_project] = project_config
+    else:
+        project_config = projects[resolved_project]
+    if not isinstance(project_config, dict):
+        raise ValueError(
+            f"Invalid Claude Code config at {target}: "
+            f"project entry for {resolved_project} must be a JSON object"
+        )
+
+    if project_config.get("hasTrustDialogAccepted") is True:
+        logger.info(
+            "claude_project_trust_unchanged path=%s project=%s",
+            target,
+            resolved_project,
+        )
+        return False
+
+    project_config["hasTrustDialogAccepted"] = True
+    serialized = json.dumps(config, indent=2, ensure_ascii=False) + "\n"
+    temp_fd, temp_name = tempfile.mkstemp(
+        prefix=f".{target.name}.",
+        dir=str(target.parent),
+    )
+    temp_path = Path(temp_name)
+    try:
+        os.fchmod(temp_fd, target.stat().st_mode & 0o777)
+        temp_file = os.fdopen(temp_fd, "w", encoding="utf-8")
+        temp_fd = -1
+        with temp_file:
+            temp_file.write(serialized)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        os.replace(temp_path, target)
+    except Exception:
+        if temp_fd >= 0:
+            os.close(temp_fd)
+        temp_path.unlink(missing_ok=True)
+        logger.exception(
+            "claude_config_write_failed path=%s project=%s",
+            target,
+            resolved_project,
+        )
+        raise
+
+    logger.info("claude_project_trust_written path=%s project=%s", target, resolved_project)
+    return True
+
+
 def _port_available(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         # Match ThreadingHTTPServer.allow_reuse_address, or a port left in
@@ -761,6 +853,8 @@ def start(
     try:
         from team.paths import default_session_name
         from team.state import init_state, load_state, remove_agent, set_dashboard_port, update_lead
+        from team.settings import agent_doc_map, load_settings, resolve_agent_settings
+        from team.launch import CLI_CONFIGS, prepare_launch, build_initial_prompt_command, runtime_env_values, resolve_env_value
     except ImportError:
         logger.exception("team_runtime_import_failed")
         raise AssertionError("team runtime modules not found in .vibegame/team/")
@@ -776,6 +870,39 @@ def start(
     prev_state = load_state(str(team_dir))
     prev_agents = prev_state.get("agents", {}) if not new else {}
     orch_session_id = prev_state.get("lead", {}).get("session_id") if not new else None
+
+    reviewer_start = None
+    startup_agent_names: tuple[str, ...] = ()
+    configured_agents: dict[str, tuple[str | None, str | None, str | None, str | None]] = {}
+    if not no_agents:
+        reviewer_start = _last_reviewer_start(
+            project_path / ".vibegame" / "logs" / "agents.jsonl"
+        )
+        startup_agent_names = _startup_agent_names(reviewer_start)
+        startup_roles = {"orchestrator", *startup_agent_names}
+        settings = load_settings(str(team_dir))
+        potential_roles = startup_roles | set(settings.get("agents", {})) | set(
+            agent_doc_map(str(team_dir))
+        )
+        resolved_agents = {
+            role: resolve_agent_settings(
+                name=role,
+                agent=role,
+                model=None,
+                explicit_team_dir=str(team_dir),
+            )
+            for role in potential_roles
+        }
+        configured_agents = {
+            role: resolved_agents[role]
+            for role in startup_roles
+        }
+        uses_claude_code = any(
+            cli is not None and CLI_CONFIGS.get(cli, {}).get("command") == "claude"
+            for _, cli, _, _ in resolved_agents.values()
+        )
+        if uses_claude_code:
+            _register_claude_project_trust(project_path)
 
     team_start_mode = "new" if new else "per-agent"
 
@@ -908,22 +1035,17 @@ def start(
     # --- Orchestrator FIRST ---
     # Start or resume orchestrator before mates so dashboard registration is stable.
     if not no_agents:
-        from team.settings import resolve_agent_settings
-        from team.launch import prepare_launch, build_initial_prompt_command, runtime_env_values, resolve_env_value
-
-        _, orch_cli, orch_model, orch_effort = resolve_agent_settings(
-            name="orchestrator", agent="orchestrator", model=None,
-            explicit_team_dir=str(team_dir),
-        )
+        _, orch_cli, orch_model, orch_effort = configured_agents["orchestrator"]
         assert orch_cli, "Orchestrator CLI not configured. Run: vibegame setup"
         assert orch_model, "Orchestrator model not configured. Run: vibegame setup"
+        orch_command = CLI_CONFIGS[orch_cli]["command"]
 
         # The initial input is written in the Claude form (`/vibegame-build ...`),
         # because that is what a user types and what a task's instruction.md holds.
         # Codex would take it as literal text, so rewrite before either delivery
         # path uses it -- the dashboard does the same for the prompts it sends.
         if message:
-            rewritten = rewrite_leading_skill(orch_cli, message)
+            rewritten = rewrite_leading_skill(orch_command, message)
             if rewritten != message:
                 logger.info("initial_input_skill_rewritten cli=%s head=%s",
                             orch_cli, rewritten.split(None, 1)[0])
@@ -994,7 +1116,7 @@ def start(
                 and orch_mode == "fresh"
                 and orch_config.get("initial_prompt_mode") == "argument"
             )
-            fresh_prompt = skill_invocation(orch_cli, "vibegame-start")
+            fresh_prompt = skill_invocation(orch_command, "vibegame-start")
             if launch_carries_message:
                 # `message` is already in this CLI's skill form (rewritten above).
                 fresh_prompt = f"{fresh_prompt}\n\n{message}"
@@ -1116,20 +1238,13 @@ def start(
         # Filled per freshly launched role below; see the comment at the add site.
         wait_for: set[str] = set()
 
-        reviewer_start = _last_reviewer_start(
-            project_path / ".vibegame" / "logs" / "agents.jsonl"
-        )
-        startup_agent_names = _startup_agent_names(reviewer_start)
         for role in startup_agent_names:
             agent_state = prev_agents.get(role)
             if role == "reviewer" and agent_state is None:
                 agent_state = reviewer_start
             # effort is unused here: mates launch through `vibegame lead agent`,
             # which resolves settings again in its own process.
-            _, configured_cli, configured_model, _ = resolve_agent_settings(
-                name=role, agent=role, model=None,
-                explicit_team_dir=str(team_dir),
-            )
+            _, configured_cli, configured_model, _ = configured_agents[role]
             assert configured_cli, f"CLI not configured for {role}. Run: vibegame setup"
             sid = (agent_state or {}).get("session_id")
             pane_id = (agent_state or {}).get("pane_id", "")

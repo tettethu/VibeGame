@@ -184,6 +184,59 @@ def ensure_worktree_symlink(target: Path, link_path: Path) -> str | None:
     return f"Symlinked {link_path.name}/ to worktree"
 
 
+def effective_workspace(repo_root: Path, task: dict) -> Path:
+    """Resolve a task's code workspace, whether it is a worktree or repo root."""
+    worktree = task.get("worktree")
+    if not worktree:
+        return repo_root.resolve()
+    path = Path(worktree)
+    if not path.is_absolute():
+        path = repo_root / path
+    return path.resolve()
+
+
+def _resolve_reused_workspace(
+    repo_root: Path,
+    tasks: list[dict],
+    task: dict,
+    source_name: str,
+) -> tuple[Path, dict] | tuple[None, None]:
+    source = find_task(tasks, source_name)
+    if source is None:
+        print(
+            colored(f"Error: workspace source task '{source_name}' not found", Colors.RED),
+            file=sys.stderr,
+        )
+        return None, None
+    if source.get("name") == task.get("name"):
+        print(
+            colored("Error: a task cannot reuse its own workspace", Colors.RED),
+            file=sys.stderr,
+        )
+        return None, None
+    if source.get("status") != "done":
+        print(
+            colored(
+                f"Error: workspace source task '{source['name']}' must be done "
+                f"before its workspace can be reused",
+                Colors.RED,
+            ),
+            file=sys.stderr,
+        )
+        return None, None
+    workspace = effective_workspace(repo_root, source)
+    if not workspace.is_dir():
+        print(
+            colored(
+                f"Error: workspace for source task '{source['name']}' does not exist: {workspace}",
+                Colors.RED,
+            ),
+            file=sys.stderr,
+        )
+        return None, None
+    return workspace, source
+
+
 # =============================================================================
 # Command: create
 # =============================================================================
@@ -239,6 +292,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     repo_root = get_primary_repo_root(get_repo_root())
     tasks = read_tasks(repo_root)
     task = find_task(tasks, args.name)
+    reuse_source_name = getattr(args, "reuse_workspace_from", None)
 
     if task is None:
         print(colored(f"Error: task '{args.name}' not found in tasks.jsonl", Colors.RED), file=sys.stderr)
@@ -253,41 +307,28 @@ def cmd_init(args: argparse.Namespace) -> int:
         print(colored(f"Error: task '{args.name}' is blocked by: {', '.join(waiting)}", Colors.RED), file=sys.stderr)
         return 1
 
-    task_dir = repo_root / task["dir"]
-    task_dir.mkdir(parents=True, exist_ok=True)
-
-    # Create worktree if requested
-    if args.use_worktree:
-        worktree_path = repo_root.parent / f"vibegame-worktree-{repo_root.name}-{args.name}"
-        result = subprocess.run(
-            ["git", "worktree", "add", str(worktree_path), "-b", f"task/{task['id']:03d}-{args.name}"],
-            cwd=str(repo_root),
-            capture_output=True, text=True,
+    if args.use_worktree and reuse_source_name:
+        print(
+            colored(
+                "Error: --use-worktree and --reuse-workspace-from are mutually exclusive",
+                Colors.RED,
+            ),
+            file=sys.stderr,
         )
-        if result.returncode == 0:
-            task["worktree"] = os.path.relpath(worktree_path, repo_root)
-            print(colored(f"Created worktree: {task['worktree']}", Colors.GREEN), file=sys.stderr)
-            # Copy .env to worktree
-            src_env = repo_root / ".env"
-            dst_env = worktree_path / ".env"
-            if src_env.exists() and not dst_env.exists():
-                shutil.copy(src_env, dst_env)
-                print(colored(f"Copied .env to worktree", Colors.DIM), file=sys.stderr)
-            # Share assets/ and .vibegame/tasks/ into the worktree
-            shared_dirs = [
-                (repo_root / "assets", worktree_path / "assets"),
-                (repo_root / TASKS_DIR, worktree_path / TASKS_DIR),
-            ]
-            for shared_src, shared_dst in shared_dirs:
-                if not shared_src.exists():
-                    continue
-                message = ensure_worktree_symlink(shared_src, shared_dst)
-                if message:
-                    print(colored(message, Colors.DIM), file=sys.stderr)
-        else:
-            print(colored(f"Warning: worktree creation failed: {result.stderr}", Colors.YELLOW), file=sys.stderr)
+        return 1
 
-    prd_path = task_dir / "prd.md"
+    source_task = None
+    if reuse_source_name:
+        _, source_task = _resolve_reused_workspace(
+            repo_root,
+            tasks,
+            task,
+            reuse_source_name,
+        )
+        if source_task is None:
+            return 1
+
+    prd_path = repo_root / task["dir"] / "prd.md"
     prd_content = ""
     if not sys.stdin.isatty():
         prd_content = sys.stdin.read().strip()
@@ -301,6 +342,58 @@ def cmd_init(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
+
+    # Create worktree if requested
+    if args.use_worktree:
+        worktree_path = repo_root.parent / f"vibegame-worktree-{repo_root.name}-{args.name}"
+        result = subprocess.run(
+            ["git", "worktree", "add", str(worktree_path), "-b", f"task/{task['id']:03d}-{args.name}"],
+            cwd=str(repo_root),
+            capture_output=True, text=True,
+        )
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip()
+            print(
+                colored(f"Error: worktree creation failed for '{args.name}': {detail}", Colors.RED),
+                file=sys.stderr,
+            )
+            return 1
+
+        task["worktree"] = os.path.relpath(worktree_path, repo_root)
+        task.pop("workspaceFrom", None)
+        print(colored(f"Created worktree: {task['worktree']}", Colors.GREEN), file=sys.stderr)
+        # Copy .env to worktree
+        src_env = repo_root / ".env"
+        dst_env = worktree_path / ".env"
+        if src_env.exists() and not dst_env.exists():
+            shutil.copy(src_env, dst_env)
+            print(colored("Copied .env to worktree", Colors.DIM), file=sys.stderr)
+        # Share assets/ and .vibegame/tasks/ into the worktree
+        shared_dirs = [
+            (repo_root / "assets", worktree_path / "assets"),
+            (repo_root / TASKS_DIR, worktree_path / TASKS_DIR),
+        ]
+        for shared_src, shared_dst in shared_dirs:
+            if not shared_src.exists():
+                continue
+            message = ensure_worktree_symlink(shared_src, shared_dst)
+            if message:
+                print(colored(message, Colors.DIM), file=sys.stderr)
+    elif source_task is not None:
+        task["worktree"] = source_task.get("worktree")
+        task["workspaceFrom"] = source_task["name"]
+        print(
+            colored(
+                f"Reusing workspace from task '{source_task['name']}'",
+                Colors.GREEN,
+            ),
+            file=sys.stderr,
+        )
+    else:
+        task.pop("workspaceFrom", None)
+
+    task_dir = repo_root / task["dir"]
+    task_dir.mkdir(parents=True, exist_ok=True)
 
     if prd_content:
         prd_path.write_text(prd_content, encoding="utf-8")
@@ -321,6 +414,10 @@ def cmd_init(args: argparse.Namespace) -> int:
     if task.get("worktree"):
         print(colored(f"  Worktree: {task['worktree']}", Colors.BLUE), file=sys.stderr)
         print(colored("  Task artifacts are shared into the worktree via .vibegame/tasks/ symlink", Colors.BLUE), file=sys.stderr)
+    else:
+        print(colored(f"  Workspace: {repo_root}", Colors.BLUE), file=sys.stderr)
+    if task.get("workspaceFrom"):
+        print(colored(f"  Workspace source: {task['workspaceFrom']}", Colors.BLUE), file=sys.stderr)
     print(colored("  Task workflow: architect -> programmer -> auditor -> player", Colors.CYAN), file=sys.stderr)
     print(
         colored(
@@ -410,11 +507,17 @@ def cmd_list(args: argparse.Namespace) -> int:
         ready_str = "" if t.get("status") in ("done", "decomposed") else (
             "" if is_ready(t, tasks) else f" [waiting: {','.join(t.get('blockedBy',[]))}]"
         )
-        worktree_str = f" wt:{t['worktree']}" if t.get("worktree") else ""
+        workspace_str = (
+            f" workspace:{t['worktree']}"
+            if t.get("worktree")
+            else " workspace:repo-root"
+        )
+        if t.get("workspaceFrom"):
+            workspace_str += f" from:{t['workspaceFrom']}"
         return (f"  {format_task_prefix(t)} "
                 f"[{t.get('status','?'):12}] [{t.get('type') or '-':6}] "
                 f"{t['name']:25}"
-                f"{ready_str}{worktree_str}")
+                f"{ready_str}{workspace_str}")
 
     if active:
         print(colored("Active:", Colors.BLUE))
@@ -538,7 +641,9 @@ def main() -> int:
     # init
     p = sub.add_parser("init", help="Initialize task directory")
     p.add_argument("name", help="Task name")
-    p.add_argument("--use-worktree", action="store_true", help="Create git worktree")
+    group = p.add_mutually_exclusive_group()
+    group.add_argument("--use-worktree", action="store_true", help="Create git worktree")
+    group.add_argument("--reuse-workspace-from", metavar="TASK", help="Reuse another task's effective workspace")
 
     # modify
     p = sub.add_parser("modify", help="Modify arbitrary task field")

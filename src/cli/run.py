@@ -1,5 +1,7 @@
+import contextlib
 import http.server
 import json
+import logging
 import os
 import queue
 import secrets
@@ -13,6 +15,13 @@ import time
 from pathlib import Path
 from urllib.parse import quote
 
+# Background mode is refused on Windows (see the guard in `run`), so the only
+# platform that can have two runtimes starting at once is the one that has fcntl.
+if sys.platform == "win32":  # pragma: no cover - no background mode to serialise
+    fcntl = None
+else:
+    import fcntl
+
 import typer
 
 from cli.router import app
@@ -22,8 +31,9 @@ from util.runtime import DEFAULT_RUNTIME_PORT
 # Query keys the engine boot path (src/engine/boot.js) reads off location.search.
 # User passthrough params (`vibegame run . -- k=v`, bot META["params"]) must not
 # use these, or a game param would silently hijack engine runtime control.
-# KEEP IN SYNC with boot.js: if the engine starts reading a new query key, add it
-# here so passthrough validation keeps rejecting it.
+# KEEP IN SYNC with RESERVED_PARAMS in boot.js: if the engine starts reading a new
+# query key, add it to both, so passthrough validation keeps rejecting it and
+# in-tab navigation keeps carrying it.
 RESERVED_QUERY_KEYS = frozenset({"runtime", "activate", "debug", "physicsDebug", "renderer", "fps"})
 RENDERER_CHOICES = frozenset({"auto", "webgl", "canvas"})
 
@@ -99,6 +109,32 @@ def _legacy_runtime_logs_dir(project_path: Path) -> Path:
 
 def _servers_info_path(project_path: Path) -> Path:
     return _runtime_logs_dir(project_path) / "servers.json"
+
+
+@contextlib.contextmanager
+def _servers_lock(project_path: Path):
+    """Serialise the read-modify-write cycles on servers.json.
+
+    Every writer rewrites the whole file, so two `vibegame run -b` starting in the
+    same second each write a dict built from a read that predates the other, and
+    the later write drops the earlier entry. A runtime with no entry can then be
+    neither reused nor closed: `vibegame close` says "No server tracked on port N"
+    and `vibegame run` calls the port "in use by another process (not this
+    project)", while the server itself keeps serving and burning a couple of
+    cores. One recorded batch of eight simultaneous starts lost exactly one that
+    way, and nothing short of killing the container could reclaim it.
+    """
+    if fcntl is None:
+        yield
+        return
+    lock_file = _servers_info_path(project_path).parent / "servers.json.lock"
+    lock_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_file, "w", encoding="utf-8") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
 
 
 def _server_log_path(project_path: Path, port: int = DEFAULT_RUNTIME_PORT) -> Path:
@@ -187,7 +223,12 @@ def _write_all_servers(project_path: Path, servers: dict[str, dict]) -> None:
     info_file = _servers_info_path(project_path)
     if servers:
         info_file.parent.mkdir(parents=True, exist_ok=True)
-        info_file.write_text(json.dumps(servers), encoding="utf-8")
+        # Rename over the old file rather than truncating it: a reader that is not
+        # holding the lock (every `_read_all_servers` outside a write cycle) would
+        # otherwise be able to catch the file mid-write and read it as empty.
+        tmp = info_file.with_name(info_file.name + ".tmp")
+        tmp.write_text(json.dumps(servers), encoding="utf-8")
+        tmp.replace(info_file)
     else:
         info_file.unlink(missing_ok=True)
 
@@ -207,11 +248,12 @@ def _is_server_entry_stale(info: dict) -> bool:
 
 
 def _prune_stale_servers(project_path: Path) -> dict[str, dict]:
-    servers = _read_all_servers(project_path)
-    cleaned = {port_key: info for port_key, info in servers.items() if not _is_server_entry_stale(info)}
-    if cleaned != servers:
-        _write_all_servers(project_path, cleaned)
-    return cleaned
+    with _servers_lock(project_path):
+        servers = _read_all_servers(project_path)
+        cleaned = {port_key: info for port_key, info in servers.items() if not _is_server_entry_stale(info)}
+        if cleaned != servers:
+            _write_all_servers(project_path, cleaned)
+        return cleaned
 
 
 def _migrate_old_server_info(project_path: Path) -> None:
@@ -308,26 +350,31 @@ def _write_server_info(
     background: bool,
     server_pid: int,
     launcher_pid: int = 0,
+    daemon_pid: int = 0,
 ) -> None:
-    servers = _read_all_servers(project_path)
-    servers[str(port)] = _normalize_server_entry(
-        {
-            "pid": launcher_pid if not background else server_pid,
-            "launcher_pid": launcher_pid,
-            "server_pid": server_pid,
-            "host": host,
-            "port": port,
-            "background": background,
-        },
-        background_default=background,
-    )
-    _write_all_servers(project_path, servers)
+    with _servers_lock(project_path):
+        servers = _read_all_servers(project_path)
+        servers[str(port)] = _normalize_server_entry(
+            {
+                "pid": launcher_pid if not background else server_pid,
+                "launcher_pid": launcher_pid,
+                "server_pid": server_pid,
+                "host": host,
+                "port": port,
+                "background": background,
+            },
+            background_default=background,
+        )
+        if daemon_pid:
+            servers[str(port)]["daemon_pid"] = daemon_pid
+        _write_all_servers(project_path, servers)
 
 
 def _remove_server_info(project_path: Path, port: int) -> None:
-    servers = _read_all_servers(project_path)
-    servers.pop(str(port), None)
-    _write_all_servers(project_path, servers)
+    with _servers_lock(project_path):
+        servers = _read_all_servers(project_path)
+        servers.pop(str(port), None)
+        _write_all_servers(project_path, servers)
 
 
 def _is_process_alive(pid: int) -> bool:
@@ -511,17 +558,29 @@ def _resolve_runtime_port(value: str, host: str) -> int:
 
 
 def _handle_existing_server(project_path: Path, host: str, port: int) -> None:
-    """Check for existing server on this port, clean up or abort."""
+    """Refuse a port that is taken. Never stop what is running on it.
+
+    A runtime on the requested port belongs to someone, and nothing here can
+    tell whom: several agents share one workspace and run at the same time --
+    architect reworking while player verifies, lead and reviewer checking the
+    build -- so replacing "the previous runtime on this port" stopped other
+    agents' sessions mid-check. Whoever started a runtime closes it. A tracked
+    entry whose processes are all gone is not a runtime any more and is
+    dropped; that is bookkeeping, not replacement.
+    """
     info = _read_server_info(project_path, port)
-    if info:
-        stopped, message = _terminate_runtime_processes(info)
-        if stopped:
-            print(f"Stopped previous runtime on port {port} ({message})")
+    if info and _is_server_entry_stale(info):
         _remove_server_info(project_path, port)
+        info = None
+    if info:
+        print(f"Error: port {port} already has a runtime from this project ({_pid_summary(info)})")
+        print(f"If it is yours, stop it first with `vibegame close . --port {port}`; "
+              "otherwise run on a free port with --port auto")
+        raise typer.Exit(1)
 
     if _is_port_in_use(host, port):
-        print(f"Port {port} is in use by another process (not this project)")
-        print("Use --port to choose a different port, or find the process manually")
+        print(f"Error: port {port} is in use by another process (not this project)")
+        print("Run on a free port with --port auto, or choose one with --port <N>")
         raise typer.Exit(1)
 
 
@@ -541,13 +600,13 @@ def _server_command(project_path: Path, host: str, port: int) -> list[str]:
     ]
 
 
-def _server_env(runtime_token: str | None = None, screenshot_port: int | None = None) -> dict[str, str]:
+def _server_env(runtime_token: str | None = None, playwright_port: int | None = None) -> dict[str, str]:
     env = dict(os.environ)
     env.setdefault("PYTHONUNBUFFERED", "1")
     if runtime_token:
         env["VIBEGAME_RUNTIME_TOKEN"] = runtime_token
-    if screenshot_port:
-        env["VIBEGAME_SCREENSHOT_PORT"] = str(screenshot_port)
+    if playwright_port:
+        env["VIBEGAME_PLAYWRIGHT_PORT"] = str(playwright_port)
     return env
 
 
@@ -657,95 +716,81 @@ def _finalize_shot(page, context, shot_path: Path | None, work_dir: Path) -> Pat
     return _write_shot_video(source_path, shot_path, work_dir)
 
 
-_screenshot_queue: queue.Queue = queue.Queue()
-_refresh_queue: queue.Queue = queue.Queue()
-
-
 class _PlaywrightBrokerHandler(http.server.BaseHTTPRequestHandler):
-    """HTTP handler that delegates Playwright ops (screenshot, refresh) to the owning thread."""
+    """Queue browser work without blocking other control requests."""
 
     def do_GET(self):
-        if self.path == "/screenshot":
-            self._handle_screenshot()
-        elif self.path == "/refresh":
-            self._handle_refresh()
-        else:
-            self.send_response(404)
-            self.end_headers()
+        self._request()
 
-    def _handle_screenshot(self):
-        resp_q: queue.Queue = queue.Queue(maxsize=1)
-        _screenshot_queue.put(resp_q)
-        try:
-            result = resp_q.get(timeout=15)
-        except queue.Empty:
-            self.send_response(503)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(b'{"error":"Screenshot timed out"}')
-            return
-        if isinstance(result, Exception):
-            self.send_response(500)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            msg = f'{{"error":"Screenshot failed: {result}"}}'
-            self.wfile.write(msg.encode())
-            return
-        png_bytes: bytes = result
-        self.send_response(200)
-        self.send_header("Content-Type", "image/png")
-        self.send_header("Content-Length", str(len(png_bytes)))
-        self.end_headers()
-        self.wfile.write(png_bytes)
+    def do_POST(self):
+        self._request()
 
-    def _handle_refresh(self):
-        resp_q: queue.Queue = queue.Queue(maxsize=1)
-        _refresh_queue.put(resp_q)
+    def _request(self):
+        if self.path not in {"/screenshot", "/refresh", "/runtime"}:
+            self.send_error(404)
+            return
         try:
-            result = resp_q.get(timeout=75)
-        except queue.Empty:
-            self.send_response(503)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(b'{"error":"Refresh timed out"}')
-            return
-        if isinstance(result, Exception):
-            self.send_response(500)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            msg = f'{{"error":"Refresh failed: {result}"}}'
-            self.wfile.write(msg.encode())
-            return
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
+            if self.path == "/runtime":
+                payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
+                if not isinstance(payload, dict) or not isinstance(payload.get("params"), dict):
+                    raise ValueError("Expected cmd and params object")
+            else:
+                payload = {}
+            response = queue.Queue(maxsize=1)
+            self.server.requests.put((self.path, payload, response))
+            result = response.get(timeout=300 if payload.get("cmd") == "continue" else 90)
+            if isinstance(result, Exception):
+                raise result
+            if isinstance(result, bytes):
+                body, content_type = result, "image/png"
+            else:
+                body, content_type = json.dumps(result).encode(), "application/json"
+            status = 200
+        except Exception as exc:
+            logging.exception("Browser broker request failed: %s", self.path)
+            body = json.dumps({"error": str(exc) or type(exc).__name__}).encode()
+            content_type, status = "application/json", 500
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(b'{"status":"ok"}')
+        self.wfile.write(body)
 
     def log_message(self, format, *args):
-        pass  # silence request logging
+        logging.info("Browser broker: " + format, *args)
 
 
-def _drain_queues(page) -> None:
-    """Execute pending Playwright requests on the owning thread."""
+def _drain_queues(page, runtime, broker) -> float:
+    """Service control requests between game frames on the Playwright thread."""
     while True:
         try:
-            resp_q = _screenshot_queue.get_nowait()
+            path, payload, response = broker.requests.get_nowait()
         except queue.Empty:
             break
         try:
-            resp_q.put(page.screenshot(type="png"))
+            if path == "/screenshot":
+                response.put(page.screenshot(type="png"))
+            elif path == "/refresh":
+                page.reload(wait_until="domcontentloaded")
+                runtime.wait_ready()
+                response.put({"status": "ok"})
+            else:
+                runtime.command(payload["cmd"], payload["params"], response)
         except Exception as exc:
-            resp_q.put(exc)
-    while True:
-        try:
-            resp_q = _refresh_queue.get_nowait()
-        except queue.Empty:
-            break
-        try:
-            page.evaluate("window.location.reload()")
-            resp_q.put("ok")
-        except Exception as exc:
-            resp_q.put(exc)
+            logging.exception("Browser operation failed: %s %s", path, payload)
+            response.put(exc)
+    try:
+        return runtime.tick()
+    except Exception as exc:
+        runtime.abort(exc)
+        raise
+
+
+def _wait_with_runtime(seconds, page, runtime, broker) -> None:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        delay = _drain_queues(page, runtime, broker)
+        page.wait_for_timeout(min(delay, max(0, deadline - time.monotonic())) * 1000)
 
 
 class BrowserLaunchError(RuntimeError):
@@ -799,9 +844,10 @@ def _browser_launch_args() -> list[str]:
     return args
 
 
-def _start_screenshot_broker() -> http.server.HTTPServer:
-    """Start a daemon HTTP server on a random port for Playwright operations."""
-    server = http.server.HTTPServer(("127.0.0.1", 0), _PlaywrightBrokerHandler)
+def _start_playwright_broker() -> http.server.HTTPServer:
+    """Start a daemon HTTP server for operations that require the Playwright page."""
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _PlaywrightBrokerHandler)
+    server.requests = queue.Queue()
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server
@@ -828,7 +874,7 @@ def _run_daemon_child(
     shot_path: str | None = None,
     extra_params: dict[str, str] | None = None,
 ) -> None:
-    """Background daemon: full runtime setup (server + Playwright) then screenshot drain loop."""
+    """Background daemon: start the runtime and drain Playwright broker requests."""
     import urllib.request
 
     try:
@@ -837,14 +883,15 @@ def _run_daemon_child(
         status_file.write_text(json.dumps({"error": "playwright not installed"}))
         os._exit(1)
 
-    _screenshot_broker: http.server.HTTPServer | None = None
+    _playwright_broker: http.server.HTTPServer | None = None
     proc: sp.Popen | None = None
     shot_target = Path(shot_path) if shot_path else None
+    exit_code = 0
 
     try:
-        # 1. Screenshot broker
-        _screenshot_broker = _start_screenshot_broker()
-        _screenshot_port = _screenshot_broker.server_address[1]
+        # 1. Playwright broker
+        _playwright_broker = _start_playwright_broker()
+        _playwright_port = _playwright_broker.server_address[1]
 
         # 2. Server (child of daemon, not detached)
         proc = _start_server_process(
@@ -852,7 +899,7 @@ def _run_daemon_child(
             log_file=log_file,
             detached=False,
             runtime_token=runtime_token,
-            screenshot_port=_screenshot_port,
+            playwright_port=_playwright_port,
         )
 
         # 3. Wait for server ready
@@ -868,20 +915,13 @@ def _run_daemon_child(
             except Exception:
                 time.sleep(0.5)
         if not server_ready:
-            status_file.write_text(json.dumps({"error": "server startup failed"}))
-            os._exit(1)
+            raise RuntimeError("server startup failed")
 
         # 4. Write server info so vibegame close works from this point
-        servers = _read_all_servers(project_path)
-        servers[str(port)] = _normalize_server_entry({
-            "host": host,
-            "port": port,
-            "background": True,
-            "pid": os.getpid(),
-            "server_pid": proc.pid,
-            "daemon_pid": os.getpid(),
-        }, background_default=True)
-        _write_all_servers(project_path, servers)
+        _write_server_info(
+            project_path, host=host, port=port, background=True,
+            server_pid=proc.pid, daemon_pid=os.getpid(),
+        )
 
         # 5. Playwright
         launch_args = _browser_launch_args()
@@ -916,14 +956,14 @@ def _run_daemon_child(
                 )
             context = browser.new_context(**context_kwargs)
             page = context.new_page()
-            page.goto(
+            from cli.runtime_clock import RuntimeClock
+            runtime_clock = RuntimeClock(page)
+            runtime_clock.load(
                 _runtime_page_url(
                     url, runtime_token, activate=activate,
                     physics_debug=physics_debug, renderer=renderer, fps=fps, extra=extra_params,
                 ),
-                wait_until="domcontentloaded",
             )
-            page.wait_for_function("window.__vibegame_ready === true", timeout=30000)
 
             # 6. Signal readiness to parent
             status_file.write_text(json.dumps({"ready": True, "daemon_pid": os.getpid()}))
@@ -933,9 +973,10 @@ def _run_daemon_child(
             signal.signal(signal.SIGINT, lambda *_: stop.set())
             signal.signal(signal.SIGTERM, lambda *_: stop.set())
             while not stop.is_set():
-                _drain_queues(page)
-                stop.wait(timeout=0.3)
+                delay = _drain_queues(page, runtime_clock, _playwright_broker)
+                page.wait_for_timeout(delay * 1000)
 
+            runtime_clock.close()
             if page and context:
                 try:
                     _finalize_shot(page, context, shot_target, _shot_work_dir(project_path))
@@ -945,16 +986,17 @@ def _run_daemon_child(
             browser.close()
 
     except Exception as exc:
+        logging.exception("Background runtime failed")
+        exit_code = 1
         try:
             status_file.write_text(json.dumps({"error": str(exc)}))
         except Exception:
             pass
-        os._exit(1)
 
     finally:
-        if _screenshot_broker:
+        if _playwright_broker:
             try:
-                _screenshot_broker.shutdown()
+                _playwright_broker.shutdown()
             except Exception:
                 pass
         if proc:
@@ -966,10 +1008,11 @@ def _run_daemon_child(
             _remove_server_info(project_path, port)
         except Exception:
             pass
-        try:
+        if exit_code == 0:
             status_file.unlink(missing_ok=True)
-        except Exception:
-            pass
+
+    if exit_code:
+        os._exit(exit_code)
 
 
 def _start_server_process(
@@ -980,7 +1023,7 @@ def _start_server_process(
     log_file: Path,
     detached: bool,
     runtime_token: str | None = None,
-    screenshot_port: int | None = None,
+    playwright_port: int | None = None,
 ) -> sp.Popen:
     log_file.parent.mkdir(parents=True, exist_ok=True)
     with open(log_file, "w", encoding="utf-8") as lf:
@@ -989,7 +1032,7 @@ def _start_server_process(
             "stderr": sp.STDOUT,
             "stdin": sp.DEVNULL,
             "cwd": str(project_path),
-            "env": _server_env(runtime_token, screenshot_port=screenshot_port),
+            "env": _server_env(runtime_token, playwright_port=playwright_port),
         }
         if detached:
             if sys.platform == "win32":
@@ -1027,7 +1070,7 @@ def run(
     renderer: str = typer.Option("auto", "--renderer", help="Renderer: auto, webgl, or canvas"),
     fps: int | None = typer.Option(None, "--fps", help="Render FPS cap for this session. 0 = uncapped. Default: project settings.fpsLimit, else 60 for runtime sessions"),
     shot: str | None = typer.Option(None, "--shot", help="Record runtime browser video to FILE (.mp4 requires ffmpeg)"),
-    bot: str | None = typer.Option(None, "--bot", help="Run a Python bot script. See spec/engine/runtime.md `## Runtime bot`."),
+    bot: str | None = typer.Option(None, "--bot", help="Run a Python bot script. See spec/engine/index.md#runtime-bot."),
     max_seconds: float | None = typer.Option(None, "--max-seconds", help="Bot mode: override META[max_seconds]. Default 10."),
     logs: bool = typer.Option(False, "--logs", help="Show runtime server logs"),
     status: bool = typer.Option(False, "--status", help="Show tracked server status"),
@@ -1218,9 +1261,9 @@ def run(
     log_file = _server_log_path(project_path, port)
     runtime_token = secrets.token_hex(16)
 
-    # Start screenshot broker before server so we can pass the port via env.
-    _screenshot_broker = _start_screenshot_broker()
-    _screenshot_port = _screenshot_broker.server_address[1]
+    # Start Playwright broker before server so we can pass the port via env.
+    _playwright_broker = _start_playwright_broker()
+    _playwright_port = _playwright_broker.server_address[1]
 
     proc = _start_server_process(
         project_path,
@@ -1229,7 +1272,7 @@ def run(
         log_file=log_file,
         detached=False,
         runtime_token=runtime_token,
-        screenshot_port=_screenshot_port,
+        playwright_port=_playwright_port,
     )
     _write_server_info(
         project_path,
@@ -1315,14 +1358,14 @@ def run(
                 )
             context = browser.new_context(**context_kwargs)
             page = context.new_page()
-            page.goto(
+            from cli.runtime_clock import RuntimeClock
+            runtime_clock = RuntimeClock(page)
+            runtime_clock.load(
                 _runtime_page_url(
                     url, runtime_token, activate=activate,
                     physics_debug=physics_debug, renderer=renderer, fps=fps, extra=_passthrough_params,
                 ),
-                wait_until="domcontentloaded",
             )
-            page.wait_for_function("window.__vibegame_ready === true", timeout=30000)
             print(f"Runtime session connected ({mode_label}, {browser_label}). Runtime API ready.")
             if activate:
                 print("Runtime control active: paused at frame 0.")
@@ -1339,17 +1382,19 @@ def run(
                         max_seconds,
                         server_url=url,
                         out_dir=_bot_out_dir,
+                        wait=lambda seconds: _wait_with_runtime(seconds, page, runtime_clock, _playwright_broker),
                     )
                 else:
                     stop = threading.Event()
                     signal.signal(signal.SIGINT, lambda *_: stop.set())
                     signal.signal(signal.SIGTERM, lambda *_: stop.set())
                     while not stop.is_set():
-                        _drain_queues(page)
-                        stop.wait(timeout=0.3)
+                        delay = _drain_queues(page, runtime_clock, _playwright_broker)
+                        page.wait_for_timeout(delay * 1000)
             except KeyboardInterrupt:
                 pass
             finally:
+                runtime_clock.close()
                 saved_shot = None
                 try:
                     saved_shot = _finalize_shot(page, context, shot_path, _shot_work_dir(project_path))
@@ -1373,7 +1418,7 @@ def run(
                 # server, so cleanup still runs.
                 raise typer.Exit(_bot_exit_code)
     finally:
-        _screenshot_broker.shutdown()
+        _playwright_broker.shutdown()
         _stop_server_process(proc, host, port)
         _remove_server_info(project_path, port)
 

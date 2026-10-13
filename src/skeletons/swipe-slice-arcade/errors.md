@@ -96,7 +96,7 @@ DOM HUD elements were authored assuming a real-art project instead of using CSS-
 ### Fix
 Render DOM-only status indicators (badges, icons) with pure CSS (background-color / border / clip-path), not `<img>` tags pointing at unregistered paths. Reserve `<img>` for manifest-registered keys only.
 
-**Spec update**: `scripts/GameController.js` HUD builder; `.vibegame/spec/engine/ui.md`.
+**Spec update**: `scripts/GameController.js` HUD builder; `.vibegame/spec/engine/index.md#ui`.
 
 ---
 
@@ -114,7 +114,7 @@ Visual/collider/depth facts the engine already supports declaring (`visual.width
 ### Fix
 When the value is genuinely per-instance-type (a roster of distinct sizes/hitboxes), author one `.node.json` template per distinct value set rather than a shared template with a script-computed override. When the value is a single fixed constant, declare it directly in the template/config and delete the imperative override. Never let a script re-derive a value the engine could have declared, even when the numbers currently happen to agree.
 
-**Spec update**: `.vibegame/spec/engine/collision-guide.md`; `.vibegame/spec/engine/animation-guide.md`; this skeleton's per-type `.node.json` templates.
+**Spec update**: `.vibegame/spec/engine/index.md#collisions`; `.vibegame/spec/engine/index.md#animation`; this skeleton's per-type `.node.json` templates.
 
 ---
 
@@ -132,7 +132,7 @@ Feel-affecting numeric bounds (not pure math identities/clamps) were added direc
 ### Fix
 Every gameplay/physics/visual-sizing/hitbox/spawn-timing/HUD-placement/animation-timing number that is not a pure math identity or clamp boundary belongs in exactly one config surface (the owning node's inline `config`, or a named shared config for values read by more than one node/script). Scripts read it directly and fail loudly if it is missing or invalid — no second literal default living in the script.
 
-**Spec update**: `scenes/main.scene.json`; `config/fruit-roster.json`; `.vibegame/spec/engine/script-rules.md`.
+**Spec update**: `scenes/main.scene.json`; `config/fruit-roster.json`; `.vibegame/spec/engine/index.md#scripts`.
 
 ---
 
@@ -150,7 +150,7 @@ A directory was duplicated (rename/copy) during earlier iteration and the stale 
 ### Fix
 Keep exactly one authoritative `.node.json` template directory; `trash` (not `rm`) any duplicate and record it in the project's `.deleted` file.
 
-**Spec update**: `.vibegame/spec/engine/entity-guide.md`.
+**Spec update**: `.vibegame/spec/engine/index.md#nodes`.
 
 ---
 
@@ -168,4 +168,4 @@ The background node is positioned at screen center, but its manifest entry omits
 ### Fix
 For a full-screen image positioned at screen center, declare manifest `pivot: [0.5, 0.5]`. Keep scene position, display width, and display height aligned to the logical screen. Do not compensate with a second color layer or an unexplained position offset.
 
-**Spec update**: `assets/manifest.json` `bg_dojo_backdrop`; `.vibegame/spec/engine/animation-guide.md` pivot cascade.
+**Spec update**: `assets/manifest.json` `bg_dojo_backdrop`; `.vibegame/spec/engine/index.md#animation` pivot cascade.

@@ -54,7 +54,7 @@ When the task uses a worktree:
 Read:
 - `prd.md` as the product contract
 - `plan.md` as the technical contract
-- all references injected for `programmer` (architect listed them in `<task_dir>/context.json`)
+- every file listed under `inject_config.all` and `inject_config.programmer` in `<task_dir>/context.json`
 
 If these sources conflict, do not guess. Query the lead.
 
@@ -70,7 +70,7 @@ Before editing:
 Follow:
 - `prd.md` for behavior
 - `plan.md` for technical shape
-- injected specs for local rules
+- those referenced specs for local rules
 
 Implementation rules:
 - stay inside the agreed scope
@@ -78,28 +78,9 @@ Implementation rules:
 - put tunable values into the owning `node.json:config` by default — long `node.json:config` blocks are fine. Promote to `config/<name>.json` only when more than one node reads the same effective value, or when the value is genuinely project-global (input map, registries). Never hardcode tunables in scripts.
 - keep files focused
 - follow engine script and scene rules
-- follow `.vibegame/spec/engine/ui.md` when building any UI element (CSS / sprite asset / SVG route)
+- follow `.vibegame/spec/engine/index.md#ui` when building any UI element (CSS / sprite asset / SVG route)
 
-**Engine defaults to honor** (these cause most feel-issue bugs when missed, and auditor / reviewer cannot reliably catch them by static review):
-
-Visual:
-- `visual.width` / `visual.height` (or `visual.ratio`) is the declarative size source. Set the size **there once**, in scene / NodeDef JSON. Do NOT manually `setScale()` / `setDisplaySize()` in scripts.
-- Only add runtime scaling when the gameplay mechanic genuinely needs it (charge-up grow, hit shrink, screen-shake squash, etc.). If you cannot name the mechanic that requires it, you do not need it.
-- The most common drift is "I will just scale it in `ready()`" — the value ends up split between scene JSON and script, neither is the source of truth, downstream tuning gets confused.
-
-Collider:
-- omit `width` / `height` → inherits visual's `displayWidth` / `displayHeight` (works for ALL visual types: rect / circle / image / atlas / sprite). Do NOT repeat dimensions when equal.
-- omit `pivot` → inherits visual sprite's resolved origin (cascade ends at `[0.5, 1]`, feet-anchor for ground characters).
-- use `host: "separate"` ONLY when animation frame sizes vary a lot — not as a safety default.
-- box collider stays axis-aligned; setting `rotation` on the gameObject does NOT rotate the collision shape.
-
-Animation:
-- pivot cascade is clip-level > manifest sprite-level > manifest group-level > default `[0.5, 1]`. Set pivot at whichever level matches the visual's intent; do not set it where it isn't needed.
-- `playAnim(name, { restart: false })` keeps the current frame if the same clip is already playing. Pass `restart: true` only when the action genuinely needs to re-trigger from frame 0 (attack restart, re-cast, etc.).
-- never manually step the frame index — `AnimationPlayer` owns frame time.
-- `visual.width` / `visual.height` clamps per-frame bbox size so per-frame size changes do not visually shift the character; `visual.ratio` is the proportional alternative.
-
-For cases not listed here, read `collision-guide.md` / `animation-guide.md`.
+Use `.vibegame/spec/engine/index.md` as the single source for engine behavior, including world-size authoring and the `animations.clips + animator` setup. Do not copy these rules into task-local specs.
 
 ### 5. Validate before handoff
 
@@ -128,10 +109,17 @@ Rules:
 - If you are writing a second round (e.g. auditor pushed back, you fixed and re-ran), append another `# Programmer` section after the auditor's. Order in the file is the order of work.
 - No timestamps in the header — position implies sequence.
 
-Two report primitives:
-- `vibegame mate report --over "<message>"` — ends your turn so the lead can reply. Use it when (a) the implementation handoff is ready, or (b) you hit a blocker (contract gap, ambiguity, environment issue you cannot resolve) that needs the lead's response before you can continue.
-- `vibegame mate report "<message>"` — sends a message without ending your turn. Use it when the lead pings you mid-work for a status check.
+Two report primitives. Always pass the message through a quoted heredoc, so backticks and `$` in it reach the lead intact:
 
-When the implementation handoff is ready, send `vibegame mate report --over "<message>"` with:
+```bash
+vibegame mate report --over <<'EOF'
+<message>
+EOF
+```
+
+- `--over` — ends your turn so the lead can reply. Use it when (a) the implementation handoff is ready, or (b) you hit a blocker (contract gap, ambiguity, environment issue you cannot resolve) that needs the lead's response before you can continue.
+- no flag — sends a message without ending your turn. Use it when the lead pings you mid-work for a status check.
+
+When the implementation handoff is ready, send `vibegame mate report --over` with:
 - the absolute path to `log.md`
 - a short summary only

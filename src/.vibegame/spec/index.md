@@ -14,18 +14,15 @@ Updated by Architect and Programmer agents as the project grows.
 
 ## Engine
 
-| Doc | File | Default Inject | Description |
-|-----|------|---------------|-------------|
-| Project Setup | engine/project-setup.md | programmer | project.json, manifest, input-map, directory layout, runtime flow |
-| Entity Guide | engine/entity-guide.md | programmer | NodeDef, VisualDef, Node lifecycle, tree ops, MountPoint, AI patterns |
-| Animation Guide | engine/animation-guide.md | selective | visual.animations, animations.clips, animator state machine |
-| Collision Guide | engine/collision-guide.md | selective | ColliderDef, trackCollider/trackOverlap, Collider child node, events |
-| Script Rules | engine/script-rules.md | programmer + auditor | File structure, import rules, common mistakes, pitfalls |
-| Modules | engine/modules.md | selective | `modules/` reusable Node scripts, `Module` suffix routing, subclassing |
-| Tilemap Guide | engine/tilemap-guide.md | selective | Tileset/tilemap formats + TileMap Node API |
-| Rastermap | contracts/rastermap.md | selective | One-PNG-with-explicit-colliders map pattern, landmark schema, artist/programmer/player workflow |
-| Runtime | engine/runtime.md | programmer + player + reviewer | startup, parameters, control API, bot testing, evidence, shutdown |
-| Engine Internals | engine/engine-internals.md | — | SceneTree internals + PhaserHost (engine integration only, not for game agents) |
+| Guide | File | Scope |
+|---|---|---|
+| Game development | [engine/index.md](engine/index.md) | Project, Node, world size, collision, animation, children, modules, UI, assets and runtime verification |
+| Tilemaps and tilesets | [engine/tilemap-guide.md](engine/tilemap-guide.md) | Semantic grid data, tileset registration and TileMap API |
+| Game deployment | [engine/deployment.md](engine/deployment.md) | Release payload, URLs and hosting |
+
+The main guide is the default engine reference. It is not an index of additional
+required engine manuals. Production-specific role handoffs live in
+[contracts/index.md](contracts/index.md), including raster maps and prototype/polish.
 
 ---
 

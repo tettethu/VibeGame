@@ -69,7 +69,6 @@ The runtime server reads `apiBaseUrl` when it starts. Restart the runtime after 
 
 #### Orchestrator
 
-- Select this Pattern when a game character or player needs model-generated speech and simple game actions.
 - In `prd.md`, state which character or player uses the model, when the game calls it, what speech and actions it must produce, which outputs may change game state, and what the player sees when the model call fails or returns invalid output.
 
 #### Architect

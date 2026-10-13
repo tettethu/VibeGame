@@ -1,195 +1,70 @@
-# Deployment Guide
+# Game deployment
 
-How vibegame projects go from local dev to production deployment.
+This guide covers packaging a game, not publishing the VibeGame toolkit. Local development and testing are in [the main guide](index.md#runtime-control).
 
----
+## Release payload
 
-## Three Stages
+Run from a Git-backed game project:
 
-| Stage | Tool | Purpose |
-|-------|------|---------|
-| Local dev | `vibegame run` | Serve game page + inject dev config |
-| Release branch | `vibegame release` | Generate pure deployment branch |
-| Server deploy | `git reset --hard origin/release` | Deploy the clean branch |
+~~~sh
+vibegame release --dry-run
+vibegame release
+vibegame release -b prod
+~~~
 
----
+The default destination is the local release branch. A dry run validates and reports the payload without updating that branch. Normal release commits only when its content changes. It does not push or deploy anything.
 
-## Runtime Config Injection
+Default roots are index.html, project.json, config/, scenes/, scripts/ and engine/. Explicitly add other runtime directories, including entities/, modules/ and maps/ when your game uses them:
 
-### The Config Object
-
-`window.__APP_CONFIG__` is the single configuration entry point consumed by the page. It has two fields:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `appBasePath` | string | URL path prefix for sub-path serving (e.g. `/games/trpg/`) |
-| `apiBaseUrl` | string | Business API base URL (e.g. `http://127.0.0.1:3001`) |
-
-### project.json Declaration
-
-```json
-{
-  "runtimeDefaults": {
-    "dev": {
-      "appBasePath": "",
-      "apiBaseUrl": "http://127.0.0.1:3001"
-    },
-    "deploy": {
-      "appBasePath": "",
-      "apiBaseUrl": ""
-    }
-  }
-}
-```
-
-- `dev` block: used by `vibegame run` to inject local development defaults.
-- `deploy` block: used by project's deploy server as baseline, overridable by env vars.
-
-### Injection Flow
-
-```
-project.json.runtimeDefaults.dev
-         |
-         v
-   vibegame run reads dev defaults
-         |
-         v
-   Injects <script>window.__APP_CONFIG__ = {...}</script>
-   before the fallback script in index.html
-         |
-         v
-   index.html fallback: window.__APP_CONFIG__ = window.__APP_CONFIG__ || { appBasePath: '', apiBaseUrl: '' }
-         |
-         v
-   boot.js reads __APP_CONFIG__.appBasePath -> resolves project resource URLs
-   game scripts read __APP_CONFIG__.apiBaseUrl -> constructs API request URLs
-```
-
-For deploy servers, the flow is the same but reads `runtimeDefaults.deploy` and layers env vars (`APP_BASE_PATH`, `API_BASE_URL`) on top.
-
-### API URL Priority
-
-When game scripts construct API request URLs, the resolution order is:
-
-1. **URL query `?serverUrl=`** - emergency runtime override
-2. **Scene config `serverUrl`** - per-scene override
-3. **`window.__APP_CONFIG__.apiBaseUrl`** - injected from project.json
-4. **`location.origin + appBasePath`** - same-origin fallback
-
-### Resource Path Resolution
-
-`boot.js` resolves project resource URLs through `engine/url.js`:
-
-- `resourceUrl('project.json')` -> `${appBasePath}/project.json`
-- `resourceUrl('config/player.json')` -> `${appBasePath}/config/player.json`
-- `assetUrl('ui/icon_heart.svg')` -> `${appBasePath}/assets/ui/icon_heart.svg`
-
-`appBasePath` is the only project path prefix. `vibegame run` intentionally does not provide a `/game/...` alias, so static previews and normal deployment catch the same path bugs.
-
-### index.html Template
-
-The HTML template has two key elements:
-
-1. **Fallback config script** (before `</head>`):
-```html
-<script>window.__APP_CONFIG__ = window.__APP_CONFIG__ || { appBasePath: '', apiBaseUrl: '' }</script>
-```
-The `||` idiom means: keep server-injected values if present, otherwise use empty-string defaults.
-
-2. **Dynamic boot import** (in `<body>`):
-```html
-<script type="module">
-  const cfg = window.__APP_CONFIG__ || {}
-  const base = String(cfg.appBasePath || '').replace(/\/+$/, '')
-  const { boot } = await import(`${base}/engine/boot.js`)
-  boot(document.getElementById('game-container'))
-</script>
-```
-
----
-
-## Release Branch Generation
-
-### Overview
-
-`vibegame release` generates a pure deployment branch containing only runtime-needed files.
-
-```bash
-vibegame release              # generate/update 'release' branch
-vibegame release --dry-run    # validate without writing
-vibegame release -b prod      # custom branch name
-```
-
-### What Goes Into Release
-
-**Default runtime roots** (always included):
-- `index.html`, `project.json`
-- `config/`, `scenes/`, `scripts/`, `engine/`
-
-**Project-specific extras** via `project.json.releaseExtraRoots`:
-```json
+~~~json
 {
   "releaseExtraRoots": [
+    "entities/",
+    "modules/",
+    "maps/",
     "server/package.json",
     "server/package-lock.json",
     "server/src/"
   ]
 }
-```
+~~~
 
-**Manifest-selected assets**: every file in `project.json.manifests` plus files referenced by the final merged entries. Entry `path` and `image` values resolve relative to their manifest directory. Later manifests override earlier entries with the same key.
+List only files/directories needed by the shipped game. Do not add whole asset directories to releaseExtraRoots to bypass manifest selection.
 
-### What Does NOT Go Into Release
+Every manifest listed in project.json.manifests is included, together with the files referenced by the final merged entries. Later manifests override earlier keys. Entry path and image values resolve relative to their own manifest. If manifests is omitted, the default is ["assets/manifest.json"].
 
-- `.claude/`, `.codex/`, `.vibegame/` (dev tooling)
-- `assets/artifacts/` (build intermediates)
-- Tests, saves, screenshots, task docs
+Missing referenced files or references into assets/artifacts/ fail the release. Dev tooling, task documents, screenshots, tests and unreferenced asset files are not part of the normal payload. Never put private keys into runtime files.
 
-### Asset Rules
+The command uses a temporary worktree; it does not switch the source branch. Do not keep the destination branch checked out in another worktree while regenerating it. Release needs a source branch, not detached HEAD.
 
-- Assets are collected from `project.json.manifests`, defaulting to `["assets/manifest.json"]`.
-- Do not add whole asset subdirectories to `releaseExtraRoots`.
-- Manifest entries pointing into `assets/artifacts/` cause immediate failure (fail-fast).
-- Missing referenced asset files cause immediate failure.
-- Force-add is used to include assets that are `.gitignore`d in the source repo.
+## URLs and hosting
 
-### Git Strategy
+Keep the initialized index.html boot entry. Serve the generated branch over HTTP; it needs no frontend build step. A game with a custom backend still needs that backend installed and started by its deployment environment.
 
-1. Creates a temporary git worktree (no pollution of dev branch).
-2. Clears everything except `.git` in the worktree.
-3. Copies allowlisted runtime roots and manifest assets.
-4. Writes a release-specific `.gitignore`.
-5. Commits only if content changed (idempotent).
+window.__APP_CONFIG__ supplies two independent values:
 
-### Release Commit Message
+Field -> Purpose:
+- appBasePath: Project resource prefix, e.g. /games/demo
+- apiBaseUrl: Business API base URL; empty means origin-root API paths
 
-```
-release: main@4a9177b
+vibegame run injects project.json.runtimeDefaults.dev. A custom deployment server must implement its own configuration injection, before the boot entry; runtimeDefaults.deploy is available as project data, not an automatic server.
 
-source: main
-sha: 4a9177b...
-assets: 12
-```
+~~~json
+{
+  "runtimeDefaults": {
+    "dev": {"appBasePath": "", "apiBaseUrl": "http://127.0.0.1:3001"},
+    "deploy": {"appBasePath": "/games/demo", "apiBaseUrl": "https://api.example.com"}
+  }
+}
+~~~
 
-### Failure Conditions
+From scripts/, import helpers from ../engine/url.js:
 
-| Condition | Exit Code |
-|-----------|-----------|
-| Not a game project (no project.json) | 1 |
-| manifest.json missing or invalid | 2 |
-| Referenced asset file missing | 3 |
-| Manifest entry points to artifacts/ | 4 |
-| Release branch in active worktree | 1 |
-| Detached HEAD | 1 |
+Helper -> Example result:
+- resourceUrl('config/input-map.json'): /games/demo/config/input-map.json
+- assetUrl('ui/heart.svg'): /games/demo/assets/ui/heart.svg
+- apiUrl('api/save'): https://api.example.com/api/save
 
-### Deploy Server Workflow
+Use resourceUrl/assetUrl for project files and apiUrl for business endpoints. There is no /game alias. apiUrl does not automatically prepend appBasePath. Query-string or per-scene serverUrl overrides are not a general engine rule.
 
-On the server:
-
-```bash
-git fetch origin
-git reset --hard origin/release
-# restart server if needed
-```
-
-The release branch is directly deployable - no build step required.
+Before publishing, test the release payload at its actual URL prefix and check network failures, all scenes, dynamically spawned entities and DOM assets. Push the release branch and update the host only when the user requests it.

@@ -1,6 +1,188 @@
-# Tilemap Contract
+# Map Contract
 
-## Pattern 1: tilemap
+Map production and integration, including terrain layout, map assets, and collision.
+
+## Pattern 1: image-first
+
+### When to use
+
+Use when a level / arena is one bespoke image, not reusable tiles:
+- side-view arena
+- boss room
+- fixed-screen platform slice
+- hand-painted top-down room with explicit collision
+
+Do not use for reusable tile grids or procedural room layouts; use the [`tilemap` Pattern](#pattern-3-tilemap).
+
+### Scrolling maps
+
+A scrolling camera (side-scroller, vertical descent) is still rastermap, but the background must cover everywhere the camera can reach — not just the first screen.
+
+- Anchor the image at the scroll-start edge: set its manifest `pivot` to that edge (`[0, 0.5]` for horizontal scroll, `[0.5, 0]` for vertical), then place the node at 0 on the scroll axis and at the canvas centerline on the other axis. Coverage then extends in the scroll direction. Example, a vertical shaft on a 1280-wide canvas: `pivot: [0.5, 0]` with `config: { x: 640, y: 0 }` covers y from 0 downward.
+- If one image is not long enough, lay several background nodes end-to-end — repeat the same image, or commission more segments from artist. Never stretch a single image to make up the distance; it only blurs.
+
+### Responsibility
+
+#### Orchestrator
+
+- Name required landmarks: ground line, platform bboxes, wall bounds, arena bounds, and kill zones if needed.
+
+#### Artist
+
+- Produce one background PNG that includes the visible terrain.
+- Estimate required landmarks with `vibegame art label` and VLM confirmation.
+- Write final landmark estimates into `assets/manifest.json` under the image asset's `landmark` block.
+- Do not write scene JSON.
+
+##### Workflow
+
+1. Generate
+   - Create the background image with visible terrain, platforms, walls, and bounds.
+2. Package
+   - Register the image in `assets/manifest.json`.
+   - Add `landmark.markY`, `landmark.markX`, and `landmark.bbox` entries for requested terrain features.
+3. Verify
+   - Use `vibegame art label` overlays plus VLM yes/no checks until each landmark is visually aligned.
+
+#### Architect
+
+- Read the manifest `landmark` block.
+- Convert source-image pixel landmarks to world-space collider positions.
+- Plan invisible static colliders only; terrain art stays in the background image.
+- If required landmarks are missing, report `[MISSING LEAD DECISION] rastermap landmarks: <list>` or `[ASSETS GAP] <asset/key>` as appropriate.
+
+#### Programmer
+
+- Add the background image node.
+- Add map colliders as `script: "Collider"` nodes with `collider.body: "static"` and no `visual` field.
+- Do not add visible rect / circle / image placeholders for map collision.
+- Keep collider names stable so player can tune them at runtime.
+
+Example invisible raster-map colliders:
+
+```json
+{
+  "name": "Ground",
+  "script": "Collider",
+  "tags": ["ground"],
+  "collider": { "body": "static", "width": 1440, "height": 40 },
+  "config": { "x": 720, "y": 446 }
+},
+{
+  "name": "WallLeft",
+  "script": "Collider",
+  "tags": ["wall"],
+  "collider": { "body": "static", "width": 20, "height": 540 },
+  "config": { "x": 35, "y": 270 }
+}
+```
+
+#### Player
+
+- Run the game and tune collider positions live via Runtime API.
+- Use screenshots plus VLM yes/no checks:
+  - feet on visible ground: on / above / below
+  - platform contact: on / above / below
+  - wall stop: at edge / before / past
+- Persist final collider values to scene JSON after convergence.
+- Save before/after screenshots and VLM verdicts as evidence.
+
+#### Reviewer
+
+- Reject if terrain colliders are visible in normal runtime.
+- Reject if player feet float or sink relative to visible ground / platforms.
+- Reject if wall collision stops before or past the visible wall edge.
+- Use external VLM verdicts for raster alignment checks.
+
+### Manifest and asset boundary
+
+`landmark` metadata is written on the image asset:
+
+```json
+{
+  "forest-arena": {
+    "type": "image",
+    "path": "levels/forest-arena.png",
+    "landmark": {
+      "bbox": {
+        "left-ledge": { "x": 430, "y": 630, "w": 260, "h": 30 }
+      },
+      "markY": {
+        "ground": 840
+      },
+      "markX": {
+        "left-bound": 60,
+        "right-bound": 1860
+      }
+    }
+  }
+}
+```
+
+Rules:
+- `landmark` is metadata for agents; the engine does not consume it.
+- Coordinates are source-image pixels, top-left origin.
+- Colliders are physics-only and invisible in normal runtime: use `script: "Collider"` with a `collider` field and no `visual` field.
+- `vibegame run --debug` may show physics bodies for evidence; do not enable debug visuals in project config.
+- The engine never infers collision from image pixels.
+
+## Pattern 2: sketch-first
+
+> This is an experimental map production method. Its use is encouraged, but consider situations this document may not cover.
+
+### When to use
+
+Use when either condition applies:
+
+1. The map is much larger than a single camera view, with its width or height exceeding twice the corresponding view dimension.
+2. A rough layout description in a prompt is insufficient: the map layout and positions of important visual elements need to be specified precisely before image generation.
+
+This pattern provides finer control over the layout than `image-first`.
+
+### Basic Knowledge
+
+- **Sketch**: A rough visual layout built from flat-colored polygonal placeholders, used as a layout reference for image generation. Each placeholder has a defined meaning and role in the game, with a clear position and approximate size. Distinct colors distinguish elements and convey the intended palette. The sketch directory contains a drawing script, `layout.json` with layout data and element meanings, and the generated `sketch.png`.
+- **Block**: A rectangular region of the complete map, divided according to the specified block dimensions. Each block is generated separately and stitched into its original position. A single-block map contains just one such region.
+- **Core Idea**: Draw a sketch to establish the layout, then use image generation to turn its placeholders into finished art. Use style references to keep elements and visual style consistent. Larger maps can be produced by drawing a complete sketch spanning multiple blocks, such as a 3x3 grid, generating and resizing each block, then stitching the results together.
+- **Error Cases**: Image generation can be unreliable. Minor shifts in element positions or sizes are acceptable, but report an error and suggest that the orchestrator consider another map strategy when:
+
+  1. The generated image fails to follow the sketch layout and cannot meet the game's requirements, such as a chessboard with too few rows or columns.
+  2. The generated image's aspect ratio differs substantially from the sketch's, including a landscape image instead of a portrait image or vice versa.
+
+### Responsibility
+
+#### Orchestrator
+
+- Give `artist` one complete map task, including map requirements, style references, map dimensions, and block dimensions (defaulting to the game's logical dimensions). **Specify which elements belong in the map and which should be produced or implemented separately, to avoid duplication or omissions.**
+- The map's width and height must be integer multiples of the corresponding block dimensions, forming a grid such as 3x3 or 1x3 according to the game's needs.
+
+#### Artist
+
+Follow the Sketch section in `artist.md` and store the map sketch in `assets/sketch/<map_name>/`.
+
+##### Single-Block Workflow
+
+1. Design the layout and draw the map sketch.
+2. Generate the map using the sketch, reference image, and any other helpful reference images. Resize the result to the sketch dimensions if needed.
+3. Deliver the map.
+
+##### Multi-Block Workflow
+
+1. Draw the complete sketch at the full map dimensions, then divide it into blocks. **Do not draw individual block sketches first and combine them afterward.**
+2. Generate each block using its sketch, reference image, and any other helpful reference images. Resize each result to its block sketch dimensions if needed.
+3. Stitch the blocks together and deliver the map.
+
+##### Progressive Report
+
+Map design and implementation are closely coupled. As soon as the sketch is ready, run `vibegame mate report 'Sketch done, see ...'` with the sketch directory path and without `--over`, so the orchestrator can pass it to the architect as an implementation reference while map generation continues.
+
+#### Architect/Programmer
+
+- Refer to the drawing code, layout data, and image in the Artist's sketch directory as useful, and decide how to use them for planning or implementation.
+- Once the generated map is accepted, use the existing rastermap runtime and collider handoff. The engine does not infer collision from sketches or image pixels.
+- Before receiving the sketch, you can develop features that are relatively independent of the map, such as character actions and gameplay systems, using a minimal map, such as a platform, as a test scene.
+
+## Pattern 3: tilemap
 
 ### When to use
 

@@ -35,17 +35,17 @@ The lead spawns you when the first final review begins. You stay alive and only 
 
 # Final Review
 
-> **Stop and report the moment you find any reject-worthy issue. Do NOT keep going down the checklist.** The lead decides the next step; your job is to surface the first blocker fast, not to enumerate every defect.
+> **Act as a picky game QA tester, and stop the moment you find any reject-worthy issue.** Walk the build through three dimensions, **basic → advanced**: Functionality → Visual Quality → Playability; a failure at any earlier dimension makes the later ones irrelevant. Report the first blocker rather than enumerating every defect — the lead decides the next step.
 
-When the lead notifies you that all tasks are done, act as a picky game QA tester. Walk the build through three dimensions, **basic → advanced**: Functionality → Visual Quality → Playability. A failure at any earlier dimension makes the later ones irrelevant — you can stop and report once you have grounds to reject.
+A runtime started with `-b` keeps running after the command returns, so stop each one you started with `vibegame close . --port <N>` before you report your verdict — including when you stop early to reject. `vibegame run --status` lists every background runtime in the project, other agents' included, so close by your own ports and never with `--all`. Never use `pkill` or manual process kills.
 
 ## 1. Dimension 1 — Functionality
 
 The game runs and the goal's user-visible outcome is observable end to end.
 
-- Game loads without console errors (Runtime: `.vibegame/spec/engine/runtime.md`).
+- Game loads without console errors (Runtime: `.vibegame/spec/engine/index.md#runtime-control`).
 - Walk the goal's core loop with `vibegame play`; the user-visible outcome must be reachable.
-- **When ad-hoc `vibegame play` would take many rounds (boss fights, multi-stage flows), author your own short bot under `tests/bot/` and run it via `vibegame run --bot`.** Five lines of `decide()` + 30s of `vibegame run --bot` usually replaces 10+ rounds of agent-loop play; you get `video.webm` + `trace.jsonl` + `result.json` in one shot. Use this on top of any bots player already delivered, not as a replacement. See `.vibegame/spec/engine/runtime.md` `## Runtime bot` for the protocol.
+- **When ad-hoc `vibegame play` would take many rounds (boss fights, multi-stage flows), author your own short bot under `tests/bot/` and run it via `vibegame run --bot`.** Five lines of `decide()` + 30s of `vibegame run --bot` usually replaces 10+ rounds of agent-loop play; you get `video.webm` + `trace.jsonl` + `result.json` in one shot. Use this on top of any bots player already delivered, not as a replacement. See `.vibegame/spec/engine/index.md#runtime-bot` for the protocol.
 - **Run every regression test under `tests/`** (mandatory). Per the contract in `.vibegame/spec/test/index.md`, run each `tests/test_*/test.sh` individually with a port you manage. Triage failures:
   - true regression → reject; the responsible task must fix the code
   - outdated assertion (legitimate behavior change per `prd.md`) → update the assert yourself if the fix is local and obvious; otherwise reject and explain
@@ -124,10 +124,10 @@ Procedure:
 - No clipping / z-fighting: sprites must not clip through walls or flicker between layers.
 - No element / UI overlap: HUD must not cover critical gameplay view; two on-screen sprites must not be stacked into one inseparable blob.
 - No positional issues: player spawn on-stage, UI elements inside the viewport, scene boundaries oriented correctly.
-- **Raster-map collider alignment** (per `.vibegame/spec/contracts/rastermap.md`): for any scene that uses one PNG as the visual map, take a screenshot of the player at rest and ask `vibegame vlm` whether the player's feet are on the visible ground (binary verdict — on, above, or below). Repeat for each platform (player at rest on it) and each wall (player blocked at the visible edge). VLM verdict of "above" or "below" is a reject for Visual Quality.
+- **Raster-map collider alignment** (per `.vibegame/spec/contracts/map.md`): for any scene that uses one PNG as the visual map, take a screenshot of the player at rest and ask `vibegame vlm` whether the player's feet are on the visible ground (binary verdict — on, above, or below). Repeat for each platform (player at rest on it) and each wall (player blocked at the visible edge). VLM verdict of "above" or "below" is a reject for Visual Quality.
 - Overall visual consistency across screens, menus, and gameplay scenes.
 - Art style matches the GDD's art direction.
-- UI elements follow `.vibegame/spec/engine/ui.md` routing — in particular, no `Phaser.Text` for HUD / menu text.
+- UI elements follow `.vibegame/spec/engine/index.md#ui` routing — in particular, no `Phaser.Text` for HUD / menu text.
 - First-impression quality: would a new player understand what they see?
 
 ## 3. Dimension 3 — Playability
@@ -153,7 +153,7 @@ Walk through every item before declaring approve. Any fail -> reject. Do not get
   - `trace.jsonl` — every decision's `{tick, t, action, state}`. Confirms state actually changed across the run, not just frames advanced.
   - `video.webm` — visual proof of gameplay progression.
 
-  Read protocol in `.vibegame/spec/engine/runtime.md` `## Runtime bot`. If `tests/bot/io_basic.py` (or equivalent) ran clean, Runnable passes; if missing or failing, fall back to per-criterion capture below.
+  Read protocol in `.vibegame/spec/engine/index.md#runtime-bot`. If `tests/bot/io_basic.py` (or equivalent) ran clean, Runnable passes; if missing or failing, fall back to per-criterion capture below.
 
   **Per-criterion capture (fallback when no bot, or to supplement)**:
   - Character moves on input: capture player position via Runtime API before and after a movement input, the two positions MUST differ. Pair with a before/after screenshot.
@@ -168,7 +168,9 @@ Walk through every item before declaring approve. Any fail -> reject. Do not get
 
   **When any of these fails**, diagnose in this order: project code (scripts / scene config / input map) -> engine code.
 
-- [ ] **GDD coverage.** Every item under GDD `### Signature Mechanics`, Detailed Design `### System Mechanics`, and `## Art Requirements` has an implementation trace: game code for a mechanic, an `assets/manifest.json` entry for an art item. Existence is the bar — whether it behaves correctly is what Functionality / Visual Quality / Playability already cover. A missing trace is a reject unless `goal.md` `## Done When` excludes it. Do not check `## Core Fantasy`, Design Pillars, or Design Philosophy: not decidable from artifacts.
+- [ ] **GDD coverage.** Every item under GDD `### Signature Mechanics`, Detailed Design `### System Mechanics`, and `## Art Requirements` has an implementation trace: game code for a mechanic, an `assets/manifest.json` entry for an art item. A missing trace is a reject unless `goal.md` `## Done When` excludes it.
+
+  **For any mechanic whose state the player reads in order to decide, the trace is not done until you can point at where it is drawn.** Name the screen and the element in a runtime screenshot. "The code computes it" and "it is in `runtimeState()`" are not answers: a value the player cannot read changes no decision, so the mechanic does not exist for the player.
 
 - [ ] **UI displays correctly** (VLM, ask each as an independent binary question; any NO -> reject).
   - All visible text sits fully inside its container, no clipping, no overflow.
@@ -180,7 +182,7 @@ Walk through every item before declaring approve. Any fail -> reject. Do not get
   - HUD values match game state (HP 80/100 means the bar is drawn at 80%).
   - **No HUD element overlaps another HUD element** (background panels excluded — they're meant to hold other UI). Ask VLM specifically: "Does the nameplate cover any part of the HP bar?" / "Does the buff icon row cover any part of the stamina bar?" / etc. — one binary per adjacent pair. Subtle overlap is a defect.
   - **Symmetric layouts mirror in position and size.** If the game has mirrored left/right HUD (fighting game pattern: both fighters get a nameplate + HP bar + super gauge), confirm both sides are at mirrored on-screen positions with equal sizes. Fill direction may differ; the bar rect must be symmetric.
-  - Counter-example: VLM tends to answer YES to "overall looks good". Constraints come from asking each item as an independent binary.
+  - **Ask the VLM to read the value, not to judge whether it is readable.** "What is the player's fuel level?" fails on a screen where "is the fuel gauge readable?" passes. Do this for every value the player has to read in order to decide.
 
 - [ ] **Map / scene renders correctly** (VLM, one screenshot per scene, each item binary).
   - No missing-texture placeholders (solid magenta blocks, "MISSING" text, default checkerboard).
@@ -216,7 +218,7 @@ git log --oneline -10
 
 Write detailed review notes to `.vibegame/logs/review.md`.
 
-> **WARNING**: `.vibegame/logs/review.md` is not visible to the orchestrator. **You MUST use `vibegame mate report --over "<message>"` to verbally report your final verdict and findings.**
+> **WARNING**: `.vibegame/logs/review.md` is not visible to the orchestrator. **You MUST use `vibegame mate report --over`, with the text in a quoted heredoc (`<<'EOF'`), to verbally report your final verdict and findings.**
 
 Report:
 - the verdict (approve / reject)

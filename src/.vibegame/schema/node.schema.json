@@ -103,6 +103,11 @@
         },
         "width": { "type": "number", "description": "Display width in pixels." },
         "height": { "type": "number", "description": "Display height in pixels." },
+        "ratio": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Uniform multiplier from source pixels to displayed size. Cannot be combined with width or height."
+        },
         "color": {
           "description": "Fill color for rect type. Integer or hex string.",
           "oneOf": [

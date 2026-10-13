@@ -146,6 +146,41 @@ Examples: Mario's jump / Sekiro's parry / Zelda's puzzle-combat -->
 - **Lose condition**: <!-- TODO -->
 - **After win/lose**: <!-- restart / keep progress / outro screen -->
 
+### Player Visible
+
+<!-- What the player must be able to see and read. Not how it is presented:
+animation, layout and effects belong to the artist and the implementer.
+
+Answer per interface — title, shop, combat, map, menus — rather than once for
+the whole game. The same value is often readable on one screen and missing on
+the next, and that gap is invisible to a single flat list.
+
+UI form is yours where form follows mechanic: a segmented health bar and a
+continuous one say different things about the game. A preliminary suggestion is
+a design decision; the final arrangement is not. -->
+
+**Values the player must be able to read**
+
+| Interface | Value | Decision it serves |
+|-----------|-------|--------------------|
+| <!-- TODO --> | <!-- TODO --> | <!-- TODO --> |
+
+**How much of a kind must be visible at once**
+
+| Interface | Content | How many distinct ones together |
+|-----------|---------|---------------------------------|
+| <!-- TODO --> | <!-- TODO --> | <!-- TODO --> |
+
+**Things the player must be told happened**
+
+<!-- State changes the player did not cause: a round advancing, a rival being
+eliminated, a threshold activating, a supply boat arriving. Write what the
+player must know. How they are told is the artist's and implementer's call. -->
+
+| Event | What the player must know |
+|-------|---------------------------|
+| <!-- TODO --> | <!-- TODO --> |
+
 ### Map / Level Design
 
 - **Map type**: <!-- Random / Level-based / Open World -->

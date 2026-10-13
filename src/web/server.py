@@ -2683,7 +2683,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             if not PROJECT_DIR:
                 self.send_error(404, 'No project directory configured')
                 return
-            rel = path[len(PLAY_PREFIX):].lstrip('/')
+            rel = unquote(path[len(PLAY_PREFIX):]).lstrip('/')
             if rel in ('', 'index.html'):
                 body = _play_index_html(PROJECT_DIR)
                 if body is None:
@@ -2987,7 +2987,7 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             if not PROJECT_DIR:
                 self.send_error(404)
                 return
-            rel = path[8:]  # strip '/assets/' -> 'bat/flap.png'
+            rel = unquote(path[8:])  # strip '/assets/' -> 'bat/flap.png'
             file_path = _validate_asset_path(f'assets/{rel}')
             if not file_path or not file_path.is_file():
                 self.send_error(404)

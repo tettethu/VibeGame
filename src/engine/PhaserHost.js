@@ -98,7 +98,7 @@ export class PhaserHost {
       backgroundColor: bgColor,
       transparent: transparent,
       scale: {
-        mode: Phaser.Scale[settings.scaleMode] || Phaser.Scale.FIT,
+        mode: Phaser.Scale[settings.scaleMode] ?? Phaser.Scale.FIT,
         width: logicalW,
         height: logicalH,
         parent: container,

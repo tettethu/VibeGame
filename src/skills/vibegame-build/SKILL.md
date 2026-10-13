@@ -33,7 +33,8 @@ Clarify the goal until it is concrete and actionable. Do not proceed to executio
    - Anything but `NO DEVIATION` goes back to `designer` with the quoted lines. This check is mandatory; your own read of the GDD does not replace it — you wrote the brief it was derived from.
 3. If visual elements are involved:
    - If user does not provide concept/reference image, commission `artist` to produce a **project reference image** (see artist.md → "Reference image"): a restrained single image showing the **actual in-game look** from the GDD (not concept art / mood board / poster), containing only the key elements that belong in the same real gameplay view. Later asset tasks use this image as the reference so generated player, enemy, UI, prop, and scene assets match the approved elements.
-   - The reference image may contradict or extend the GDD. The lead owns the design decision and must unify them before execution: either ask `artist` to redraw the reference to match the GDD, or update the GDD to explicitly accept UI / HUD / layout / prop choices introduced by the reference image.
+   - Establish the GDD before commissioning the reference image. Artist may develop visual details and UI layouts left unspecified by the GDD, but must preserve its established gameplay rules and requirements.
+   - If the generated reference image contradicts or extends the GDD, the lead must reconcile them before execution: either ask `artist` to redraw the reference to match the GDD, or update the GDD to explicitly accept UI / HUD / layout / prop choices introduced by the reference image.
    - Use this reference image to validate visual direction with the user. Iterate until approved.
    - DO NOT specify frame counts or animation details - that is artist's responsibility
 4. Break the goal into macro stages. Each stage should have:

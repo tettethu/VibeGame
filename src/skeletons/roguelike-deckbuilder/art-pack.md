@@ -36,7 +36,7 @@ Reusable raw-asset list for the 1v1 turn-based card-battler sub-genre. Prompts a
 - layout: single frame, opaque, 16:9 horizontal (1024×768 native, target 960×540 canvas)
 
 **Hints**
-- Run the rastermap landmark workflow (see [spec/contracts/rastermap.md](../../.vibegame/spec/contracts/rastermap.md)) to record `ground_y`, `left_bound_x`, `right_bound_x` for explicit ground / wall colliders. The programmer places a horizontal ground collider at `ground_y` so character feet sit on the visible platform.
+- Run the rastermap landmark workflow (see [spec/contracts/map.md](../../.vibegame/spec/contracts/map.md)) to record `ground_y`, `left_bound_x`, `right_bound_x` for explicit ground / wall colliders. The programmer places a horizontal ground collider at `ground_y` so character feet sit on the visible platform.
 
 ## Player
 

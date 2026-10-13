@@ -545,7 +545,7 @@ def cmd_edit(
     inplace: Annotated[bool, typer.Option("--inplace", help="Overwrite original")] = False,
     scale: Annotated[float, typer.Option("-s", "--scale", help="resize: scale factor")] = EditConfig.RESIZE_SCALE,
     width: Annotated[Optional[int], typer.Option("-w", "--width", help="resize: target width")] = None,
-    height: Annotated[Optional[int], typer.Option("-h", "--height", help="resize: target height")] = None,
+    height: Annotated[Optional[int], typer.Option("--height", help="resize: target height")] = None,
     max_edge: Annotated[
         Optional[int],
         typer.Option("--max-edge", help="resize: maximum width or height, never upscale"),

@@ -108,4 +108,4 @@ this._addInvisibleWallRect(corridor.x0 * TS, top, leftW, h)
 
 For map-shape colliders, prefer **tilemap-built collision** (`tile.collision: true` + `getCollisionLayer()`) over hand-placed zones. The tilemap pipeline already handles the boundary↔center conversion correctly. Reserve `invisibleWall` for shape-irregular geometry that can't be expressed as a tile grid (e.g. an arbitrary polygon room).
 
-**Spec update**: Folded into [`contracts/tilemap.md`](../../.vibegame/spec/contracts/tilemap.md) `#### Architect/Programmer` → Common Mistakes §3.
+**Spec update**: Folded into [`contracts/map.md`](../../.vibegame/spec/contracts/map.md) `#### Architect/Programmer` → Common Mistakes §3.

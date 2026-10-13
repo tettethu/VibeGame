@@ -36,7 +36,7 @@ Reusable asset list for the 1v1 boss-slice sub-genre. Prompts assume the project
 - layout: single frame, opaque, ~1.5× camera width for horizontal scroll
 
 **Hints**
-- After generation, run the rastermap landmark workflow (see [spec/contracts/rastermap.md](../../.vibegame/spec/contracts/rastermap.md)) to converge `floor_top_y`, `left_wall_right_x`, `right_wall_left_x`, and any prop bboxes.
+- After generation, run the rastermap landmark workflow (see [spec/contracts/map.md](../../.vibegame/spec/contracts/map.md)) to converge `floor_top_y`, `left_wall_right_x`, `right_wall_left_x`, and any prop bboxes.
 
 ## Player
 

@@ -28,7 +28,7 @@
 
 **Fix:** Use `animationPlayer.isFinished()` for non-loop clips, or use `Animator` transitions with `hasExitTime`. If gameplay sequencing must await an animation, poll the engine `AnimationPlayer` rather than listening for Phaser native animation events.
 
-**Spec update:** `.vibegame/spec/engine/animation-guide.md`, `.vibegame/spec/contracts/dom_card.md`
+**Spec update:** `.vibegame/spec/engine/index.md#animation`, `.vibegame/spec/contracts/dom_card.md`
 
 ## Fixed timeout cuts non-loop animations or adds dead time
 
@@ -38,7 +38,7 @@
 
 **Fix:** Let engine animation metadata decide clip length. For battle sequencing, wait for `animationPlayer.isFinished()` and then return to idle for non-die clips.
 
-**Spec update:** `.vibegame/spec/engine/animation-guide.md`
+**Spec update:** `.vibegame/spec/engine/index.md#animation`
 
 ## Large central fly-out card competes with hand refresh
 

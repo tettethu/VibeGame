@@ -40,7 +40,7 @@ mate_app = typer.Typer(
 
 @mate_app.callback()
 def _mate_callback():
-    _bootstrap()
+    """Keep help available outside a project; handlers bootstrap on execution."""
 
 
 def _exit(rc: int) -> None:
@@ -56,4 +56,5 @@ def cmd_report(
     wait: bool = typer.Option(False, "--wait", help="Turn done but background jobs still running; status -> waiting."),
 ):
     """Send a progress or completion report from a mate back to the lead."""
+    _bootstrap()
     _exit(_mate_main.cmd_report(SimpleNamespace(content=content, name=name, over=over, wait=wait)))

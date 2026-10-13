@@ -1,13 +1,12 @@
 """
 VLM (Vision Language Model) query tool.
 
-Uses the openai-compatible SDK. Works with any provider that exposes an
-OpenAI chat completions endpoint with vision support.
+Uses the OpenAI-compatible Chat Completions API. Configure the endpoint, API key, and model explicitly; image queries require vision support.
 
 Environment variables (read from .env):
-    VLM_BASE_URL    - API endpoint (e.g. https://api.openai.com/v1)
+    VLM_BASE_URL    - API base URL
     VLM_API_KEY     - API key
-    VLM_MODEL       - default model id (optional)
+    VLM_MODEL       - user-configured model id (required unless --model is passed)
 """
 
 from openai import OpenAI
@@ -23,8 +22,6 @@ from PIL import Image
 from util.prompt import load_prompt
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
-
-DEFAULT_MODEL = "gemini-3-flash-preview"
 
 BACKGROUND_COLORS: dict[str, tuple[int, int, int]] = {
     "white": (255, 255, 255),
@@ -144,7 +141,7 @@ def ask_vlm(
         image_paths: Local paths, URLs, or folder paths (folders are expanded).
         prompt: User question text, or path to a .txt/.md file.
         system: Optional system prompt (role, format, persona). Also supports file path.
-        model: Model id. Defaults to VLM_MODEL env var or DEFAULT_MODEL.
+        model: User-configured model id. Overrides VLM_MODEL; one is required.
         api_key: Defaults to VLM_API_KEY env var.
         base_url: Defaults to VLM_BASE_URL env var.
         timeout: HTTP timeout in seconds.
@@ -157,7 +154,11 @@ def ask_vlm(
     prompt = load_prompt(prompt, label="prompt")
     if system:
         system = load_prompt(system, label="system prompt")
-    model = model or os.environ.get("VLM_MODEL") or DEFAULT_MODEL
+    if model is None:
+        model = os.environ.get("VLM_MODEL")
+    if model is None or not model.strip():
+        raise ValueError("VLM model is required. Set VLM_MODEL or pass a non-empty --model.")
+    model = model.strip()
     api_key = api_key or os.environ.get("VLM_API_KEY")
     base_url = base_url or os.environ.get("VLM_BASE_URL")
 
@@ -215,12 +216,12 @@ def cmd_vlm(
     images: Annotated[List[str], typer.Option("-i", "--image", help="Image path, URL, or folder (repeatable)")] = [],
     text: Annotated[str, typer.Option("-t", "--text", help="User prompt text or path to a .txt/.md file")] = "",
     system: Annotated[Optional[str], typer.Option("-s", "--system", help="System prompt: role/format/persona (text or file path)")] = None,
-    model: Annotated[Optional[str], typer.Option("-m", "--model", help="Model id (default: VLM_MODEL or gemini-3-flash-preview)")] = None,
+    model: Annotated[Optional[str], typer.Option("-m", "--model", help="Model ID (overrides VLM_MODEL)")] = None,
     add_background: Annotated[Optional[str], typer.Option("--add-background", help="Composite local images onto a background before sending: white, black, magenta, #RRGGBB, or R,G,B")] = None,
 ):
     """Ask a VLM (text-only or with images).
 
-    Requires env vars VLM_BASE_URL and VLM_API_KEY (any OpenAI-compatible endpoint).
+    Requires VLM_BASE_URL and VLM_API_KEY. Set the model via VLM_MODEL or --model.
 
     Examples:
       vibegame vlm -t "what is the best pixel size for a platformer sprite?"
