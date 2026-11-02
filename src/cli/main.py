@@ -871,13 +871,32 @@ def check(
         print("Project check\n\nUsage: vibegame check [PROJECT] [--api]\nValidates project.json, scenes, manifests, scripts, input-map. --api also runs paid VLM and image generation smoke checks.")
         return
 
-    from cli.check import check_project, print_report
     project_path = target
     if not (project_path / "project.json").exists():
         print(f"Error: {project_path} is not a game project (no project.json)")
         raise typer.Exit(1)
 
     print(f"Checking {project_path} ...")
+    from cli.godot import find_godot_binary, is_godot_project
+
+    if is_godot_project(project_path):
+        from cli.godot_check import check_godot_project
+
+        godot_issues = check_godot_project(
+            project_path, godot_bin=find_godot_binary()
+        )
+        for issue in godot_issues:
+            print(str(issue))
+        errors = [issue for issue in godot_issues if issue.level == "error"]
+        warnings = [issue for issue in godot_issues if issue.level == "warning"]
+        if not godot_issues:
+            print("Godot project check passed.")
+        else:
+            print(f"\n{len(errors)} error(s), {len(warnings)} warning(s).")
+        raise typer.Exit(1 if errors else 0)
+
+    from cli.check import check_project, print_report
+
     issues = check_project(project_path)
     exit_code = print_report(issues)
     if api:

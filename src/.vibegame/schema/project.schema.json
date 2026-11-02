@@ -18,8 +18,8 @@
     },
     "engine": {
       "type": "string",
-      "pattern": "^vibegame@",
-      "description": "Engine identifier (e.g. vibegame@0.1.0)."
+      "pattern": "^(vibegame|godot)@\\d+\\.\\d+\\.\\d+$",
+      "description": "Engine identifier (e.g. vibegame@0.1.0 or godot@4.7.2)."
     },
     "settings": {
       "type": "object",

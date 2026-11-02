@@ -108,6 +108,23 @@ vibegame run --port auto
 vibegame close
 ```
 
+### Godot (experimental)
+
+A Godot 4 companion sits beside the Phaser workflow. It has its own scaffold,
+runtime bridge and checks, and `vibegame play` works against it unchanged:
+
+```sh
+mkdir my-godot-game && cd my-godot-game
+vibegame godot init --name "My Godot Game"
+vibegame godot check
+vibegame godot run --port auto
+vibegame play screenshot -o /tmp/shot.png
+vibegame close
+```
+
+The multi-agent build workflow and art pipeline are still Phaser-only. See
+[docs/GODOT.md](docs/GODOT.md) for the runtime protocol and current limits.
+
 ## VibeGame Dashboard
 
 We provide a web dashboard for interacting more freely with the agent team and manually editing game properties.
@@ -127,7 +144,8 @@ We provide a web dashboard for interacting more freely with the agent team and m
 
 - [x] Release the VibeGame technical report
 - [x] Open-source the Phaser-based VibeGame implementation
-- [ ] Add Godot support
+- [x] Add Godot support (experimental CLI: `vibegame godot`)
+- [ ] Integrate Godot with the multi-agent build workflow
 - [ ] Add Unity support
 - [ ] Expand VibeGame from 2D to end-to-end 3D game creation
 
