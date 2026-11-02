@@ -1,0 +1,11 @@
+# Godot import cache and generated files
+.godot/
+export/
+*.translation
+
+# VibeGame runtime state
+.vibegame/logs/
+.env
+
+# OS noise
+.DS_Store

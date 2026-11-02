@@ -88,6 +88,16 @@ def _normalize_fps(value: int | None) -> int | None:
 SOURCE_ENGINE_DIR = Path(__file__).resolve().parent.parent / "engine"
 
 
+def _project_engine(project_path: Path) -> str:
+    """Read project.json's engine id without assuming the file is valid."""
+    try:
+        data = json.loads((project_path / "project.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ""
+    value = data.get("engine")
+    return value if isinstance(value, str) else ""
+
+
 def _engine_fallback_warning(project_path: Path) -> list[str]:
     if (project_path / "engine").is_dir():
         return []
@@ -1079,6 +1089,10 @@ def run(
     project_path = Path(path).resolve()
     if not project_path.is_dir():
         print(f"Error: Path does not exist or is not a directory: {project_path}")
+        raise typer.Exit(1)
+
+    if _project_engine(project_path).startswith("godot@"):
+        print("Error: this is a Godot project. Use `vibegame godot run` instead of `vibegame run`.")
         raise typer.Exit(1)
 
     resolved_port = _resolve_runtime_port(port, host)
