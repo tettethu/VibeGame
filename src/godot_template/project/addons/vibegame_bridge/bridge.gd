@@ -182,7 +182,9 @@ func _service_connection() -> void:
 func _flush_pending_events() -> void:
 	# One event per frame keeps press/release visible to per-frame input
 	# polling (`Input.is_action_just_pressed`, Button release handling).
-	if _pending_events.is_empty():
+	# Paused nodes drop input, so events wait until `continue` or `play`
+	# advances frames.
+	if _pending_events.is_empty() or get_tree().paused:
 		return
 	var event: InputEvent = _pending_events.pop_front()
 	Input.parse_input_event(event)

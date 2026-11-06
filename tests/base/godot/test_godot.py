@@ -131,6 +131,69 @@ def test_check_treats_a_failed_boot_as_an_error(tmp_path: Path) -> None:
     ), issues
 
 
+def _node_state(snapshot: dict, name: str) -> dict:
+    """Return the `vibegame_state()` of the first snapshot node called `name`."""
+    stack = [snapshot["snapshot"]["root"]]
+    while stack:
+        node = stack.pop()
+        if node["name"] == name:
+            return node["state"]
+        stack.extend(node.get("children", []))
+    raise AssertionError(f"no node {name!r} in snapshot")
+
+
+@pytest.mark.skipif(find_godot_binary() is None, reason="Godot is not installed")
+def test_click_sent_while_paused_reaches_the_game_once_frames_advance(tmp_path: Path) -> None:
+    """A click sent during runtime control reaches event-driven game code when `continue` advances frames.
+
+    Target: bridge input queue, addons/vibegame_bridge/bridge.gd: _cmd_click() -> _flush_pending_events(), driven through src/cli/godot_runtime.py: BridgeClient and _continue_and_wait().
+    Input: a scaffold whose `scenes/main.tscn` uses `scripts/clicker.gd`, which counts left presses in `_unhandled_input()` and reports `clicks` from `vibegame_state()`. Real Godot runs headless with the bridge. Commands: `activate`, `click` at (10, 10), then `continue` 5 frames.
+    Expect: `clicks` is 0 right after the click while the game is paused, and 1 after the 5 frames.
+    """
+    import os
+    import subprocess
+
+    from cli.godot_runtime import _continue_and_wait, _free_port
+
+    project = _init_project(tmp_path)
+    (project / "scripts" / "clicker.gd").write_text(
+        "extends Node2D\n"
+        "var clicks := 0\n"
+        "func _unhandled_input(event: InputEvent) -> void:\n"
+        "\tif event is InputEventMouseButton and event.pressed:\n"
+        "\t\tclicks += 1\n"
+        "func vibegame_state() -> Dictionary:\n"
+        '\treturn {"clicks": clicks}\n',
+        encoding="utf-8",
+    )
+    (project / "scenes" / "main.tscn").write_text(
+        '[gd_scene load_steps=2 format=3]\n\n'
+        '[ext_resource type="Script" path="res://scripts/clicker.gd" id="1"]\n\n'
+        '[node name="Main" type="Node2D"]\nscript = ExtResource("1")\n',
+        encoding="utf-8",
+    )
+    port = _free_port()
+    env = {key: value for key, value in os.environ.items() if key != "VIBEGAME_GODOT_CHECK"}
+    process = subprocess.Popen(
+        [find_godot_binary(), "--headless", "--path", str(project), "--", f"--vibegame-bridge={port}"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        env=env,
+    )
+    client = BridgeClient(port=port, timeout=10)
+    try:
+        client.wait_ready(timeout=45, process=process)
+        client.call("activate")
+        client.call("click", x=10, y=10)
+        assert _node_state(client.call("snapshot"), "Main")["clicks"] == 0
+        _continue_and_wait(client, 5)
+        assert _node_state(client.call("snapshot"), "Main")["clicks"] == 1
+    finally:
+        client.close()
+        process.terminate()
+        process.wait(timeout=10)
+
+
 class _FakeBridge:
     """One-connection fake of the Godot bridge protocol."""
 
