@@ -137,3 +137,58 @@ def test_bridge_client_surfaces_bridge_errors() -> None:
                 client.call("set", nodeId="Main", path="x", value=1)
         finally:
             client.close()
+
+
+class _RecordingClient:
+    """Stands in for BridgeClient behind the HTTP adapter and records every command."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict]] = []
+
+    def call(self, command: str, **params) -> dict:
+        self.calls.append((command, params))
+        return {"ok": True, "result": 2}
+
+
+def test_runtime_api_refuses_browser_requests(tmp_path: Path) -> None:
+    """The runtime API refuses any request that carries an `Origin` header and never forwards it to the game.
+
+    Target: Godot runtime HTTP adapter, src/cli/godot_runtime.py: _make_handler() -> Handler._dispatch().
+    Input: a real ThreadingHTTPServer with the adapter handler and a recording bridge client. Requests: POST `/api/runtime/eval` with `Origin: https://evil.example`, the same POST without `Origin`, and OPTIONS `/api/runtime/eval` with `Origin`.
+    Expect: the POST with `Origin` gets 403 and the client records no call. The POST without `Origin` gets 200 with result 2, and the client records exactly one `eval` call with code "1 + 1". No response has an `Access-Control-Allow-Origin` header. OPTIONS gets 501 (unsupported method), so a browser preflight cannot succeed.
+    """
+    import http.client
+    from http.server import ThreadingHTTPServer
+
+    from cli.godot_runtime import _make_handler
+
+    client = _RecordingClient()
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(client, tmp_path))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    def request(method: str, headers: dict[str, str]) -> http.client.HTTPResponse:
+        connection = http.client.HTTPConnection("127.0.0.1", server.server_address[1], timeout=5)
+        body = json.dumps({"code": "1 + 1"}) if method == "POST" else None
+        connection.request(method, "/api/runtime/eval", body=body, headers={"Content-Type": "application/json", **headers})
+        response = connection.getresponse()
+        response.read()
+        connection.close()
+        return response
+
+    try:
+        browser = request("POST", {"Origin": "https://evil.example"})
+        assert browser.status == 403
+        assert client.calls == []
+
+        cli = request("POST", {})
+        assert cli.status == 200
+        assert client.calls == [("eval", {"code": "1 + 1"})]
+
+        preflight = request("OPTIONS", {"Origin": "https://evil.example"})
+        assert preflight.status == 501
+        for response in (browser, cli, preflight):
+            assert response.getheader("Access-Control-Allow-Origin") is None
+    finally:
+        server.shutdown()
+        server.server_close()

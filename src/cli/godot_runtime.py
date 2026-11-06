@@ -160,7 +160,6 @@ def _make_handler(client: BridgeClient, project: Path):
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(body)
 
@@ -168,17 +167,8 @@ def _make_handler(client: BridgeClient, project: Path):
             self.send_response(200)
             self.send_header("Content-Type", "image/png")
             self.send_header("Content-Length", str(len(payload)))
-            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(payload)
-
-        def do_OPTIONS(self) -> None:
-            self.send_response(204)
-            self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
-            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-            self.send_header("Content-Length", "0")
-            self.end_headers()
 
         def do_GET(self) -> None:
             self._dispatch("GET")
@@ -187,6 +177,14 @@ def _make_handler(client: BridgeClient, project: Path):
             self._dispatch("POST")
 
         def _dispatch(self, method: str) -> None:
+            # `eval` can run arbitrary code in the game process. Browsers attach
+            # `Origin` to cross-site requests and the CLI never does, so refusing
+            # it keeps web pages from driving the runtime.
+            origin = self.headers.get("Origin")
+            if origin is not None:
+                self.close_connection = True  # the unread request body must not reach the next request
+                self._send_json({"error": f"browser requests are not accepted (Origin: {origin})"}, status=403)
+                return
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path.rstrip("/") or "/"
             query = urllib.parse.parse_qs(parsed.query)
