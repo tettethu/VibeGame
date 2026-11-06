@@ -115,6 +115,33 @@ def require_godot_binary(explicit: str | None = None) -> str:
     raise typer.Exit(1)
 
 
+IMPORT_TIMEOUT_S = 300
+
+
+class GodotImportError(RuntimeError):
+    """`godot --import` failed or did not finish."""
+
+
+def import_assets(binary: str, project_path: Path) -> None:
+    """Import new or changed assets, as the editor does when it opens the project.
+
+    A project launched from the command line never imports, so an image added
+    since the last import fails to load with "No loader found for resource".
+    """
+    command = [binary, "--headless", "--path", str(project_path), "--import"]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=IMPORT_TIMEOUT_S)
+    except subprocess.TimeoutExpired as exc:
+        raise GodotImportError(
+            f"asset import did not finish within {IMPORT_TIMEOUT_S}s: {' '.join(command)}"
+        ) from exc
+    if result.returncode != 0:
+        tail = ((result.stdout or "") + (result.stderr or "")).strip().splitlines()[-5:]
+        raise GodotImportError(
+            f"asset import exited {result.returncode}: {' '.join(command)}\n" + "\n".join(tail)
+        )
+
+
 def godot_version(binary: str) -> tuple[int, int, int] | None:
     try:
         result = subprocess.run(

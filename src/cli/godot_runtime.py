@@ -352,7 +352,11 @@ def serve(
     background: bool,
 ) -> int:
     """Launch Godot and expose the runtime API until the game exits."""
+    from cli.godot import import_assets
+
     project_path = project_path.resolve()
+    print(f"Importing assets: {godot_bin} --headless --path {project_path} --import", flush=True)
+    import_assets(godot_bin, project_path)
     command = [godot_bin]
     if headless:
         command.append("--headless")
@@ -438,7 +442,7 @@ def run_godot(
     """Entry point behind `vibegame godot run`."""
     import typer
 
-    from cli.godot import find_godot_binary, is_godot_project, project_engine
+    from cli.godot import GodotImportError, find_godot_binary, is_godot_project, project_engine
     from cli.run import (
         _display_server_log_path,
         _handle_existing_server,
@@ -509,7 +513,7 @@ def run_godot(
                 headless=headless,
                 background=False,
             )
-        except BridgeError as exc:
+        except (BridgeError, GodotImportError) as exc:
             typer.echo(f"Error: {exc}", err=True)
             raise typer.Exit(1) from exc
         except OSError as exc:

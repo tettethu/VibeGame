@@ -131,6 +131,26 @@ def test_check_treats_a_failed_boot_as_an_error(tmp_path: Path) -> None:
     ), issues
 
 
+@pytest.mark.skipif(find_godot_binary() is None, reason="Godot is not installed")
+def test_check_imports_new_images_before_booting(tmp_path: Path) -> None:
+    """The check imports an image added after init, so a script that preloads it compiles.
+
+    Target: `vibegame godot check` asset import, src/cli/godot_check.py: check_godot_project() -> src/cli/godot.py: import_assets().
+    Input: a fresh scaffold plus `assets/red.png` (8x8, red) and `scripts/uses_png.gd`, which preloads `res://assets/red.png`. The project was never opened in the Godot editor.
+    Expect: the check reports no error, and `assets/red.png.import` exists afterwards.
+    """
+    from PIL import Image
+
+    project = _init_project(tmp_path)
+    Image.new("RGB", (8, 8), (255, 0, 0)).save(project / "assets" / "red.png")
+    (project / "scripts" / "uses_png.gd").write_text(
+        'extends Node\nconst RED := preload("res://assets/red.png")\n', encoding="utf-8"
+    )
+    issues = check_godot_project(project, godot_bin=find_godot_binary(), boot_check=True)
+    assert [issue for issue in issues if issue.level == "error"] == [], issues
+    assert (project / "assets" / "red.png.import").is_file()
+
+
 def _node_state(snapshot: dict, name: str) -> dict:
     """Return the `vibegame_state()` of the first snapshot node called `name`."""
     stack = [snapshot["snapshot"]["root"]]

@@ -9,6 +9,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from cli.godot import GodotImportError, import_assets
+
 BOOT_TIMEOUT_S = 60
 CHECK_FAIL_PREFIX = "[vibegame-check] FAIL "
 CHECK_DONE_PREFIX = "[vibegame-check] DONE "
@@ -62,6 +64,8 @@ def _parse_error_lines(output: str) -> list[str]:
             "SCRIPT ERROR" in stripped
             or "Parse Error" in stripped
             or "Failed to load script" in stripped
+            or "No loader found for resource" in stripped
+            or "Failed loading resource" in stripped
         ):
             found.append(stripped[:300])
     return found
@@ -174,6 +178,11 @@ def check_godot_project(
     # autoloads included, and reports each failure on a "[vibegame-check]" line.
 
     if boot_check:
+        try:
+            import_assets(godot_bin, project)
+        except (GodotImportError, OSError) as exc:
+            issues.append(_error("import", str(exc)))
+            return issues
         env = dict(os.environ)
         env["VIBEGAME_GODOT_CHECK"] = "1"
         command = [godot_bin, "--headless", "--path", str(project), "--quit-after", "3"]
