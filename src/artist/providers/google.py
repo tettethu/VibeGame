@@ -15,6 +15,10 @@ MODEL_MAP = {
     "nano-banana-pro": "gemini-3-pro-image-preview",
     "nano-banana-2": "gemini-3.1-flash-image-preview",
 }
+OPTION_HELP = {
+    "aspect": "1:1 | 4:3 | 3:4 | 16:9 | 9:16 | 2:3 | 3:2 | 4:5 | 5:4 | 21:9 | auto",
+    "resolution": "1K | 2K | 4K | auto",
+}
 
 
 def t2i(base_url, api_key, prompt, output, model, *, size="", aspect_ratio="auto", resolution="auto", quality="auto"):

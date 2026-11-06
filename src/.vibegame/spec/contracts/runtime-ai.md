@@ -50,7 +50,7 @@ Only then does the game apply the vote.
 
 `prd.md` defines what the player sees when the model cannot be reached, returns empty text, or returns an invalid action. A local fallback is one possible product choice, not a requirement of this Pattern.
 
-The `orchestrator` writes the expected product behavior in `prd.md`. The `architect` turns it into a technical plan and chooses how each claim will be verified. The `programmer` implements the plan. The `auditor` checks the code without running the game. The `player` runs the verification selected in the plan. The `reviewer` applies the normal final quality gate.
+The `orchestrator` writes the expected product behavior in `prd.md`. The `architect` turns it into a technical plan and chooses how each claim will be verified. The `programmer` implements the plan. The `auditor` checks the code without running the game. The `player` verifies after implementation and auditor handoff, reusing applicable self-test evidence under the shared test contract. The `reviewer` applies the normal final quality gate.
 
 **Verified scope**: a single-player text social-deduction game with many chatbot players. Each chatbot produced turn speech and simple game actions. That project used a local rule-based player when the model was unavailable.
 
@@ -95,8 +95,8 @@ The runtime server reads `apiBaseUrl` when it starts. Restart the runtime after 
 
 #### Player
 
-- Run the `bot` and/or `runtime api` steps selected in `plan.md` for each runtime AI claim.
-- Collect the state, screenshot, trace, or bot result requested by the Verification Plan.
+- For each runtime AI claim, inspect existing evidence and run the selected `bot` and/or `runtime api` steps when evidence is missing or no longer applicable.
+- Collect or reference the state, screenshot, trace, or bot result requested by the Verification Plan.
 - If a claim depends on whether a result came from the model or on why a request failed, verify the corresponding `runtimeState()` fields declared by the architect.
 
 #### Reviewer

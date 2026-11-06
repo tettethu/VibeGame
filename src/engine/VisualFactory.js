@@ -39,7 +39,7 @@ export const VisualFactory = {
   _createRect(scene, def, x, y) {
     const w = def.width || 32
     const h = def.height || 32
-    const color = typeof def.color === 'string' ? parseInt(def.color) : (def.color || 0xffffff)
+    const color = typeof def.color === 'string' ? parseInt(def.color) : (def.color ?? 0xffffff)
     return scene.add.rectangle(x, y, w, h, color)
   },
 

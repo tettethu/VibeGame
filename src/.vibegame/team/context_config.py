@@ -209,7 +209,7 @@ def build_workspace_lines(agent_type: str, repo_root: str, task: dict | None, ta
     task_dir_display = task_dir or "(missing task dir)"
 
     role_rules = {
-        "architect": "Must do codebase research, spec/doc updates, and task document edits in the worktree.",
+        "architect": "Must do research and task docs in the worktree; after implementation is authorized, also do code changes, runtime checks, and tests there.",
         "programmer": "Must do all code changes, related doc/spec edits, checks, and tests in the worktree.",
         "auditor": "Must do review, fixes, validation, and tests in the worktree.",
         "player": "Must do visual verification in the worktree.",

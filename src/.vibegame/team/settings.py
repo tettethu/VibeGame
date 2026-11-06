@@ -10,6 +10,7 @@ from .launch import CLI_CONFIGS
 from .paths import ensure_team_dir, settings_path, workspace_root
 
 DEFAULT_SETTINGS = {
+    "orchestrator_wait_mode": "poll",
     "agents": {},
     "hooks": {
         "Stop": [
@@ -55,14 +56,12 @@ def load_settings(explicit_team_dir: str | None = None) -> dict:
     if not path.exists():
         path.write_text(json.dumps(DEFAULT_SETTINGS, indent=2), encoding="utf-8")
         return deepcopy(DEFAULT_SETTINGS)
-    try:
-        raw = path.read_text(encoding="utf-8").strip()
-        data = json.loads(raw) if raw else {}
-    except (OSError, json.JSONDecodeError):
-        data = {}
+    data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
-        data = {}
+        raise ValueError(f"Expected a settings object in {path}.")
     merged = _deep_merge(DEFAULT_SETTINGS, data)
+    if merged["orchestrator_wait_mode"] not in ("message", "poll"):
+        raise ValueError(f"Invalid orchestrator_wait_mode in {path}: expected 'message' or 'poll'.")
     return merged
 
 

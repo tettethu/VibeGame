@@ -77,10 +77,10 @@ Lifecycle / property -> Contract:
 - config: Merged node configuration
 - parent, children, tags, id, name: Node identity and hierarchy
 - getVisualObject(): Rendered object
-- getPhysicsObject(): Body host, when present
+- getPhysicsObject(): Phaser object that hosts the Arcade body, when present. It is not the body; call velocity and body-size methods on getPhysicsObject().body
 - getTransformObject(): Object whose movement drives the node
 - gameObject: Primary object; the physics host when host is separate
-- animationPlayer, animator: Engine-created animation helpers
+- animationPlayer, animator: Engine-created animation helpers; methods are listed in Animation
 
 Siblings become ready in children-array order. Put a listener before a sibling that emits during ready(), or connect siblings from their parent's ready(). The engine cleans up declared visuals and bodies. Scripts clean up what they created manually, including DOM, timers and listeners on longer-lived objects.
 
@@ -233,6 +233,17 @@ Animator field -> Meaning:
 A condition is {"param": "moving", "eq": true} or {"trigger": "attack"}. Use setBool(name, value), getBool(name), setTrigger(name), resetTrigger(name) and getState() on this.animator. Triggers are consumed by a matching transition. Any also matches the current state; entering the same state does not restart its clip. Express interruption and retrigger rules deliberately.
 
 Do not also select clips with playAnim() on an animator-controlled node. Animations and animator state tables belong in NodeDef JSON, not runtime-generated tables hidden in script code.
+
+Script animation method -> Use:
+- this.animator.setBool(name, value), getBool(name): Set or read a bool parameter
+- this.animator.setTrigger(name), resetTrigger(name): Request or cancel a trigger
+- this.animator.getState(): Current animator state name
+- this.playAnim(name, {restart, force}): Select a clip on a node without an animator. restart: false keeps the clip running when it already plays; force: false does not replace a playing clip
+- this.stopAnim(): Stop the current clip
+- this.getCurrentAnim(): Current clip name, or null
+- this.animationPlayer.isPlaying(name), isFinished(): Read clip playback
+
+These are the only script animation methods. There is no playAnimation().
 
 ### A complete prototype
 
@@ -406,7 +417,8 @@ Node method -> Result:
 - getChild(name): Direct child or null
 - getNode(path): Child, ../Sibling or Group/Child lookup
 - findByTag(tag): Enabled matching nodes across the scene
-- sceneTree.nodes.get(id): Registered node by ID
+- sceneTree.nodes.get(id): Registered node by ID. sceneTree.nodes is a Map, so search by name with [...sceneTree.nodes.values()].find(node => node.name === name)
+- playAnim/stopAnim/getCurrentAnim: Clip playback, see Animation
 - addChild(node): Async attachment and ready propagation
 - instantiate(src, config): Async template instance attached as a child
 - removeSelf(): Remove this node and descendants
@@ -425,6 +437,8 @@ Then spawn it from the owning node:
 ~~~js
 const bullet = await this.instantiate('entities/bullet.node.json', {x: 200, y: 120})
 ~~~
+
+Boot recursively discovers src references inside loaded .node.json templates, including disabled declarations. Each unique definition path loads once. A missing definition stops boot with its path and HTTP status. Nested templates do not need repeated top-level preload declarations.
 
 Disabled src references preload definitions and scripts without live objects. Do not call private SceneTree._buildNode() to bypass this path.
 
@@ -478,6 +492,25 @@ These helpers accept image and placeholder_image entries. They throw for missing
 
 Game pause is a game-owned behavior: stop the gameplay the menu promises to pause, while keeping the required menu input, UI effects and audio active. Skip the relevant gameplay work inside update, or pause a gameplay scene while handling the menu elsewhere. Do not rely on sceneTree.running as a game-pause API; the boot-created controller's update path does not gate nodes with that flag. The supplied overlay pauses the Phaser scene and handles resume through DOM listeners. Verify both stopped gameplay and a working resume path.
 
+## Motion and effects
+
+A game whose screen only jumps between states reads as a slide deck. Animate the cases listed under GDD `### UI & Effects`. Game state still changes at once: motion presents a change that already happened, so rules, snapshots and tests read the logical value, never a mid-animation one.
+
+Use the layer where the change appears. Typical rows of the GDD table per layer:
+
+Layer -> Tool:
+- DOM UI (Transition, Control response, Value change, Drawing the eye, Celebration): CSS transitions and keyframes. Toggle classes from script; animate transform and opacity.
+- Game world (Impact, Spawn and removal, Position change, Ambient): Phaser effect APIs through this.scene: this.scene.tweens.add for position, scale, alpha, angle and tint; this.scene.add.particles(x, y, key, config) for sparks, debris and smoke; this.scene.cameras.main shake, flash and fade.
+- Frame-by-frame character actions: animations and animator, see Animation.
+
+Tween target -> Rule:
+- Moving a node that physics does not drive: tween getTransformObject() x/y. Children follow its delta.
+- Node moved by physics: keep moving it through its body. Animate only its look.
+- Visual separate from its physics host: tween alpha, scale, angle or node.visualTransform.offsetX/offsetY. The engine resets that visual's x/y to the host after every update, so a tween on the visual's x/y has no effect.
+- Effect objects a script creates: destroy them when their tween or emitter completes.
+
+Runtime control steps tweens, particles and CSS animations with the game clock: they stay frozen while paused and advance on continue. A screenshot shows one frame, so judge motion from a real-time recording: a bot video or --shot.
+
 ## Assets and polish
 
 Register every runtime asset in a manifest listed by project.json.manifests. Entry paths are relative to their own manifest directory. Use image for a single file and atlas for named multi-frame artwork.
@@ -513,8 +546,14 @@ During the swap:
 1. Read the actual delivered manifest and artwork.
 2. Replace placeholder entries with real image/atlas entries and file paths.
 3. Update clip frame lists and any per-clip source texture to match actual art.
-4. Fit the visual to the agreed world-space object; preserve collider dimensions and anchor unless gameplay explicitly changes the object's physical size.
+4. Fit the asset and the object to each other by the rules below.
 5. Verify standing, largest poses, UI readability, input targets and gameplay timing. Remove placeholder-only shape/color fields from real entries.
+
+Readability has the highest priority. Do not stretch an asset to the placeholder size: the distortion is not acceptable. A game with correct mechanics that players cannot read has no value. The final goal is always a game that people can play.
+
+1. The asset and the placeholder match, or nearly match (aspect-ratio difference within about 15%, a heuristic limit): handle the difference with engine parameters. Fit the asset to the engine values, or the engine values to the asset, whichever trade-off is better.
+2. The asset and the placeholder do not match, but a flip or a rotation fixes the mismatch: flip or rotate the asset.
+3. The asset and the placeholder do not match, and no flip or rotation fixes the mismatch: change the game code, and the layout if necessary, because it is much harder to remake an asset than to change the layout. A change to an object's size or proportions must never break the game mechanics or the gameplay. If the asset itself does not fit the mechanics or the gameplay, or players cannot see the mechanic that it represents, the asset must be remade.
 
 Keep clip/state identity and whole-action timing where behavior depends on them. Placeholder frame counts are provisional. Frame-coupled hit windows require explicit retuning and verification against the real frames. The result must preserve gameplay, not arbitrary placeholder pixel dimensions.
 
@@ -556,11 +595,15 @@ run option -> Contract:
 - --debug: Show Phaser Arcade physics debug bodies; does not activate runtime control
 - --renderer: auto, webgl or canvas; webgl fails when unavailable
 - --fps: Render cap; 0 means uncapped
-- --shot: Record .webm or .mp4; mp4 requires ffmpeg
+- --shot: Record .webm or .mp4; mp4 requires ffmpeg. run refuses a path that already exists, so give each recording a new file name
 - --bot: Run a Python realtime bot and report its result
-- --max-seconds: Override bot time budget
+- --max-seconds: Override the bot time budget. It applies only with --bot and has no effect without it
+
+The --shot video is written when the runtime stops: when the bot ends, on Ctrl+C, or during close, which waits up to 120 s. Both print `Shot saved: PATH (BYTES bytes, DURATIONs)` after ffprobe reads the file, or `Shot NOT saved: PATH: REASON` and exit 1. Stop a recording runtime only with close: killing its process or tmux session loses the video.
 
 Background and headless are independent. A background run can be headed. A headless run can stay attached. A run never replaces a runtime already on its port: if the port is taken, by this project or anything else, it exits with an error. Stop your own runtime first with `close --port PORT`, or take a free port with `--port auto`. run --status lists tracked sessions; run --logs [--port PORT] shows the log tail. close --all closes runtimes belonging to this project.
+
+Deployments may set `VIBEGAME_BROWSER_ARGS` to a JSON array of Chromium flags. These replace the platform's default graphics flags while retaining runtime scheduling flags. Invalid JSON or non-flag entries fail at startup. Game and agent commands stay the same; `--renderer` still selects WebGL or Canvas, not a physical GPU.
 
 For render rate, explicit --fps overrides the project's fpsLimit. Without either, controlled runtime sessions use 60 FPS; 0 explicitly disables the cap. Frame stepping does not make all external clocks deterministic.
 
@@ -596,7 +639,7 @@ play command -> Effect:
 
 Under vibegame run, activate/pause freezes game frames, page timers and time reads, CSS animations and playing audio. The idle game loop stops rendering; status, snapshot, screenshot and control remain responsive. activate/deactivate retain the controller and preserve game-owned running, scene pause and physics pause states. continue counts game-loop frames even when a gameplay scene is paused; that scene stays paused and its nodes do not update. Audio that was playing resumes during continue/play and freezes again when runtime pauses; audio already paused by the game stays paused. This is normal-speed stepping, not fast-forward or sample-accurate audio synchronization.
 
-While runtime is paused, click, mousemove, drag, key and input commands return status queued without changing the game. continue/play applies them in send order before advancing. Direct human input is blocked while the agent owns runtime control. deactivate, connection loss and page reload discard unexecuted inputs; deactivate releases runtime restrictions without closing the game's pause menu. set and eval are explicit inspection/editing tools and can still change state while paused.
+While runtime is paused, click, mousemove, drag, key and input commands return status queued without changing the game. continue/play applies them in send order before advancing. While the agent owns runtime control, the page drops every input event that the runtime did not send. This includes direct human input and DOM events that eval dispatches, such as element.click() or dispatchEvent(). Send game input only with click, mousemove, drag, key and input. deactivate, connection loss and page reload discard unexecuted inputs; deactivate releases runtime restrictions without closing the game's pause menu. set and eval can still read and edit game state while paused, but they cannot deliver input.
 
 Runtime time control covers the main game page. It does not make network/resource completion or external services deterministic. A deployed static game runs its ordinary browser loop without the runtime host.
 
@@ -606,7 +649,7 @@ Pointer operations share the bot's Playwright executor. Chromium hit-tests the a
 
 For screen-fixed DOM while the camera moves, use the bot or REST pointer payload with space: "client". CLI pointer coordinates remain game-world coordinates.
 
-A snapshot includes frame, mode and nodes keyed by ID. Nodes expose config, transform and physics when available; runtimeState() adds game-specific values under runtime. Expose acceptance-critical state, including state owned by ordinary JS modules, through a host node. Use sceneTree.nodes.get(id), not window.__vibegameRuntime, to inspect gameplay.
+A snapshot includes frame, mode and nodes keyed by ID. Nodes expose name, tags, config, transform and physics when available; runtimeState() adds game-specific values under runtime. Expose acceptance-critical state, including state owned by ordinary JS modules, through a host node. Use sceneTree.nodes.get(id), not window.__vibegameRuntime, to inspect gameplay.
 
 ~~~sh
 vibegame play eval 'return sceneTree.nodes.get("hero").runtimeState()'
@@ -651,7 +694,7 @@ Run with vibegame run . --headless --bot tests/bot/walk_right.py. Bot mode requi
 
 Bot kind -> Payload / meaning:
 - wait: None; wait for duration
-- tap, hold: One key or a list; press/release then wait
+- tap, hold: One key or a list; hold for the requested duration_s, then release. Zero duration sends down/up without a timed hold. No automatic extension until a game frame; short presses can be missed by frame-polled input under low FPS.
 - down, up: Change key state; policy must pair them
 - mousemove: {x, y, space?} or [x, y]
 - click: {x, y, button?, space?} or [x, y]
@@ -661,11 +704,11 @@ Bot kind -> Payload / meaning:
 
 Pointer coordinates default to game-world space; client uses browser viewport CSS pixels. Buttons are left/middle/right; Runtime API also accepts 0/1/2. Duration is the action's waiting/holding time, not a frame count.
 
-Default bot output is .vibegame/logs/bot/<run-id>/: video.webm, trace.jsonl, result.json and stdout.log. run-id is YYYYMMDD-HHMMSS-<bot-basename>; --shot overrides the video path. Each trace row contains tick, t, action and state. result.json records ok, status, reason, setup_s, duration_s, decision_count, bot_file, bot_meta, error and console_errors. Statuses include done, fail, timeout, crash and breakpoint; only done sets ok true. Read the trace to confirm the intended behavior was exercised. After breakpoint, recording remains active and the runner waits for shutdown.
+Default bot output is .vibegame/logs/bot/<run-id>/: video.webm, trace.jsonl, result.json and stdout.log. run-id is YYYYMMDD-HHMMSS-<bot-basename>; --shot overrides the video path. Each trace row contains tick, t, action and state. result.json records ok, status, reason, setup_s, duration_s, decision_count, bot_file, bot_meta, error, console_errors and video. video holds path, saved, bytes, duration_s and error for the recording; the run exits 1 when saved is false. Statuses include done, fail, timeout, crash and breakpoint; only done sets ok true. Read the trace to confirm the intended behavior was exercised. After breakpoint, recording remains active and the runner waits for shutdown.
 
 ### Record and verify
 
-play record NAME records discrete commands to .vibegame/traces/NAME/play.sh. Activate before recording. play record --stop ends it and appends deactivate. Screenshots go into the trace's logs directory. Review the commands before replay with bash or play batch @FILE.
+play --port PORT record NAME records discrete commands to .vibegame/traces/PORT/NAME/play.sh, with runtime-specific state in .vibegame/traces/.recording-PORT. Different runtimes can record concurrently, including recordings with the same name. If exactly one runtime exists, --port may be omitted and its resolved port is written into replay commands. Activate before recording. play --port PORT record --stop ends only that runtime's recording and appends deactivate. Recording updates are serialized in command completion order, including start/stop; commands completed after stop are not recorded. Screenshots go into the trace's logs directory. Review the commands before replay with bash or play batch @FILE.
 
 Verify state transitions through actual input, inspect decisive screenshots and check console/network failures. Save repeatable tests, then close the runtime.
 

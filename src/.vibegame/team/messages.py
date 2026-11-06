@@ -43,6 +43,7 @@ def append_message(
     sender_name: str,
     message_type: str,
     content: str,
+    report_mode: str | None = None,
     explicit_team_dir: str | None = None,
 ) -> dict:
     ensure_team_dir(explicit_team_dir)
@@ -52,9 +53,12 @@ def append_message(
         "name": sender_name,
         "type": message_type,
         "content": content,
-        "read": from_role == "lead",
+        # Only the lead reads an inbox; teammates receive messages in their pane.
+        "read": to_name != "lead",
         "timestamp": _now(),
     }
+    if report_mode is not None:
+        msg["report_mode"] = report_mode
     with file_lock(lock_path(explicit_team_dir)):
         with open(messages_path(explicit_team_dir), "a", encoding="utf-8") as handle:
             handle.write(json.dumps(msg, ensure_ascii=False) + "\n")

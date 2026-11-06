@@ -11,9 +11,12 @@ from typing import Callable, TypeVar
 
 from .locks import file_lock
 from .paths import ensure_team_dir, lock_path, state_path
+from .tmux import TmuxError
 
 T = TypeVar("T")
 STATE_ERROR_PREFIX = "Team state error:"
+STOP_EXIT_TIMEOUT = 10.0
+STOP_EXIT_INTERVAL = 0.05
 
 
 def _now() -> float:
@@ -140,6 +143,7 @@ def register_agent(
             raise ValueError(f"Agent '{name}' already exists in team state.")
         agents[name] = {
             "status": "idle",
+            "starting": True,
             "workdir": workdir,
             "command": command,
             "cli": cli,
@@ -204,3 +208,50 @@ def require_agent(name: str, explicit_team_dir: str | None = None) -> dict:
     if agent is None:
         raise KeyError(name)
     return agent
+
+
+def _process_exists(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def idle(entry: dict, prompt_field: str) -> bool:
+    """An agent is idle when its last approved stop is later than its last prompt."""
+    stopped = entry.get("stopped")
+    return bool(stopped) and stopped["at"] > (entry.get(prompt_field) or 0)
+
+
+def stop_record() -> dict:
+    """Written by the Stop hook when it lets an agent stop; the pid is the hook process."""
+    return {"at": _now(), "pid": os.getpid()}
+
+
+def submission_check(load_entry: Callable[[], dict], prompt_field: str) -> Callable[[], bool] | None:
+    """Confirmation check for a prompt about to be pasted into an agent pane, or None to paste blind.
+
+    An idle agent must confirm the paste through its UserPromptSubmit hook. A running agent takes
+    the paste into its current turn without that hook, so the paste is blind.
+    Known gap: an interrupt or an API error ends a turn without a Stop hook. Such an agent looks
+    running, so a failed paste into it goes unnoticed.
+    """
+    entry = load_entry()
+    if not idle(entry, prompt_field):
+        return None
+    # The approved Stop hook may still be running; the CLI is idle only after it exits.
+    deadline = time.monotonic() + STOP_EXIT_TIMEOUT
+    while _process_exists(entry["stopped"]["pid"]):
+        if time.monotonic() >= deadline:
+            raise TmuxError("Stop hook did not exit before the delivery timeout.")
+        time.sleep(STOP_EXIT_INTERVAL)
+    if not idle(load_entry(), prompt_field):
+        return None
+    since = _now()
+    return lambda: (load_entry().get(prompt_field) or 0) >= since
+
+
+def prompt_acknowledgement(name: str, explicit_team_dir: str) -> Callable[[], bool] | None:
+    """Submission check for a prompt about to be pasted into a teammate pane."""
+    return submission_check(lambda: require_agent(name, explicit_team_dir), "last_prompt_at")

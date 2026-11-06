@@ -7,13 +7,16 @@ Wraps runtime REST API into simple CLI commands.
 Discovers running server from .vibegame/logs/runtime/servers.json.
 """
 
+import contextlib
 import json
+import logging
 import os
 import shlex
 import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import click
 import requests
@@ -31,6 +34,7 @@ play_app = typer.Typer(
 
 TRACES_DIR = ".vibegame/traces"
 RECORDING_FILE = ".recording"
+logger = logging.getLogger(__name__)
 PLAY_PORT: int | None = None
 # When set (during `batch`), `_base_url` returns it instead of re-resolving the
 # server from servers.json on every op — one resolution for the whole batch.
@@ -233,59 +237,99 @@ def _print_json(resp: requests.Response) -> None:
 # --- Recording ---
 
 
-def _recording_state(project_path: str = ".") -> dict | None:
-    """Load recording state from marker file, or None if not recording."""
-    p = _resolve_path(project_path) / TRACES_DIR / RECORDING_FILE
+def _recording_port(project_path: str) -> int:
+    if PLAY_PORT is not None:
+        return PLAY_PORT
+    port = urlsplit(_base_url(project_path)).port
+    if port is None:
+        raise ValueError('Runtime URL must contain a port')
+    return port
+
+
+@contextlib.contextmanager
+def _recording_lock(project_path: str, port: int):
+    root = _resolve_path(project_path) / TRACES_DIR
+    root.mkdir(parents=True, exist_ok=True)
+    lock_path = root / f'{RECORDING_FILE}-{port}.lock'
+    logger.debug('Locking recording transaction: %s', lock_path)
+    with lock_path.open('a+b') as handle:
+        if sys.platform == 'win32':
+            import msvcrt
+            if handle.tell() == 0:
+                handle.write(b'0')
+                handle.flush()
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            if sys.platform == 'win32':
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+def _recording_path(project_path: str, port: int) -> Path:
+    return _resolve_path(project_path) / TRACES_DIR / f'{RECORDING_FILE}-{port}'
+
+
+def _recording_state(project_path: str, port: int) -> dict | None:
+    p = _recording_path(project_path, port)
     if p.exists():
+        logger.debug('Reading recording state: %s', p)
         return json.loads(p.read_text())
     return None
 
 
-def _save_recording_state(state: dict, project_path: str = ".") -> None:
-    p = _resolve_path(project_path) / TRACES_DIR / RECORDING_FILE
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(state))
+def _save_recording_state(state: dict, project_path: str, port: int) -> None:
+    p = _recording_path(project_path, port)
+    logger.debug('Writing recording state: %s, step=%s', p, state['step'])
+    with tempfile.NamedTemporaryFile(mode='w', dir=p.parent, delete=False) as handle:
+        json.dump(state, handle)
+        temporary = Path(handle.name)
+    temporary.replace(p)
 
 
-def _clear_recording(project_path: str = ".") -> None:
-    p = _resolve_path(project_path) / TRACES_DIR / RECORDING_FILE
-    if p.exists():
-        p.unlink()
+def _clear_recording(project_path: str, port: int) -> None:
+    p = _recording_path(project_path, port)
+    logger.debug('Removing recording state: %s', p)
+    p.unlink()
+
+
+def _append_record(project_path: str, build_command) -> None:
+    if not (_resolve_path(project_path) / TRACES_DIR).is_dir():
+        return
+    port = _recording_port(project_path)
+    with _recording_lock(project_path, port):
+        state = _recording_state(project_path, port)
+        if state is None:
+            return
+        step = state['step'] + 1
+        command = build_command(port, step)
+        script = Path(state['script_path'])
+        logger.debug('Appending recording step: %s, step=%s, port=%s', script, step, port)
+        with script.open('a') as handle:
+            handle.write(f'run {command}\n')
+        state['step'] = step
+        _save_recording_state(state, project_path, port)
 
 
 def _record(project_path: str, *cmd_parts: str) -> None:
-    """Append command to recording script if active."""
-    state = _recording_state(project_path)
-    if not state:
-        return
-    state["step"] = state.get("step", 0) + 1
-    _save_recording_state(state, project_path)
-    script = Path(state["script_path"])
-    parts = list(cmd_parts)
-    record_port = PLAY_PORT if PLAY_PORT is not None else state.get("port")
-    if record_port is not None and parts[:2] == ["vibegame", "play"] and "--port" not in parts:
-        parts = parts[:2] + ["--port", str(record_port)] + parts[2:]
-    cmd = " ".join(shlex.quote(p) for p in parts if p)
-    with open(script, "a") as f:
-        f.write(f"run {cmd}\n")
+    def command(port, step):
+        parts = list(cmd_parts)
+        if parts[:2] == ['vibegame', 'play']:
+            parts = parts[:2] + ['--port', str(port)] + parts[2:]
+        return ' '.join(shlex.quote(part) for part in parts if part)
+    _append_record(project_path, command)
 
 
 def _record_screenshot(project_path: str) -> None:
-    """Record screenshot with trace-relative output path."""
-    state = _recording_state(project_path)
-    if not state:
-        return
-    step = state.get("step", 0) + 1
-    state["step"] = step
-    _save_recording_state(state, project_path)
-    script = Path(state["script_path"])
-    record_port = PLAY_PORT if PLAY_PORT is not None else state.get("port")
-    if record_port is None:
-        cmd = f'run vibegame play screenshot -o "$TRACE_DIR/logs/step_{step:03d}.png"'
-    else:
-        cmd = f'run vibegame play --port {record_port} screenshot -o "$TRACE_DIR/logs/step_{step:03d}.png"'
-    with open(script, "a") as f:
-        f.write(f"{cmd}\n")
+    _append_record(project_path, lambda port, step:
+        f'vibegame play --port {port} screenshot -o "$TRACE_DIR/logs/step_{step:03d}.png"')
 
 
 # --- Subcommands ---
@@ -297,54 +341,55 @@ def play_record(
     stop: bool = typer.Option(False, "--stop", help="Stop recording"),
     path: str = typer.Argument(".", help="Game project path"),
 ):
-    """Record play commands to a reusable trace script."""
-    if stop:
-        state = _recording_state(path)
-        if not state:
-            typer.echo("Not recording.", err=True)
+    """Record the selected runtime to traces/PORT/NAME/play.sh."""
+    port = _recording_port(path)
+    with _recording_lock(path, port):
+        if stop:
+            state = _recording_state(path, port)
+            if not state:
+                typer.echo("Not recording.", err=True)
+                raise typer.Exit(1)
+            script = Path(state["script_path"])
+            with open(script, "a") as f:
+                f.write(f'\nrun vibegame play --port {port} deactivate\n')
+                f.write('echo "=== Trace complete ===" >> "$LOG"\n')
+            _clear_recording(path, port)
+            logger.info('Stopped recording: port=%s, script=%s', port, script)
+            typer.echo(f"Recording saved: {script}")
+            typer.echo(
+                "\nREMINDER: Review and clean up unnecessary steps:\n"
+                "  - Remove redundant activate/deactivate\n"
+                "  - Remove exploratory steps that aren't part of the test story\n"
+                f"\nRun directly: bash {script}"
+            )
+            return
+
+        if not name:
+            typer.echo("Usage: vibegame play record <name>", err=True)
             raise typer.Exit(1)
-        script = Path(state["script_path"])
-        record_port = PLAY_PORT if PLAY_PORT is not None else state.get("port")
-        with open(script, "a") as f:
-            if record_port is None:
-                f.write('\nrun vibegame play deactivate\n')
-            else:
-                f.write(f'\nrun vibegame play --port {record_port} deactivate\n')
-            f.write('echo "=== Trace complete ===" >> "$LOG"\n')
-        _clear_recording(path)
-        typer.echo(f"Recording saved: {script}")
-        typer.echo(
-            "\nREMINDER: Review and clean up unnecessary steps:\n"
-            "  - Remove redundant activate/deactivate\n"
-            "  - Remove exploratory steps that aren't part of the test story\n"
-            f"\nRun directly: bash {script}"
-        )
-        return
 
-    if not name:
-        typer.echo("Usage: vibegame play record <name>", err=True)
-        raise typer.Exit(1)
+        if _recording_state(path, port):
+            typer.echo(f"Already recording on port {port}. Stop first: vibegame play --port {port} record --stop", err=True)
+            raise typer.Exit(1)
 
-    if _recording_state(path):
-        typer.echo("Already recording. Stop first: vibegame play record --stop", err=True)
-        raise typer.Exit(1)
+        if Path(name).name != name or name in {'.', '..'}:
+            raise ValueError('Trace name must be a single directory name')
+        root = _resolve_path(path)
+        trace_dir = root / TRACES_DIR / str(port) / name
+        logs_dir = trace_dir / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
 
-    root = _resolve_path(path)
-    trace_dir = root / TRACES_DIR / name
-    logs_dir = trace_dir / "logs"
-    logs_dir.mkdir(parents=True, exist_ok=True)
+        # Clear previous evidence
+        for f in logs_dir.iterdir():
+            f.unlink()
 
-    # Clear previous evidence
-    for f in logs_dir.iterdir():
-        f.unlink()
+        script_path = trace_dir / "play.sh"
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    script_path = trace_dir / "play.sh"
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        activate_cmd = f"vibegame play --port {port} activate"
 
-    activate_cmd = "vibegame play activate" if PLAY_PORT is None else f"vibegame play --port {PLAY_PORT} activate"
-
-    script_path.write_text(
-        f'''#!/bin/bash
+        script_path.write_text(
+            f'''#!/bin/bash
 # Trace: {name}
 # Recorded: {now}
 #
@@ -364,16 +409,17 @@ echo "=== Trace: {name} - $(date) ===" > "$LOG"
 
 run {activate_cmd}
 '''
-    )
-    script_path.chmod(0o755)
+        )
+        script_path.chmod(0o755)
 
-    _save_recording_state(
-        {"name": name, "script_path": str(script_path), "step": 0, "port": PLAY_PORT},
-        path,
-    )
+        _save_recording_state(
+            {"name": name, "script_path": str(script_path), "step": 0, "port": port},
+            path, port,
+        )
+        logger.info('Started recording: port=%s, script=%s', port, script_path)
 
-    typer.echo(f"Recording to: {script_path}")
-    typer.echo("Run 'vibegame play record --stop' when done.")
+        typer.echo(f"Recording to: {script_path}")
+        typer.echo(f"Run 'vibegame play --port {port} record --stop' when done.")
 
 
 @play_app.command("screenshot")

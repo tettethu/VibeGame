@@ -138,7 +138,7 @@ def ensure_codex_role_doc(team_root: str, role: str) -> Path:
 
 
 def append_codex_model_instructions(command: str, role_doc: Path) -> str:
-    override = f'model_instructions_file="{role_doc}"'
+    override = f"model_instructions_file={json.dumps(str(role_doc), ensure_ascii=False)}"
     return f"{command} -c {shlex.quote(override)}"
 
 
@@ -173,6 +173,7 @@ def prepare_launch(
     name: str | None = None,
     team_root: str | None = None,
     effort: str | None = None,
+    workdir: str | None = None,
 ) -> tuple[str, dict, str]:
     config = CLI_CONFIGS[cli]
     resolved_model = model or config.get("default_model")
@@ -193,6 +194,12 @@ def prepare_launch(
         params["agent"] = agent
     command = build_launch_command(cli, params)
     if cli == "codex":
+        if workdir is None:
+            raise ValueError("workdir is required for codex project trust")
+        trusted_path = json.dumps(str(Path(workdir).resolve()), ensure_ascii=False)
+        trust = f'projects={{{trusted_path}={{trust_level="trusted"}}}}'
+        command += " -c check_for_update_on_startup=false"
+        command += f" -c {shlex.quote(trust)}"
         if resolved_effort:
             command = append_codex_effort(command, resolved_effort)
         if agent:

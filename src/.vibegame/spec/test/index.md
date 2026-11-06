@@ -48,7 +48,8 @@ There is no global aggregator (no `run_once.sh`). Callers run individual `test.s
 
 | Agent | Create | Modify | Run |
 |---|---|---|---|
-| `player` | yes — creates a new `test_<topic>/` when a topic first earns one | yes — adds/updates assertions when their task touches the topic | yes — runs after writing or modifying |
+| `architect` / `programmer` | yes, during approved implementation | yes, within task scope | yes, during self-testing; hand off evidence |
+| `player` | yes — creates a new `test_<topic>/` when a topic first earns one | yes — adds/updates assertions when their task touches the topic | yes — runs new/changed tests; may reuse applicable results |
 | `reviewer` | no | yes — when a failure reveals an outdated assertion the reviewer can fix locally | **mandatory** during final review: runs every test in `tests/` |
 | `orchestrator` | no | yes — used as a debugging aid when triaging issues | selective — runs whichever tests are relevant to the current question |
 | `auditor` | no | no | **never** — `auditor` does static review only; running the runtime is not its job. Do not write prompts that ask `auditor` to invoke `vibegame play` or `tests/test_*/test.sh` |
@@ -56,6 +57,21 @@ There is no global aggregator (no `run_once.sh`). Callers run individual `test.s
 When a test fails, whoever finds out fixes it directly — no fixed arbitration:
 - a true regression → change the code that broke
 - a legitimate behavior change per `prd.md` → update the assertion to match
+
+## Shared runtime evidence
+
+Architect/programmer self-tests before handing the completed implementation to auditor and then player. Player independently accepts the task; reviewer independently accepts the final game. Player may reuse test results; reviewer may reuse task evidence while retaining its final review checklist.
+
+Index evidence in task `log.md`: architect/programmer appends `## Runtime Evidence` under `# Programmer`; player references it from `# Player`. For each checked claim, record:
+
+- Expected and observed results, with pass/fail and any unverified cases.
+- Reproduction commands or test/bot path, starting state, and inputs. Record any state setup or skipped steps; skipped steps remain unverified.
+- Absolute artifact paths and the relevant fields, frames, or timestamps. Choose evidence that proves the claim; no mandatory media bundle.
+- Tested workspace, revision, and relevant code/config/assets/test state. For dirty or shared files, retain contents, diff, or hashes so consumers can compare them; HEAD alone is insufficient.
+
+Keep each handed-off run intact under `Task dir/evidence/<run-name>/`, or reference a unique bot/trace run directory. Copy mutable regression outputs into the task run directory before handoff. After changing files, reload them in the runtime before capturing evidence for the changed build.
+
+Consumers open the actual artifacts and check coverage and applicability to the current files, including auditor fixes and integration changes. Record reused results with their source and reason; rerun missing, stale, doubtful, or high-risk checks. Run new/changed tests and recheck failed behavior after a fix. Reviewer still runs the full regression suite, independently plays the final core loop, and judges visual quality and feel.
 
 ## What to write a test for
 
@@ -89,7 +105,7 @@ If you can't translate an AC this way, it's probably a visual / feel AC — leav
 
 Best (deterministic, tolerant to internal refactor):
 - numeric runtime fields (`hp`, `x`, `y`, `phase`, `ammo`)
-- counts (`scene.nodes.filter(n => n.tag === 'enemy').length`)
+- counts (the number of snapshot `nodes` whose `tags` include `enemy`)
 - boolean states / enum strings
 
 Fragile (avoid):
@@ -97,9 +113,10 @@ Fragile (avoid):
 - pixel colors — those drift with art changes
 - exact tween-mid values — use start / end states only
 
-### Determinism
+### Reproducibility
 
-- Never `sleep`. Use `vibegame play continue -f N` to advance N frames; same N produces same state.
+- Aim for reproducible tests. For random behavior such as wandering or attack selection, consider seeds or presets; weigh implementation cost against verification benefit rather than requiring exact replay.
+- Never `sleep`. Use `vibegame play continue -f N` to advance N frames.
 - Don't depend on wall clock. Use frame counts.
 - If the test depends on an initial state, set it explicitly via `play eval` rather than assuming default.
 - One test per scenario. Don't chain unrelated assertions in one `test.sh` — when one fails, the rest never run, and the failure cause is muddier.

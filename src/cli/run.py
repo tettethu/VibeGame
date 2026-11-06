@@ -36,6 +36,8 @@ from util.runtime import DEFAULT_RUNTIME_PORT
 # in-tab navigation keeps carrying it.
 RESERVED_QUERY_KEYS = frozenset({"runtime", "activate", "debug", "physicsDebug", "renderer", "fps"})
 RENDERER_CHOICES = frozenset({"auto", "webgl", "canvas"})
+# How long close waits for a recording runtime to transcode and write its video.
+SHOT_SAVE_TIMEOUT = 120.0
 
 
 def _parse_cli_query_tokens(tokens: list[str]) -> dict[str, str]:
@@ -351,6 +353,7 @@ def _write_server_info(
     server_pid: int,
     launcher_pid: int = 0,
     daemon_pid: int = 0,
+    shot: str | None = None,
 ) -> None:
     with _servers_lock(project_path):
         servers = _read_all_servers(project_path)
@@ -367,6 +370,8 @@ def _write_server_info(
         )
         if daemon_pid:
             servers[str(port)]["daemon_pid"] = daemon_pid
+        if shot:
+            servers[str(port)]["shot"] = shot
         _write_all_servers(project_path, servers)
 
 
@@ -470,10 +475,10 @@ def _terminate_runtime_processes(info: dict) -> tuple[bool, str]:
 
     if background:
         daemon_pid = _coerce_pid(info.get("daemon_pid"))
-        # Kill daemon first (it manages server lifecycle)
+        # Kill daemon first (it manages server lifecycle). A recording daemon needs time to write the video.
         if daemon_pid and _is_process_alive(daemon_pid):
             _terminate_process(daemon_pid, force=False, include_tree=True)
-            if not _wait_for_process_exit(daemon_pid, timeout=5):
+            if not _wait_for_process_exit(daemon_pid, timeout=SHOT_SAVE_TIMEOUT if info.get("shot") else 5):
                 _terminate_process(daemon_pid, force=True, include_tree=True)
                 _wait_for_process_exit(daemon_pid, timeout=2)
         # Kill server directly (handles orphan case if daemon crashed)
@@ -490,7 +495,7 @@ def _terminate_runtime_processes(info: dict) -> tuple[bool, str]:
 
     if launcher_pid and _is_process_alive(launcher_pid):
         _terminate_process(launcher_pid, force=False, include_tree=True)
-        if not _wait_for_process_exit(launcher_pid, timeout=10):
+        if not _wait_for_process_exit(launcher_pid, timeout=SHOT_SAVE_TIMEOUT if info.get("shot") else 10):
             _terminate_process(launcher_pid, force=True, include_tree=True)
             _wait_for_process_exit(launcher_pid, timeout=2)
 
@@ -655,6 +660,10 @@ def _shot_work_dir(project_path: Path) -> Path:
 def _validate_shot_target(shot_path: Path | None) -> None:
     if not shot_path:
         return
+    if shot_path.exists():
+        print(f"Error: --shot file already exists: {shot_path}")
+        print("Recordings are never overwritten. Choose a new file name.")
+        raise typer.Exit(1)
     if shot_path.suffix.lower() == ".mp4" and not shutil.which("ffmpeg"):
         print("Error: --shot .mp4 output requires ffmpeg.")
         print("Install ffmpeg or use a .webm output path.")
@@ -667,6 +676,8 @@ def _raw_shot_path(work_dir: Path, target_path: Path) -> Path:
 
 
 def _write_shot_video(source_path: Path, target_path: Path, work_dir: Path) -> Path:
+    if target_path.exists():
+        raise RuntimeError(f"{target_path} appeared during recording and is not overwritten; the recording stays at {source_path}")
     target_path.parent.mkdir(parents=True, exist_ok=True)
     if target_path.suffix.lower() != ".mp4":
         shutil.move(str(source_path), str(target_path))
@@ -695,12 +706,48 @@ def _write_shot_video(source_path: Path, target_path: Path, work_dir: Path) -> P
         text=True,
     )
     if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg failed: {result.stderr.strip() or result.stdout.strip()}")
+        raise RuntimeError(f"ffmpeg failed: {result.stderr.strip() or result.stdout.strip()}; the raw recording stays at {raw_path}")
     raw_path.unlink(missing_ok=True)
     return target_path
 
 
-def _finalize_shot(page, context, shot_path: Path | None, work_dir: Path) -> Path | None:
+def _check_shot(target: Path) -> dict:
+    """Report whether a written recording is a complete video that ffprobe can read."""
+    report = {"path": str(target), "saved": False, "bytes": 0, "duration_s": None, "error": None}
+    if not target.is_file() or target.stat().st_size == 0:
+        report["error"] = "video file is missing or empty"
+        return report
+    report["bytes"] = target.stat().st_size
+    if not shutil.which("ffprobe"):
+        # Without ffprobe the file cannot be checked; it exists and is not empty.
+        report["saved"] = True
+        return report
+    probe = sp.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", str(target)],
+        capture_output=True,
+        text=True,
+    )
+    logging.info("ffprobe %s returncode=%d stdout=%r stderr=%r", target, probe.returncode, probe.stdout.strip(), probe.stderr.strip())
+    if probe.returncode != 0:
+        report["error"] = f"ffprobe cannot read the video, so it is incomplete: {probe.stderr.strip()}"
+        return report
+    try:
+        report["duration_s"] = round(float(probe.stdout.strip()), 2)
+    except ValueError:
+        pass
+    report["saved"] = True
+    return report
+
+
+def _shot_summary(report: dict) -> str:
+    if not report["saved"]:
+        return f"Shot NOT saved: {report['path']}: {report['error']}"
+    duration = "unknown duration" if report["duration_s"] is None else f"{report['duration_s']}s"
+    return f"Shot saved: {report['path']} ({report['bytes']} bytes, {duration})"
+
+
+def _finalize_shot(page, context, shot_path: Path | None, work_dir: Path) -> dict | None:
+    """Close the page, write the recording to shot_path and return its check report."""
     video = page.video if shot_path else None
     try:
         page.close()
@@ -713,7 +760,11 @@ def _finalize_shot(page, context, shot_path: Path | None, work_dir: Path) -> Pat
     if not shot_path or not video:
         return None
     source_path = Path(video.path())
-    return _write_shot_video(source_path, shot_path, work_dir)
+    try:
+        written = _write_shot_video(source_path, shot_path, work_dir)
+    except Exception as exc:
+        return {"path": str(shot_path), "saved": False, "bytes": 0, "duration_s": None, "error": str(exc)}
+    return _check_shot(written)
 
 
 class _PlaywrightBrokerHandler(http.server.BaseHTTPRequestHandler):
@@ -835,7 +886,13 @@ def _browser_launch_args() -> list[str]:
         "--disable-backgrounding-occluded-windows",
         "--disable-renderer-backgrounding",
     ]
-    if sys.platform == "darwin":
+    configured = os.environ.get("VIBEGAME_BROWSER_ARGS")
+    if configured is not None:
+        extra = json.loads(configured)
+        if not isinstance(extra, list) or not all(isinstance(arg, str) and arg.startswith("--") for arg in extra):
+            raise ValueError("VIBEGAME_BROWSER_ARGS must be a JSON array of Chromium flags")
+        args.extend(extra)
+    elif sys.platform == "darwin":
         args.extend([
             "--enable-gpu",
             "--ignore-gpu-blocklist",
@@ -856,6 +913,11 @@ def _start_playwright_broker() -> http.server.HTTPServer:
 def _bg_status_file(project_path: Path, port: int) -> Path:
     """Temp file for daemon child to signal readiness to parent."""
     return _runtime_logs_dir(project_path) / f".bg-status-{port}"
+
+
+def _shot_report_file(project_path: Path, port: int) -> Path:
+    """The background daemon writes its shot check here when it stops; close reads it."""
+    return _runtime_logs_dir(project_path) / f".shot-report-{port}.json"
 
 
 def _run_daemon_child(
@@ -921,6 +983,7 @@ def _run_daemon_child(
         _write_server_info(
             project_path, host=host, port=port, background=True,
             server_pid=proc.pid, daemon_pid=os.getpid(),
+            shot=str(shot_target) if shot_target else None,
         )
 
         # 5. Playwright
@@ -978,11 +1041,11 @@ def _run_daemon_child(
 
             runtime_clock.close()
             if page and context:
-                try:
-                    _finalize_shot(page, context, shot_target, _shot_work_dir(project_path))
-                except Exception as exc:
+                report = _finalize_shot(page, context, shot_target, _shot_work_dir(project_path))
+                if report:
                     with open(log_file, "a", encoding="utf-8") as lf:
-                        lf.write(f"\nShot save failed: {exc}\n")
+                        lf.write(f"\n{_shot_summary(report)}\n")
+                    _shot_report_file(project_path, port).write_text(json.dumps(report), encoding="utf-8")
             browser.close()
 
     except Exception as exc:
@@ -1159,6 +1222,7 @@ def run(
         status_file = _bg_status_file(project_path, port)
         status_file.parent.mkdir(parents=True, exist_ok=True)
         status_file.unlink(missing_ok=True)
+        _shot_report_file(project_path, port).unlink(missing_ok=True)
 
         if sys.platform == "win32":
             print("Background mode with runtime API is not supported on Windows.")
@@ -1281,7 +1345,9 @@ def run(
         background=False,
         server_pid=proc.pid,
         launcher_pid=os.getpid(),
+        shot=str(shot_path) if shot_path else None,
     )
+    _shot_report_file(project_path, port).unlink(missing_ok=True)
 
     import urllib.request
 
@@ -1395,16 +1461,22 @@ def run(
                 pass
             finally:
                 runtime_clock.close()
-                saved_shot = None
                 try:
-                    saved_shot = _finalize_shot(page, context, shot_path, _shot_work_dir(project_path))
-                except Exception as exc:
-                    print(f"Shot save failed: {exc}")
+                    shot_report = _finalize_shot(page, context, shot_path, _shot_work_dir(project_path))
                 finally:
                     browser.close()
-                if saved_shot:
-                    print(f"Shot saved: {saved_shot}")
+                if shot_report:
+                    print(_shot_summary(shot_report))
+                    _shot_report_file(project_path, port).write_text(json.dumps(shot_report), encoding="utf-8")
                 print("Runtime session closed.")
+
+            if bot_result is not None and _bot_out_dir is not None:
+                # run_bot writes result.json before the video exists; attach the checked video now.
+                result_file = _bot_out_dir / "result.json"
+                result_data = json.loads(result_file.read_text(encoding="utf-8"))
+                result_data["video"] = shot_report
+                result_file.write_text(json.dumps(result_data, indent=2, ensure_ascii=False), encoding="utf-8")
+            shot_failed = bool(shot_report) and not shot_report["saved"]
 
             if bot_result is not None:
                 print()
@@ -1413,10 +1485,12 @@ def run(
                 if _bot_out_dir is not None:
                     print(f"Run dir:    {_bot_out_dir}")
                     print(f"Result:     {_bot_out_dir / 'result.json'}")
-                _bot_exit_code = 0 if bot_result["ok"] else 1
+                _bot_exit_code = 0 if bot_result["ok"] and not shot_failed else 1
                 # typer.Exit propagates through the outer finally that stops the
                 # server, so cleanup still runs.
                 raise typer.Exit(_bot_exit_code)
+            if shot_failed:
+                raise typer.Exit(1)
     finally:
         _playwright_broker.shutdown()
         _stop_server_process(proc, host, port)
@@ -1458,6 +1532,7 @@ def close(
             print(f"  Port {port_key}: {state}  {_pid_summary(info)}")
         raise typer.Exit(1)
 
+    shots_failed = False
     for p in ports_to_close:
         info = servers.get(str(p), {})
         if not info:
@@ -1468,9 +1543,22 @@ def close(
             print(f"Port {p}: tracked runtime already gone, cleaning up")
             _remove_server_info(project_path, p)
             continue
+        if info.get("shot"):
+            print(f"Port {p}: saving shot {info['shot']} (up to {int(SHOT_SAVE_TIMEOUT)}s)")
         stopped, message = _terminate_runtime_processes(info)
         if stopped:
             print(f"Port {p}: {message}")
         else:
             print(f"Port {p}: failed to stop runtime ({message})")
+        if info.get("shot"):
+            report_file = _shot_report_file(project_path, p)
+            if report_file.exists():
+                report = json.loads(report_file.read_text(encoding="utf-8"))
+                report_file.unlink()
+            else:
+                report = {"path": info["shot"], "saved": False, "error": f"the runtime stopped without writing the video; see {_server_log_path(project_path, p)}"}
+            print(f"Port {p}: {_shot_summary(report)}")
+            shots_failed = shots_failed or not report["saved"]
         _remove_server_info(project_path, p)
+    if shots_failed:
+        raise typer.Exit(1)

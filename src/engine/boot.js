@@ -128,9 +128,14 @@ function restoreReservedParams() {
  * @param {function} [options.onError] - called with error message on failure
  */
 export async function boot(container, options = {}) {
-  const onError = options.onError || ((msg) => {
+  const showError = options.onError || ((msg) => {
     container.textContent = 'Error: ' + msg
   })
+  // The runtime host reads this to fail `vibegame run` with the cause instead of a readiness timeout.
+  const onError = (msg) => {
+    window.__vibegame_boot_error = msg
+    showError(msg)
+  }
 
   try {
     restoreReservedParams()
@@ -176,13 +181,17 @@ export async function boot(container, options = {}) {
     }
     if (Object.keys(mergedManifest).length) sceneTree.assetManifest = mergedManifest
 
-    // .node.json definitions (src fields)
+    // .node.json definitions (src fields), including src references inside loaded definitions.
+    // The Set visits paths added during iteration and loads each path once.
     const srcPaths = collectSrcPaths(sceneJson.root)
     for (const p of srcPaths) {
-      try {
-        const res = await fetch(resourceUrl(p))
-        if (res.ok) sceneTree.nodeDefinitions[p] = await res.json()
-      } catch {}
+      console.info('[boot] load node definition', p)
+      const res = await fetch(resourceUrl(p))
+      if (!res.ok) throw new Error(`Node definition ${p}: HTTP ${res.status}`)
+      const definition = await res.json()
+      sceneTree.nodeDefinitions[p] = definition
+      collectSrcPaths(definition, srcPaths)
+      console.info('[boot] registered node definition', p)
     }
 
     // Register tilesets from manifest (inline tile data, no external file needed)

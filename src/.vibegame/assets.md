@@ -1,6 +1,6 @@
 # Asset Inventory
 
-<!-- Maintained by artist agent. Do not edit manually. -->
+<!-- Maintained by artist agent. The implementation owner updates facing and opening after it flips or rotates an asset. Do not edit manually. -->
 
 ## Sprites
 

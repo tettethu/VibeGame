@@ -49,6 +49,7 @@ def _record_transcript_path(role: str, session_id: str, transcript_path: str) ->
                     session_id=session_id,
                     transcript_path=transcript_path,
                     last_transcript_at=time.time(),
+                    starting=False,
                 )
     except Exception:
         pass
@@ -73,6 +74,7 @@ def record_general_mate_transcript(hook_input: dict, session_id: str) -> None:
             session_id=session_id or None,
             transcript_path=transcript_path,
             last_transcript_at=time.time(),
+            starting=False,
         )
     except Exception:
         pass
@@ -168,10 +170,7 @@ def main():
         record_general_mate_transcript(hook_input, session_id)
 
     transcript_path = hook_input.get("transcript_path", "")
-    if transcript_path:
-        _record_transcript_path(role, session_id, transcript_path)
-    elif role == "orchestrator":
-        _record_transcript_path(role, session_id, "")
+    _record_transcript_path(role, session_id, transcript_path)
 
     mate_name = os.environ.get("VIBEGAME_MATE_NAME", "")
     working_dir = hook_input.get("cwd", "") or os.getcwd()

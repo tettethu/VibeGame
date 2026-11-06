@@ -9,8 +9,11 @@ Usage:
   vibegame start --port 4040          # Exact port, assert if busy
   vibegame start --host 0.0.0.0       # Listen on all interfaces
   vibegame start --no-agents          # Dashboard only
+  vibegame start --resume-task-agents # Also resume task agents that closed without `lead kill`
 """
 
+import contextlib
+import io
 import json
 import logging
 import os
@@ -22,6 +25,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from types import SimpleNamespace
 import socket
 import urllib.error
 import urllib.parse
@@ -49,11 +53,9 @@ from team.tmux import (  # noqa: E402
     pane_in_session,
     paste_prompt,
     resolve_pane_id,
-    send_trust_enter,
     session_exists,
     session_target,
     set_remain_on_exit,
-    should_send_trust_enter,
     split_window,
     tmux_bin,
     window_target,
@@ -63,6 +65,9 @@ from team.tmux import (  # noqa: E402
 logger = logging.getLogger("vibegame.start")
 DEFAULT_PORT = 8080
 AGENT_BOOT_STABLE_SECONDS = 1.5
+# A resumed CLI sends no signal while idle, so staying up is the only evidence it resumed.
+# Codex exits about 2.5s after launch when its rollout is missing.
+TASK_AGENT_RESUME_STABLE_SECONDS = 5.0
 
 
 def _register_claude_project_trust(
@@ -383,7 +388,6 @@ def _preregister_session(
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json", "User-Agent": "VG-Start/1.0"},
     )
-    time.sleep(0.5)
     with urllib.request.urlopen(request, timeout=1) as response:
         assert response.status == 200, f"Pre-register failed for {name}: {response.status}"
     logger.info("session_preregistered name=%s pane=%s", name, tmux_pane)
@@ -520,46 +524,6 @@ def _delete_dashboard_session(server_base_url: str, composite_id: str) -> bool:
         return False
 
 
-def _dashboard_agent_session_ids(server_base_url: str, name: str, agent: dict) -> set[str]:
-    try:
-        with urllib.request.urlopen(f"{server_base_url}/sessions", timeout=1) as response:
-            sessions = json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
-        return set()
-    if not isinstance(sessions, list):
-        return set()
-    workdir = agent.get("workdir")
-    ids: set[str] = set()
-    for session in sessions:
-        if not isinstance(session, dict):
-            continue
-        if session.get("name") != name:
-            continue
-        if workdir and session.get("working_dir") and session.get("working_dir") != workdir:
-            continue
-        session_id = session.get("id")
-        if session_id:
-            ids.add(session_id)
-    return ids
-
-
-def _delete_dashboard_agent_rows(server_base_url: str, name: str, agent: dict) -> int:
-    candidates = {
-        f"claude-pending:pending-{name}",
-        f"codex-pending:pending-{name}",
-    }
-    session_id = agent.get("session_id")
-    if session_id:
-        candidates.add(f"claude:{session_id}")
-        candidates.add(f"codex:{session_id}")
-    candidates.update(_dashboard_agent_session_ids(server_base_url, name, agent))
-    deleted = 0
-    for composite_id in sorted(candidates):
-        if _delete_dashboard_session(server_base_url, composite_id):
-            deleted += 1
-    return deleted
-
-
 def _delete_dashboard_pending_rows(server_base_url: str, name: str) -> int:
     deleted = 0
     for composite_id in sorted({
@@ -614,13 +578,48 @@ def _reconcile_temporal_agents(
         if not _is_temporal_agent(name, agent):
             continue
         pane_id = agent.get("pane_id")
-        if pane_id and pane_is_running(pane_id):
+        if pane_id and pane_is_running(pane_id, agent.get("cli")):
             continue
         remove_agent_fn(name, str(team_dir))
         _end_dashboard_agent_session(server_base_url, name, agent)
         _delete_dashboard_pending_rows(server_base_url, name)
         removed.append(name)
     return removed
+
+
+def _pane_runs_cli(pane_id: str, command: str) -> bool:
+    """Whether the pane's top process is the agent CLI. Launches exec down to the CLI, so it is that process."""
+    pid = sp.run([tmux_bin(), "display-message", "-p", "-t", pane_id, "#{pane_pid}"], capture_output=True, text=True)
+    if pid.returncode != 0 or not pid.stdout.strip().isdigit():
+        logger.info("pane_pid_unavailable pane=%s rc=%s stderr=%s", pane_id, pid.returncode, pid.stderr.strip())
+        return False
+    args = sp.run(["ps", "-o", "args=", "-p", pid.stdout.strip()], capture_output=True, text=True).stdout.strip()
+    running = any(Path(token).name == command for token in args.split())
+    logger.info("pane_process pane=%s pid=%s expected=%s running=%s args=%s", pane_id, pid.stdout.strip(), command, running, args[:200])
+    return running
+
+
+def _pane_last_line(pane_id: str) -> str:
+    """Last line a dead pane printed (kept by --debug), wrapped lines joined; empty once the pane is gone."""
+    out = sp.run([tmux_bin(), "capture-pane", "-p", "-J", "-t", pane_id, "-S", "-40"], capture_output=True, text=True)
+    lines = [line.strip() for line in out.stdout.splitlines() if line.strip() and not line.strip().startswith("Pane is dead")]
+    return lines[-1] if out.returncode == 0 and lines else ""
+
+
+def _task_agent_resume_blocker(agent: dict) -> str | None:
+    """Why the entry cannot be resumed at all. Other failures are left to the CLI and `vibegame lead agent`."""
+    if not agent.get("session_id"):
+        return "not resumed; it has no session id. Its team entry was removed."
+    workdir = agent.get("workdir")
+    if not (isinstance(workdir, str) and Path(workdir).is_dir()):
+        return f"not resumed; its working directory {workdir} no longer exists. Its team entry was removed."
+    return None
+
+
+def _task_agent_resume_report(errors: list[tuple[str, str]], log_file: Path) -> str:
+    """Facts for the orchestrator; sent only when resuming task agents hit an error."""
+    lines = "\n".join(f"- {name}: {reason}" for name, reason in errors)
+    return f"VibeGame hit these errors while resuming task agents at startup:\n{lines}\nStartup log: {log_file}"
 
 
 def _agent_launch_mode(
@@ -668,10 +667,13 @@ def _agent_launch_mode(
     return "resume", "matching previous session"
 
 
-def _wait_for_expected_sessions(base_url: str, expected_names: set[str], timeout: float = 15.0) -> None:
-    deadline = time.time() + timeout
+def _wait_for_expected_sessions(base_url: str, expected_panes: dict[str, str], timeout: float = 15.0) -> None:
+    deadline = time.monotonic() + timeout
     sessions_url = f"{base_url}/sessions"
-    while time.time() < deadline:
+    missing = set(expected_panes)
+    while time.monotonic() < deadline:
+        for name, pane_id in expected_panes.items():
+            _assert_tmux_pane_alive(pane_id, name)
         try:
             with urllib.request.urlopen(sessions_url, timeout=1) as response:
                 payload = json.loads(response.read().decode("utf-8"))
@@ -683,13 +685,19 @@ def _wait_for_expected_sessions(base_url: str, expected_names: set[str], timeout
             item.get("name")
             for item in payload
             if isinstance(item, dict) and item.get("source_app") in ("claude", "codex")
+            and item.get("tmux_pane") == expected_panes.get(item.get("name"))
         }
-        if expected_names.issubset(seen):
-            logger.info("session_wait_ready expected=%s seen=%s", sorted(expected_names), sorted(seen))
+        missing = set(expected_panes) - seen
+        if not missing:
+            logger.info("session_wait_ready expected=%s seen=%s", sorted(expected_panes), sorted(seen))
             return
-        logger.info("session_wait_pending expected=%s seen=%s", sorted(expected_names), sorted(seen))
+        logger.info("session_wait_pending expected=%s seen=%s", sorted(expected_panes), sorted(seen))
         time.sleep(0.25)
-    raise AssertionError(f"Dashboard sessions missing. expected={sorted(expected_names)}")
+    raise AssertionError(
+        f"Agent startup timed out; sessions not registered: {', '.join(sorted(missing))}. "
+        "Check the agent panes and hook setup. For Codex, run 'vibegame setup codex-hooks', "
+        "then open Codex and review VibeGame hooks with /hooks before retrying."
+    )
 
 
 def _assert_tmux_pane_alive(
@@ -820,6 +828,10 @@ def start(
     new: bool = typer.Option(False, "--new", help="Force fresh start, ignore previous session"),
     no_agents: bool = typer.Option(False, "--no-agents", help="Start dashboard only, no agent sessions"),
     debug: bool = typer.Option(False, "--debug", help="Debug mode: remain-on-exit for all panes, verbose logging"),
+    resume_task_agents: bool = typer.Option(
+        False, "--resume-task-agents",
+        help="Also resume task agents whose panes closed without `vibegame lead kill`, and tell the orchestrator which",
+    ),
 ):
     """Launch VibeGame Dashboard and agent tmux sessions."""
     message = " ".join(initial_input or []).strip()
@@ -852,19 +864,29 @@ def start(
     # which is what the getattr fallback here used to paper over.
     try:
         from team.paths import default_session_name
-        from team.state import init_state, load_state, remove_agent, set_dashboard_port, update_lead
+        from team.state import init_state, load_state, mutate_state, remove_agent, set_dashboard_port, update_agent, update_lead
         from team.settings import agent_doc_map, load_settings, resolve_agent_settings
         from team.launch import CLI_CONFIGS, prepare_launch, build_initial_prompt_command, runtime_env_values, resolve_env_value
     except ImportError:
         logger.exception("team_runtime_import_failed")
         raise AssertionError("team runtime modules not found in .vibegame/team/")
 
-    def _pane_is_running(pane_id: str | None) -> bool:
-        return bool(
-            pane_id
-            and pane_in_session(session_name, pane_id)
-            and not pane_dead(pane_id)
-        )
+    from cli.lead_main import AgentLaunch, cmd_agent
+
+    def _pane_is_running(pane_id: str | None, cli: str | None) -> bool:
+        """The pane is live in this session and its top process is the agent's CLI.
+
+        A pane left at a shell (launch never exec'd) or a reused pane id fails the CLI check.
+        Which session that CLI runs cannot be checked.
+        """
+        if not (pane_id and pane_in_session(session_name, pane_id) and not pane_dead(pane_id)):
+            return False
+        command = CLI_CONFIGS.get(cli or "", {}).get("command")
+        if command is None:
+            # Entries written before `cli` was recorded: only the pane can be checked.
+            logger.info("pane_cli_unknown pane=%s cli=%s", pane_id, cli)
+            return True
+        return _pane_runs_cli(pane_id, command)
 
     # --- Read previous state ---
     prev_state = load_state(str(team_dir))
@@ -1010,9 +1032,25 @@ def start(
     _assert_tmux_pane_alive(dashboard_pane, "dashboard")
     _wait_http_ready(f"{server_base_url}/status")
 
+    # A task agent whose pane closed but whose entry remains was never ended by `vibegame lead kill`.
+    # With --resume-task-agents, those that can be resumed are resumed after the main team is ready;
+    # the rest are removed as usual and, like any resume failure, reported to the orchestrator.
+    resumed_task_agents: dict[str, dict] = {}
+    resume_errors: list[tuple[str, str]] = []
+    if resume_task_agents and not no_agents and (team_dir / "messages.py").is_file():
+        for name, agent in prev_agents.items():
+            if not _is_temporal_agent(name, agent) or _pane_is_running(agent.get("pane_id"), agent.get("cli")):
+                continue
+            blocker = _task_agent_resume_blocker(agent)
+            if blocker:
+                print(f"  [{name}] {blocker}")
+                logger.warning("task_agent_not_resumed name=%s reason=%s", name, blocker)
+                resume_errors.append((name, blocker))
+            else:
+                resumed_task_agents[name] = agent
     removed_temporal = _reconcile_temporal_agents(
         server_base_url=server_base_url,
-        prev_agents=prev_agents,
+        prev_agents={name: agent for name, agent in prev_agents.items() if name not in resumed_task_agents},
         team_dir=team_dir,
         pane_is_running=_pane_is_running,
         remove_agent_fn=remove_agent,
@@ -1032,236 +1070,227 @@ def start(
     print(f"  Restart Dashboard: Ctrl+C in dashboard pane, then: {dashboard_script}")
     print(f"  Stop all: tmux kill-session -t {session_target(session_name)}")
 
-    # --- Orchestrator FIRST ---
-    # Start or resume orchestrator before mates so dashboard registration is stable.
-    if not no_agents:
-        _, orch_cli, orch_model, orch_effort = configured_agents["orchestrator"]
-        assert orch_cli, "Orchestrator CLI not configured. Run: vibegame setup"
-        assert orch_model, "Orchestrator model not configured. Run: vibegame setup"
-        orch_command = CLI_CONFIGS[orch_cli]["command"]
+    # Prepare all agents before any CLI can begin its startup turn.
+    prepared: list[AgentLaunch] = []
+    try:
+        if not no_agents:
+            _, orch_cli, orch_model, orch_effort = configured_agents["orchestrator"]
+            assert orch_cli, "Orchestrator CLI not configured. Run: vibegame setup"
+            assert orch_model, "Orchestrator model not configured. Run: vibegame setup"
+            orch_command = CLI_CONFIGS[orch_cli]["command"]
 
-        # The initial input is written in the Claude form (`/vibegame-build ...`),
-        # because that is what a user types and what a task's instruction.md holds.
-        # Codex would take it as literal text, so rewrite before either delivery
-        # path uses it -- the dashboard does the same for the prompts it sends.
-        if message:
-            rewritten = rewrite_leading_skill(orch_command, message)
-            if rewritten != message:
-                logger.info("initial_input_skill_rewritten cli=%s head=%s",
-                            orch_cli, rewritten.split(None, 1)[0])
-                message = rewritten
+            # The initial input is written in the Claude form (`/vibegame-build ...`),
+            # because that is what a user types and what a task's instruction.md holds.
+            # Codex would take it as literal text, so rewrite before either delivery
+            # path uses it -- the dashboard does the same for the prompts it sends.
+            if message:
+                rewritten = rewrite_leading_skill(orch_command, message)
+                if rewritten != message:
+                    logger.info("initial_input_skill_rewritten cli=%s head=%s",
+                                orch_cli, rewritten.split(None, 1)[0])
+                    message = rewritten
 
-        orch_lead = prev_state.get("lead", {}) if not new else {}
-        prev_orch_pane = orch_lead.get("pane_id")
-        orch_pane_alive = _pane_is_running(prev_orch_pane)
-        orch_mode, orch_reason = _agent_launch_mode(
-            force_new=new,
-            state=orch_lead,
-            configured_cli=orch_cli,
-            pane_alive=orch_pane_alive,
-        )
-
-        if orch_mode != "alive" and orch_pane_alive:
-            logger.info("orchestrator_restart pane=%s reason=%s", prev_orch_pane, orch_reason)
-            kill_pane(prev_orch_pane)
-            orch_pane_alive = False
-
-        # Set by the fresh-launch path below; an already-running orchestrator has
-        # no launch to attach the request to.
-        launch_carries_message = False
-
-        if orch_mode == "alive":
-            input_target = prev_orch_pane
-            logger.info("orchestrator_alive pane=%s skipping_spawn", prev_orch_pane)
-            print(f"  Orchestrator: already running (pane {prev_orch_pane}), skipping spawn")
-            _pane_label = resolve_pane_id(prev_orch_pane)
-            if orch_session_id:
-                cli = orch_lead.get("cli") or orch_cli
-                _sync_alive_agent(
-                    server_base_url, "orchestrator",
-                    "codex" if cli == "codex" else "claude",
-                    orch_session_id, _pane_label, str(project_path),
-                    transcript_path=orch_lead.get("transcript_path"),
-                    dashboard_token=dashboard_token,
-                )
-            else:
-                _preregister_session(
-                    server_base_url, "orchestrator", _pane_label, str(project_path),
-                    cli=orch_cli,
-                    transcript_path=orch_lead.get("transcript_path"),
-                    dashboard_token=dashboard_token,
-                )
-        else:
-            orch_base_cmd, orch_config, orch_model = prepare_launch(
-                orch_cli, orch_model, agent="orchestrator",
-                name="orchestrator", team_root=str(project_path),
-                effort=orch_effort,
+            orch_lead = prev_state.get("lead", {}) if not new else {}
+            prev_orch_pane = orch_lead.get("pane_id")
+            orch_pane_alive = _pane_is_running(prev_orch_pane, orch_lead.get("cli"))
+            orch_mode, orch_reason = _agent_launch_mode(
+                force_new=new,
+                state=orch_lead,
+                configured_cli=orch_cli,
+                pane_alive=orch_pane_alive,
             )
 
-            # Append system prompt (orchestrator.md)
-            orchestrator_content = (project_path / ".vibegame" / "orchestrator.md").read_text(encoding="utf-8").strip()
-            sys_prompt_flag = orch_config.get("system_prompt_flag")
-            if sys_prompt_flag:
-                orch_base_cmd += f" {sys_prompt_flag} {shlex.quote(orchestrator_content)}"
+            if orch_mode != "alive" and orch_pane_alive:
+                logger.info("orchestrator_restart pane=%s reason=%s", prev_orch_pane, orch_reason)
+                kill_pane(prev_orch_pane)
+                orch_pane_alive = False
 
-            # A fresh launch carries the request as part of its own launch argument.
-            # Pasting it into the pane instead races the startup turn: input that
-            # arrives mid-turn is queued, and a queued prompt reaches the agent as
-            # context rather than as a submission -- UserPromptSubmit never fires, so
-            # goal-capture misses it, and if the turn ends on a blocking Stop hook the
-            # request can sit in the queue undelivered. Resume keeps the paste: its
-            # command has no argument slot, and the pane is idle by then anyway.
-            launch_carries_message = (
-                bool(message)
-                and orch_mode == "fresh"
-                and orch_config.get("initial_prompt_mode") == "argument"
-            )
-            fresh_prompt = skill_invocation(orch_command, "vibegame-start")
-            if launch_carries_message:
-                # `message` is already in this CLI's skill form (rewritten above).
-                fresh_prompt = f"{fresh_prompt}\n\n{message}"
-            fresh_orch_cmd = build_initial_prompt_command(orch_base_cmd, fresh_prompt, orch_config)
+            # Set by the fresh-launch path below; an already-running orchestrator has
+            # no launch to attach the request to.
+            launch_carries_message = False
 
-            # Resume first. Claude-family profile switches share Claude Code's
-            # local session format; if the new endpoint rejects the resume,
-            # fall back once to a fresh orchestrator in the same pane.
-            if orch_mode == "resume" and orch_session_id:
-                resume_val = orch_config.get("resume", "--resume")
-                resume_cmd = f"{orch_base_cmd} {resume_val} {shlex.quote(orch_session_id)}"
-                if orch_cli.startswith("claude"):
-                    fallback_notice = shlex.quote(
-                        "Claude resume failed; starting a fresh orchestrator session."
-                    )
-                    orch_cmd = (
-                        f"{resume_cmd} || {{ echo {fallback_notice} >&2; "
-                        f"exec {fresh_orch_cmd}; }}"
+            if orch_mode == "alive":
+                input_target = prev_orch_pane
+                logger.info("orchestrator_alive pane=%s skipping_spawn", prev_orch_pane)
+                print(f"  Orchestrator: already running (pane {prev_orch_pane}), skipping spawn")
+                _pane_label = resolve_pane_id(prev_orch_pane)
+                if orch_session_id:
+                    cli = orch_lead.get("cli") or orch_cli
+                    _sync_alive_agent(
+                        server_base_url, "orchestrator",
+                        "codex" if cli == "codex" else "claude",
+                        orch_session_id, _pane_label, str(project_path),
+                        transcript_path=orch_lead.get("transcript_path"),
+                        dashboard_token=dashboard_token,
                     )
                 else:
-                    orch_cmd = resume_cmd
+                    _preregister_session(
+                        server_base_url, "orchestrator", _pane_label, str(project_path),
+                        cli=orch_cli,
+                        transcript_path=orch_lead.get("transcript_path"),
+                        dashboard_token=dashboard_token,
+                    )
             else:
-                orch_cmd = fresh_orch_cmd
+                orch_base_cmd, orch_config, orch_model = prepare_launch(
+                    orch_cli, orch_model, agent="orchestrator",
+                    name="orchestrator", team_root=str(project_path),
+                    effort=orch_effort, workdir=str(project_path),
+                )
 
-            # Resolve env vars from .env
-            runtime_env = runtime_env_values(str(team_dir))
-            orch_env = {
-                "VIBEGAME_ROLE": "orchestrator",
-                "VIBEGAME_TEAM_DIR": str(team_dir),
-            }
-            for key, val in (orch_config.get("env") or {}).items():
-                orch_env[key] = resolve_env_value(val, orch_model, runtime_env)
+                # Append system prompt (orchestrator.md)
+                orchestrator_content = (project_path / ".vibegame" / "orchestrator.md").read_text(encoding="utf-8").strip()
+                sys_prompt_flag = orch_config.get("system_prompt_flag")
+                if sys_prompt_flag:
+                    orch_base_cmd += f" {sys_prompt_flag} {shlex.quote(orchestrator_content)}"
 
-            orch_script = _write_launch_script(
-                "orchestrator", project_path,
-                orch_env,
-                orch_cmd,
-            )
-            logger.debug("orchestrator_script path=%s cmd=%s", orch_script, orch_cmd)
-            if orch_mode == "resume" and orch_session_id:
-                print(f"  Orchestrator: resuming {orch_cli}/{orch_model} ({orch_session_id[:8]}...)")
-            else:
-                print(f"  Orchestrator: {orch_cli}/{orch_model} (fresh: {orch_reason})")
-            orch_target = window_target(session_name, 0)
-            orch_pane = split_window(orch_target, layout="even-horizontal")
-            input_target = orch_pane
-            if debug:
-                set_remain_on_exit(orch_pane)
-            orch_pane_label = resolve_pane_id(orch_pane)
-            # Pre-register BEFORE sending the launch command so merge_pending
-            # always has a pending row to clean up when SessionStart fires.
-            _preregister_session(
-                server_base_url,
-                "orchestrator",
-                orch_pane_label,
-                str(project_path),
-                cli=orch_cli,
-                transcript_path=prev_state.get("lead", {}).get("transcript_path"),
-                dashboard_token=dashboard_token,
-            )
-            # Clear stale session metadata BEFORE launching so the hook's
-            # update_lead(session_id=real) is never overwritten by None.
-            if orch_mode == "fresh":
+                # A fresh launch carries the request as part of its own launch argument.
+                # Pasting it into the pane instead races the startup turn: input that
+                # arrives mid-turn is queued, and a queued prompt reaches the agent as
+                # context rather than as a submission -- UserPromptSubmit never fires, so
+                # goal-capture misses it, and if the turn ends on a blocking Stop hook the
+                # request can sit in the queue undelivered. Resume keeps the paste: its
+                # command has no argument slot, and the pane is idle by then anyway.
+                launch_carries_message = (
+                    bool(message)
+                    and orch_mode == "fresh"
+                    and orch_config.get("initial_prompt_mode") == "argument"
+                )
+                fresh_prompt = skill_invocation(orch_command, "vibegame-start")
+                if launch_carries_message:
+                    # `message` is already in this CLI's skill form (rewritten above).
+                    fresh_prompt = f"{fresh_prompt}\n\n{message}"
+                fresh_orch_cmd = build_initial_prompt_command(orch_base_cmd, fresh_prompt, orch_config)
+
+                # Resume first. Claude-family profile switches share Claude Code's
+                # local session format; if the new endpoint rejects the resume,
+                # fall back once to a fresh orchestrator in the same pane.
+                if orch_mode == "resume" and orch_session_id:
+                    resume_val = orch_config.get("resume", "--resume")
+                    resume_cmd = f"{orch_base_cmd} {resume_val} {shlex.quote(orch_session_id)}"
+                    if orch_cli.startswith("claude"):
+                        fallback_notice = shlex.quote(
+                            "Claude resume failed; starting a fresh orchestrator session."
+                        )
+                        orch_cmd = (
+                            f"{resume_cmd} || {{ echo {fallback_notice} >&2; "
+                            f"exec {fresh_orch_cmd}; }}"
+                        )
+                    else:
+                        orch_cmd = resume_cmd
+                else:
+                    orch_cmd = fresh_orch_cmd
+
+                # Resolve env vars from .env
+                runtime_env = runtime_env_values(str(team_dir))
+                orch_env = {
+                    "VIBEGAME_ROLE": "orchestrator",
+                    "VIBEGAME_TEAM_DIR": str(team_dir),
+                }
+                for key, val in (orch_config.get("env") or {}).items():
+                    orch_env[key] = resolve_env_value(val, orch_model, runtime_env)
+
+                orch_script = _write_launch_script(
+                    "orchestrator", project_path,
+                    orch_env,
+                    orch_cmd,
+                )
+                logger.debug("orchestrator_script path=%s cmd=%s", orch_script, orch_cmd)
+                if orch_mode == "resume" and orch_session_id:
+                    print(f"  Orchestrator: resuming {orch_cli}/{orch_model} ({orch_session_id[:8]}...)")
+                else:
+                    print(f"  Orchestrator: {orch_cli}/{orch_model} (fresh: {orch_reason})")
+                orch_target = window_target(session_name, 0)
+                orch_pane = split_window(orch_target, layout="even-horizontal")
+                input_target = orch_pane
+                orch_pane_label = resolve_pane_id(orch_pane)
+                orch_launch = f"cd {shlex.quote(str(project_path))} && exec /bin/sh {shlex.quote(orch_script)}"
+
+                orch_launched = False
+
+                def launch_orchestrator() -> None:
+                    nonlocal orch_launched
+                    logger.info("orchestrator_launch pane=%s script=%s", orch_pane, orch_script)
+                    sp.run(
+                        [tmux_bin(), "send-keys", "-t", orch_pane, orch_launch, "Enter"],
+                        capture_output=True, check=True,
+                    )
+                    orch_launched = True
+
+                def verify_orchestrator() -> None:
+                    _assert_tmux_pane_alive(
+                        orch_pane, "orchestrator", timeout=6.0,
+                        stable_for=AGENT_BOOT_STABLE_SECONDS,
+                    )
+                    if orch_mode == "resume" and orch_session_id:
+                        _sync_resumed_agent(
+                            server_base_url, "orchestrator", orch_cli, orch_session_id,
+                            orch_pane_label, str(project_path),
+                            transcript_path=orch_lead.get("transcript_path"),
+                            dashboard_token=dashboard_token,
+                        )
+                    logger.info("orchestrator_boot_ok pane=%s mode=%s reason=%s", orch_pane, orch_mode, orch_reason)
+
+                def cancel_orchestrator() -> None:
+                    # Same rule as teammates (lead_main.cmd_agent): session_id stays, a launched
+                    # pane is left alone, and only a pane that never got its launch command is closed.
+                    if orch_launched:
+                        return
+
+                    def clear_pane(current: dict) -> bool:
+                        if current["lead"].get("pane_id") != orch_pane:
+                            return False
+                        current["lead"]["pane_id"] = None
+                        return True
+
+                    _, removed = mutate_state(clear_pane, str(team_dir))
+                    if removed:
+                        kill_pane(orch_pane)
+
                 update_lead(
                     explicit_team_dir=str(team_dir),
-                    session_id=None,
-                    transcript_path=None,
-                    last_transcript_at=None,
+                    pane_id=orch_pane, cli=orch_cli, model=orch_model,
                 )
-            orch_launch = f"cd {shlex.quote(str(project_path))} && exec /bin/sh {shlex.quote(orch_script)}"
-            sp.run([tmux_bin(), "send-keys", "-t", orch_pane, orch_launch, "Enter"], capture_output=True)
-            _assert_tmux_pane_alive(
-                orch_pane,
-                "orchestrator",
-                timeout=6.0,
-                stable_for=AGENT_BOOT_STABLE_SECONDS,
-            )
-            if should_send_trust_enter(orch_config):
-                send_trust_enter(orch_pane)
-                _assert_tmux_pane_alive(
-                    orch_pane,
-                    "orchestrator",
-                    timeout=2.0,
-                    stable_for=0.5,
-                )
-            update_lead(
-                explicit_team_dir=str(team_dir),
-                pane_id=orch_pane, cli=orch_cli, model=orch_model,
-            )
-            if orch_mode == "resume" and orch_session_id:
-                _sync_resumed_agent(
-                    server_base_url,
-                    "orchestrator",
-                    orch_cli,
-                    orch_session_id,
-                    orch_pane_label,
-                    str(project_path),
-                    transcript_path=prev_state.get("lead", {}).get("transcript_path"),
+                prepared.append(AgentLaunch(
+                    "orchestrator", orch_pane, launch_orchestrator,
+                    verify_orchestrator, cancel_orchestrator,
+                ))
+                if debug:
+                    set_remain_on_exit(orch_pane)
+                _preregister_session(
+                    server_base_url, "orchestrator", orch_pane_label, str(project_path),
+                    cli=orch_cli, transcript_path=orch_lead.get("transcript_path"),
                     dashboard_token=dashboard_token,
                 )
-            logger.info("orchestrator_boot_ok pane=%s mode=%s reason=%s", orch_pane, orch_mode, orch_reason)
-            _wait_for_expected_sessions(server_base_url, {"orchestrator"}, timeout=30.0)
+                # Clear stale metadata before SessionStart can write the new session.
+                if orch_mode == "fresh":
+                    update_lead(
+                        explicit_team_dir=str(team_dir),
+                        session_id=None, transcript_path=None, last_transcript_at=None,
+                    )
 
-        if launch_carries_message:
-            print(f"  Initial input: launched with the orchestrator ({len(message)} chars)")
-            logger.info("initial_input_in_launch chars=%s", len(message))
-        elif message:
-            # Resumed or already-running orchestrator: no launch argument to use,
-            # so the request goes into the pane as its own submission.
-            assert input_target, "Orchestrator pane unavailable for initial input."
-            _send_initial_input(input_target, message)
-            print(f"  Initial input: sent to orchestrator ({len(message)} chars)")
-            logger.info("initial_input_sent pane=%s chars=%s", input_target, len(message))
+        # Prepare managed teammates in the same batch as the orchestrator.
+        if not no_agents and (team_dir / "messages.py").is_file():
+            for role in startup_agent_names:
+                agent_state = prev_agents.get(role)
+                if role == "reviewer" and agent_state is None:
+                    agent_state = reviewer_start
+                _, configured_cli, configured_model, _ = configured_agents[role]
+                assert configured_cli, f"CLI not configured for {role}. Run: vibegame setup"
+                sid = (agent_state or {}).get("session_id")
+                pane_id = (agent_state or {}).get("pane_id", "")
+                pane_alive = _pane_is_running(pane_id, (agent_state or {}).get("cli"))
+                agent_mode, agent_reason = _agent_launch_mode(
+                    force_new=new,
+                    state=agent_state,
+                    configured_cli=configured_cli,
+                    pane_alive=pane_alive,
+                )
 
-    # --- Managed teammates (synchronous, split into window 0 by `vibegame lead`) ---
-    if not no_agents and (team_dir / "messages.py").is_file():
-        # Only wait for orchestrator here if we didn't already wait at line 596 above.
-        # When orch was freshly spawned, we waited at 596 and don't need to wait again.
-        # Filled per freshly launched role below; see the comment at the add site.
-        wait_for: set[str] = set()
-
-        for role in startup_agent_names:
-            agent_state = prev_agents.get(role)
-            if role == "reviewer" and agent_state is None:
-                agent_state = reviewer_start
-            # effort is unused here: mates launch through `vibegame lead agent`,
-            # which resolves settings again in its own process.
-            _, configured_cli, configured_model, _ = configured_agents[role]
-            assert configured_cli, f"CLI not configured for {role}. Run: vibegame setup"
-            sid = (agent_state or {}).get("session_id")
-            pane_id = (agent_state or {}).get("pane_id", "")
-            pane_alive = _pane_is_running(pane_id)
-            agent_mode, agent_reason = _agent_launch_mode(
-                force_new=new,
-                state=agent_state,
-                configured_cli=configured_cli,
-                pane_alive=pane_alive,
-            )
-
-            # Already alive: skip spawn, sync to dashboard with real or pending session_id
-            if agent_mode == "alive":
-                print(f"  [{role}] already running (pane {pane_id}), skipping")
-                mate_sid = agent_state.get("session_id")
-                _pane_label = resolve_pane_id(pane_id)
-                try:
+                # Already alive: skip spawn, sync to dashboard with real or pending session_id
+                if agent_mode == "alive":
+                    print(f"  [{role}] already running (pane {pane_id}), skipping")
+                    mate_sid = agent_state.get("session_id")
+                    _pane_label = resolve_pane_id(pane_id)
                     if mate_sid:
                         previous_cli = agent_state.get("cli") or configured_cli
                         _sync_alive_agent(
@@ -1278,70 +1307,147 @@ def start(
                             transcript_path=agent_state.get("transcript_path"),
                             dashboard_token=dashboard_token,
                         )
-                except Exception:
-                    pass
-                continue
+                    continue
 
-            if pane_alive:
-                print(f"  [{role}] restarting (fresh: {agent_reason})")
-                result = _run_lead(project_path, f"kill --name {shlex.quote(role)} -f", debug=debug)
-                if result.returncode != 0:
-                    kill_pane(pane_id)
+                if pane_alive:
+                    print(f"  [{role}] restarting (fresh: {agent_reason})")
+                    result = _run_lead(project_path, f"kill --name {shlex.quote(role)} -f", debug=debug)
+                    if result.returncode != 0:
+                        kill_pane(pane_id)
+                        remove_agent(role, str(team_dir))
+                elif agent_state:
+                    # Stale state entry with no live pane (e.g. previous boot crash) — clear it.
                     remove_agent(role, str(team_dir))
-            elif agent_state:
-                # Stale state entry with no live pane (e.g. previous boot crash) — clear it.
-                remove_agent(role, str(team_dir))
 
-            # Dead or absent: determine resume flag
-            resume_flag = ""
-            if agent_mode == "resume" and sid:
-                resume_flag = f"--resume {shlex.quote(sid)}"
-
-            lead_args = (
-                f"agent --agent-type {role} --name {role} "
-                f"{resume_flag} "
-                f"--prompt 'You are the {role}. Stand by for tasks.'"
-            )
-            print(f"  [{role}] vibegame lead {lead_args} ({agent_mode}: {agent_reason})")
-            result = _run_lead(project_path, lead_args, debug=debug)
-            if result.returncode != 0:
-                logger.error("agent_boot_failed role=%s rc=%s stderr=%s", role, result.returncode, result.stderr.strip())
-                print(f"  [{role}] FAILED (rc={result.returncode}): {result.stderr.strip()}")
-                raise AssertionError(f"{role} launch failed")
-            logger.info("agent_boot_ok role=%s stdout=%s", role, result.stdout.strip())
-            print(f"  [{role}] OK: {result.stdout.strip()}")
-            pane_marker = next(
-                (token.split("=", 1)[1] for token in result.stdout.split() if token.startswith("pane=")),
-                None,
-            )
-            assert pane_marker, f"{role} launch output missing pane marker: {result.stdout}"
-            _preregister_session(
-                server_base_url, role,
-                resolve_pane_id(pane_marker),
-                str(project_path),
-                cli=configured_cli,
-                transcript_path=(agent_state or {}).get("transcript_path"),
-                dashboard_token=dashboard_token,
-            )
-            if agent_mode == "resume" and sid:
-                _sync_resumed_agent(
-                    server_base_url,
-                    role,
-                    configured_cli,
-                    sid,
-                    resolve_pane_id(pane_marker),
-                    str(project_path),
-                    transcript_path=(agent_state or {}).get("transcript_path"),
-                    dashboard_token=dashboard_token,
+                args = SimpleNamespace(
+                    agent_type=role, name=role, model=None, workdir=None,
+                    resume=sid if agent_mode == "resume" else None,
+                    prompt=f"You are the {role}. Stand by for tasks.", shortcut_peer=None,
                 )
-            # Only roles launched here. A role that was already alive is skipped
-            # above, and when it has no session_id it gets a pending row only —
-            # its process will never fire another SessionStart, so waiting on it
-            # would time out on a teammate that is in fact healthy.
-            wait_for.add(role)
+                print(f"  [{role}] preparing ({agent_mode}: {agent_reason})")
+                result = cmd_agent(args, prepared=prepared, runtime_dir=str(team_dir), debug=debug)
+                if result != 0:
+                    raise AssertionError(f"{role} launch preparation failed (rc={result})")
 
-        print(f"  Agents: {', '.join(startup_agent_names)} (per-agent)")
-        _wait_for_expected_sessions(server_base_url, wait_for)
+        for agent in prepared:
+            agent.start()
+        for agent in prepared:
+            agent.verify()
+        if prepared:
+            _wait_for_expected_sessions(
+                server_base_url, {agent.name: agent.pane_id for agent in prepared}, timeout=60.0,
+            )
+            print(f"  Agents ready: {', '.join(agent.name for agent in prepared)}")
+
+        def launch_task_agent(name: str, agent: dict) -> AgentLaunch | str:
+            """Prepare and launch one resumed task agent; return its launch, or its failure instead of raising."""
+            def keep_entry(current: dict) -> None:
+                current["agents"].setdefault(name, agent)
+
+            remove_agent(name, str(team_dir))
+            launch: list[AgentLaunch] = []
+            errors = io.StringIO()
+            args = SimpleNamespace(
+                agent_type=agent.get("agent_type"), name=name, model=None, workdir=agent["workdir"],
+                resume=agent["session_id"], prompt="", shortcut_peer=None,
+            )
+            try:
+                try:
+                    with contextlib.redirect_stderr(errors):
+                        result = cmd_agent(args, prepared=launch, runtime_dir=str(team_dir), debug=debug)
+                finally:
+                    sys.stderr.write(errors.getvalue())
+                if result != 0:
+                    # cmd_agent prints its reason last, after any model warnings.
+                    lines = errors.getvalue().strip().splitlines()
+                    detail = lines[-1] if lines else f"`vibegame lead agent` returned {result}"
+                    return f"resume failed: {detail.rstrip('.')}. Its team entry is kept."
+                # The re-registered entry starts without a transcript; the resumed session keeps writing the old one.
+                update_agent(name, str(team_dir), transcript_path=agent.get("transcript_path"))
+                (plan,) = launch
+                plan.start()
+                return plan
+            except Exception as exc:  # one agent's failure must not stop the others or the start
+                for plan in launch:
+                    plan.cancel()
+                return f"resume failed: {str(exc).rstrip('.')}. Its team entry is kept."
+            finally:
+                # A failure before re-registration must not lose the entry and its session.
+                mutate_state(keep_entry, str(team_dir))
+
+        def unstable_task_agents(plans: dict[str, AgentLaunch]) -> dict[str, str]:
+            """Agents whose pane dies within the window, or does not run its CLI when it ends.
+
+            The dashboard row is written by start itself, so it proves nothing about the CLI.
+            """
+            failed: dict[str, str] = {}
+            deadline = time.monotonic() + TASK_AGENT_RESUME_STABLE_SECONDS
+            while True:
+                for name, plan in plans.items():
+                    if name not in failed and (not pane_in_session(session_name, plan.pane_id) or pane_dead(plan.pane_id)):
+                        last = _pane_last_line(plan.pane_id)
+                        failed[name] = f"resume failed: its pane exited during startup{f' ({last})' if last else ''}. Its team entry is kept."
+                if time.monotonic() >= deadline or len(failed) == len(plans):
+                    break
+                time.sleep(0.5)
+            clis = {name: agent.get("cli") for name, agent in load_state(str(team_dir))["agents"].items()}
+            for name, plan in plans.items():
+                if name not in failed and not _pane_is_running(plan.pane_id, clis.get(name)):
+                    failed[name] = (
+                        f"resume failed: its pane is not running {clis.get(name)} "
+                        f"{TASK_AGENT_RESUME_STABLE_SECONDS:g}s after launch. Its team entry is kept."
+                    )
+            return failed
+
+        resumed_ok: list[str] = []
+        failures: dict[str, str] = {}
+        launched: dict[str, AgentLaunch] = {}
+        for name, agent in sorted(resumed_task_agents.items()):
+            print(f"  [{name}] resuming (closed without lead kill)")
+            outcome = launch_task_agent(name, agent)
+            if isinstance(outcome, str):
+                failures[name] = outcome
+            else:
+                launched[name] = outcome
+        if launched:
+            failures.update(unstable_task_agents(launched))
+        for name, plan in launched.items():
+            if name in failures:
+                continue
+            try:
+                plan.verify()
+            except Exception as exc:  # one agent's failure must not stop the others or the start
+                failures[name] = f"resume failed: {str(exc).rstrip('.')}. Its team entry is kept."
+        for name, agent in sorted(resumed_task_agents.items()):
+            if name in failures:
+                print(f"  [{name}] {failures[name]}")
+                logger.warning("task_agent_resume_failed name=%s reason=%s", name, failures[name])
+                resume_errors.append((name, failures[name]))
+            else:
+                was = "was working" if agent.get("status") in ("working", "waiting") else "was idle"
+                resumed_ok.append(f"{name} ({was})")
+        if resumed_ok:
+            print(f"  Resumed task agents: {', '.join(resumed_ok)}")
+            logger.info("task_agents_resumed %s", resumed_ok)
+        resume_report = _task_agent_resume_report(resume_errors, log_file) if resume_errors else ""
+
+        if not no_agents:
+            if launch_carries_message:
+                print(f"  Initial input: launched with the orchestrator ({len(message)} chars)")
+                logger.info("initial_input_in_launch chars=%s", len(message))
+            # Resumed or already-running orchestrator: no launch argument to use, so the request
+            # goes into the pane as its own submission, together with any resume report.
+            pending = "\n\n".join(text for text in (None if launch_carries_message else message, resume_report) if text)
+            if pending:
+                assert input_target, "Orchestrator pane unavailable for initial input."
+                _send_initial_input(input_target, pending)
+                print(f"  Initial input: sent to orchestrator ({len(pending)} chars)")
+                logger.info("initial_input_sent pane=%s chars=%s resume_errors=%s", input_target, len(pending), len(resume_errors))
+    except BaseException:
+        for agent in reversed(prepared):
+            logger.info("agent_startup_cancel name=%s pane=%s", agent.name, agent.pane_id)
+            agent.cancel()
+        raise
 
     if close_current_old_orchestrator_pane and current_pane_id:
         logger.info("previous_orchestrator_current_pane_scheduled_close pane=%s", current_pane_id)
