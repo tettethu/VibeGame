@@ -31,6 +31,12 @@ def _init_project(tmp_path: Path) -> Path:
 
 
 def test_init_scaffolds_a_godot_project(tmp_path: Path) -> None:
+    """`vibegame godot init` writes a Godot 4 project with an empty entry scene, the bridge and agent instructions.
+
+    Target: `vibegame godot init`, src/cli/godot.py: init() -> _copy_template_tree(), is_godot_project(), project_engine().
+    Input: `vibegame godot init game --name "Test Game" --lang en` in an empty temp folder.
+    Expect: `project.godot`, `scenes/main.tscn` without any `ext_resource`, the `scripts/` folder, `addons/vibegame_bridge/bridge.gd`, `.vibegame/spec/godot/engine.md` and `CLAUDE.md` exist. `CLAUDE.md` has no `{{language_name}}` placeholder left. `project.json` has an `engine` that starts with "godot@" and `startScene` "scenes/main.tscn". `is_godot_project()` is true and `project_engine()` returns the same engine.
+    """
     project = _init_project(tmp_path)
     assert (project / "project.godot").is_file()
     assert (project / "scenes" / "main.tscn").is_file()
@@ -72,6 +78,12 @@ def test_init_refuses_to_overwrite_existing_files(tmp_path: Path) -> None:
 
 
 def test_project_schema_accepts_godot_engine(tmp_path: Path) -> None:
+    """The shipped `project.json` schema accepts the `project.json` that `vibegame godot init` writes.
+
+    Target: project schema, src/.vibegame/schema/project.schema.json (`engine` pattern for "godot@x.y.z").
+    Input: the `project.json` of a fresh scaffold, validated with `jsonschema.validate()`.
+    Expect: validation raises no error.
+    """
     project = _init_project(tmp_path)
     schema = json.loads(
         (SRC_ROOT / ".vibegame" / "schema" / "project.schema.json").read_text(encoding="utf-8")
@@ -81,12 +93,24 @@ def test_project_schema_accepts_godot_engine(tmp_path: Path) -> None:
 
 
 def test_check_passes_on_fresh_scaffold_without_godot(tmp_path: Path) -> None:
+    """The static part of the check finds no error in a fresh scaffold.
+
+    Target: `vibegame godot check` static checks, src/cli/godot_check.py: check_godot_project().
+    Input: a fresh scaffold, checked with no Godot binary and `boot_check=False`.
+    Expect: no issue has level "error".
+    """
     project = _init_project(tmp_path)
     issues = check_godot_project(project, godot_bin=None, boot_check=False)
     assert [issue for issue in issues if issue.level == "error"] == []
 
 
 def test_check_rejects_a_missing_entry_scene(tmp_path: Path) -> None:
+    """The check reports an error when the scene named by `run/main_scene` does not exist.
+
+    Target: `vibegame godot check` static checks, src/cli/godot_check.py: check_godot_project() (`run/main_scene` and `startScene`).
+    Input: a fresh scaffold with `scenes/main.tscn` deleted, checked with no Godot binary and `boot_check=False`.
+    Expect: the error messages contain "missing file".
+    """
     project = _init_project(tmp_path)
     (project / "scenes" / "main.tscn").unlink()
     issues = check_godot_project(project, godot_bin=None, boot_check=False)
@@ -96,6 +120,12 @@ def test_check_rejects_a_missing_entry_scene(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(find_godot_binary() is None, reason="Godot is not installed")
 def test_check_catches_a_gdscript_parse_error(tmp_path: Path) -> None:
+    """The headless boot reports a syntax error in the script of the entry scene.
+
+    Target: `vibegame godot check` boot check, src/cli/godot_check.py: check_godot_project() -> _parse_error_lines().
+    Input: a fresh scaffold whose `scenes/main.tscn` uses `scripts/entry.gd`, which contains `func broken( -> void:`.
+    Expect: an error message contains "Parse Error".
+    """
     project = _init_project(tmp_path)
     (project / "scripts" / "entry.gd").write_text("extends Node2D\nfunc broken( -> void:\n\tpass\n", encoding="utf-8")
     (project / "scenes" / "main.tscn").write_text(
@@ -276,6 +306,12 @@ class _FakeBridge:
 
 
 def test_bridge_client_roundtrip() -> None:
+    """The bridge client sends one JSON line per command and returns the matching response.
+
+    Target: Godot bridge client, src/cli/godot_runtime.py: BridgeClient.connect(), BridgeClient.call().
+    Input: a fake bridge on a local port that answers `ping` with engine "godot" and `status` with frame 12.
+    Expect: `call("ping")["engine"]` is "godot" and `call("status")["frame"]` is 12.
+    """
     with _FakeBridge(
         {
             "ping": {"ok": True, "engine": "godot"},
@@ -292,6 +328,12 @@ def test_bridge_client_roundtrip() -> None:
 
 
 def test_bridge_client_surfaces_bridge_errors() -> None:
+    """A bridge response with `ok` false becomes a `BridgeError` that carries the bridge message.
+
+    Target: Godot bridge client, src/cli/godot_runtime.py: BridgeClient.call().
+    Input: a fake bridge that answers `set` with `{"ok": false, "error": "node not found"}`.
+    Expect: `call("set", ...)` raises `BridgeError` that matches "node not found".
+    """
     with _FakeBridge({"set": {"ok": False, "error": "node not found"}}) as bridge:
         client = BridgeClient(port=bridge.port, timeout=5)
         client.connect()
