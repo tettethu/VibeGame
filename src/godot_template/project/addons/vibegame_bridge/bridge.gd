@@ -59,7 +59,8 @@ var _snapshot_count := 0
 func _ready() -> void:
 	# Runtime control must keep working while the game tree is paused.
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	if OS.get_environment("VIBEGAME_GODOT_BRIDGE_DISABLE") == "1":
+	if OS.get_environment("VIBEGAME_GODOT_CHECK") == "1":
+		_run_project_check()
 		return
 	_port = _resolve_port()
 	var err := _server.listen(_port, "127.0.0.1")
@@ -91,6 +92,46 @@ func log_line(message: Variant, level: String = "log") -> void:
 	_console_seq += 1
 	while _console_entries.size() > MAX_CONSOLE_ENTRIES:
 		_console_entries.pop_front()
+
+
+## `vibegame godot check` boots the project with VIBEGAME_GODOT_CHECK=1. Loading
+## every script and scene here compiles the ones the entry scene never reaches,
+## with autoload names in scope, and finds scene references to missing files.
+func _run_project_check() -> void:
+	var paths: Array[String] = []
+	_collect_checkable("res://", paths)
+	var failed := 0
+	for path in paths:
+		var problem := _check_resource(path)
+		if not problem.is_empty():
+			failed += 1
+			print("[vibegame-check] FAIL %s: %s" % [path, problem])
+	print("[vibegame-check] DONE %d checked, %d failed" % [paths.size(), failed])
+
+
+func _collect_checkable(dir: String, out: Array[String]) -> void:
+	for file in DirAccess.get_files_at(dir):
+		if file.ends_with(".gd") or file.ends_with(".tscn"):
+			out.append(dir.path_join(file))
+	for sub in DirAccess.get_directories_at(dir):
+		if not sub.begins_with("."):
+			_collect_checkable(dir.path_join(sub), out)
+
+
+func _check_resource(path: String) -> String:
+	# Dependency entries read "<uid>::<type>::<path>".
+	for dependency in ResourceLoader.get_dependencies(path):
+		var dependency_path := dependency.get_slice("::", 2)
+		if dependency_path.is_empty() or not ResourceLoader.exists(dependency_path):
+			return "missing dependency %s" % dependency
+	# Default cache mode: re-loading this running script uncached crashes Godot,
+	# and a cached resource has already compiled.
+	var resource := ResourceLoader.load(path)
+	if resource == null:
+		return "failed to load"
+	if resource is GDScript and not (resource as GDScript).can_instantiate():
+		return "script does not compile"
+	return ""
 
 
 func _resolve_port() -> int:

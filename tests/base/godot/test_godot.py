@@ -80,6 +80,57 @@ def test_check_catches_a_gdscript_parse_error(tmp_path: Path) -> None:
     assert any("Parse Error" in issue.message for issue in errors), issues
 
 
+@pytest.mark.skipif(find_godot_binary() is None, reason="Godot is not installed")
+def test_check_reports_files_the_entry_scene_never_loads(tmp_path: Path) -> None:
+    """The check reports broken scripts and scenes that the entry scene never loads, without autoload false positives.
+
+    Target: `vibegame godot check` boot check, src/cli/godot_check.py: check_godot_project() -> _check_report_issues(), with the bridge check mode in addons/vibegame_bridge/bridge.gd: _run_project_check().
+    Input: a fresh scaffold plus three files that no scene loads: `scripts/broken.gd` with the syntax error `func broken(:`, `scripts/uses_bridge.gd` that calls the `VibeGameBridge` autoload, and `scenes/other.tscn` that references the missing `res://scripts/missing_script.gd`.
+    Expect: errors name `scripts/broken.gd` and `scenes/other.tscn`. No error names `scripts/uses_bridge.gd`, and no error says "Identifier not found".
+    """
+    project = _init_project(tmp_path)
+    (project / "scripts" / "broken.gd").write_text("extends Node\nfunc broken(:\n\tpass\n", encoding="utf-8")
+    (project / "scripts" / "uses_bridge.gd").write_text(
+        'extends Node\nfunc report() -> void:\n\tVibeGameBridge.log_line("ok")\n', encoding="utf-8"
+    )
+    (project / "scenes" / "other.tscn").write_text(
+        '[gd_scene load_steps=2 format=3]\n\n'
+        '[ext_resource type="Script" path="res://scripts/missing_script.gd" id="1"]\n\n'
+        '[node name="Other" type="Node"]\nscript = ExtResource("1")\n',
+        encoding="utf-8",
+    )
+    issues = check_godot_project(project, godot_bin=find_godot_binary(), boot_check=True)
+    errors = [issue for issue in issues if issue.level == "error"]
+    files = {issue.file for issue in errors}
+    assert {"scripts/broken.gd", "scenes/other.tscn"} <= files, issues
+    assert "scripts/uses_bridge.gd" not in files, issues
+    assert not any("Identifier not found" in issue.message for issue in errors), issues
+
+
+@pytest.mark.skipif(find_godot_binary() is None, reason="Godot is not installed")
+def test_check_treats_a_failed_boot_as_an_error(tmp_path: Path) -> None:
+    """A headless boot that exits with a non-zero code is a check error, not a warning.
+
+    Target: `vibegame godot check` boot check, src/cli/godot_check.py: check_godot_project().
+    Input: a fresh scaffold whose `scenes/main.tscn` uses `scripts/exit_three.gd`, which calls `get_tree().quit(3)` in `_ready()`.
+    Expect: an error from `boot` says "exited 3".
+    """
+    project = _init_project(tmp_path)
+    (project / "scripts" / "exit_three.gd").write_text(
+        "extends Node2D\nfunc _ready() -> void:\n\tget_tree().quit(3)\n", encoding="utf-8"
+    )
+    (project / "scenes" / "main.tscn").write_text(
+        '[gd_scene load_steps=2 format=3]\n\n'
+        '[ext_resource type="Script" path="res://scripts/exit_three.gd" id="1"]\n\n'
+        '[node name="Main" type="Node2D"]\nscript = ExtResource("1")\n',
+        encoding="utf-8",
+    )
+    issues = check_godot_project(project, godot_bin=find_godot_binary(), boot_check=True)
+    assert any(
+        issue.level == "error" and issue.file == "boot" and "exited 3" in issue.message for issue in issues
+    ), issues
+
+
 class _FakeBridge:
     """One-connection fake of the Godot bridge protocol."""
 

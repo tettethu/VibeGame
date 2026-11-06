@@ -9,6 +9,10 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+BOOT_TIMEOUT_S = 60
+CHECK_FAIL_PREFIX = "[vibegame-check] FAIL "
+CHECK_DONE_PREFIX = "[vibegame-check] DONE "
+
 
 @dataclass
 class GodotIssue:
@@ -163,45 +167,63 @@ def check_godot_project(
         )
         return issues
 
-    def add_parse_issues(relative: str, output: str) -> None:
-        for line in _parse_error_lines(output):
-            issues.append(_error(relative, line))
-
     # `--check-only --script` parses a script without the project's autoloads,
     # so any script using an autoload reports a false "Identifier not found".
-    # The headless boot below compiles scripts in the real project context
-    # instead, autoloads included.
+    # Instead the project boots headless with VIBEGAME_GODOT_CHECK=1: the
+    # bridge autoload loads every script and scene in the real project context,
+    # autoloads included, and reports each failure on a "[vibegame-check]" line.
 
     if boot_check:
         env = dict(os.environ)
-        env["VIBEGAME_GODOT_BRIDGE_DISABLE"] = "1"
+        env["VIBEGAME_GODOT_CHECK"] = "1"
+        command = [godot_bin, "--headless", "--path", str(project), "--quit-after", "3"]
         try:
             result = subprocess.run(
-                [
-                    godot_bin,
-                    "--headless",
-                    "--path",
-                    str(project),
-                    "--quit-after",
-                    "3",
-                ],
+                command,
                 capture_output=True,
                 text=True,
-                timeout=60,
+                timeout=BOOT_TIMEOUT_S,
                 env=env,
             )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            issues.append(_warning("boot", f"headless boot did not complete: {exc}"))
+        except subprocess.TimeoutExpired:
+            issues.append(_error("boot", f"headless boot did not finish within {BOOT_TIMEOUT_S}s: {' '.join(command)}"))
+        except OSError as exc:
+            issues.append(_error("boot", f"cannot start Godot: {exc}"))
         else:
-            add_parse_issues("boot", (result.stdout or "") + (result.stderr or ""))
+            output = (result.stdout or "") + (result.stderr or "")
+            for line in _parse_error_lines(output):
+                issues.append(_error("boot", line))
+            issues.extend(_check_report_issues(output))
             if result.returncode != 0:
-                detail = (result.stderr or result.stdout or "").strip().splitlines()
+                detail = output.strip().splitlines()
                 issues.append(
-                    _warning(
+                    _error(
                         "boot",
                         f"headless boot exited {result.returncode}"
                         + (f": {detail[-1][:300]}" if detail else ""),
                     )
                 )
 
+    return issues
+
+
+def _check_report_issues(output: str) -> list[GodotIssue]:
+    """Turn the bridge's "[vibegame-check]" lines into issues."""
+    issues: list[GodotIssue] = []
+    finished = False
+    for line in output.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(CHECK_FAIL_PREFIX):
+            path, _, problem = stripped[len(CHECK_FAIL_PREFIX):].partition(": ")
+            issues.append(_error(path.removeprefix("res://"), problem))
+        elif stripped.startswith(CHECK_DONE_PREFIX):
+            finished = True
+    if not finished:
+        issues.append(
+            _error(
+                "boot",
+                "the bridge reported no project check; the game stopped before autoloads ran, "
+                "or addons/vibegame_bridge/bridge.gd predates check support",
+            )
+        )
     return issues

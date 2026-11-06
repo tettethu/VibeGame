@@ -358,7 +358,7 @@ def serve(
         command.append("--headless")
     command.extend(["--path", str(project_path), "--", f"--vibegame-bridge={bridge_port}"])
     env = dict(os.environ)
-    env.pop("VIBEGAME_GODOT_BRIDGE_DISABLE", None)
+    env.pop("VIBEGAME_GODOT_CHECK", None)  # check mode would load-test the project instead of serving it
 
     process = subprocess.Popen(command, cwd=str(project_path), env=env)
     client = BridgeClient(port=bridge_port)
