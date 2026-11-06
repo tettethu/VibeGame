@@ -34,7 +34,8 @@ def test_init_scaffolds_a_godot_project(tmp_path: Path) -> None:
     project = _init_project(tmp_path)
     assert (project / "project.godot").is_file()
     assert (project / "scenes" / "main.tscn").is_file()
-    assert (project / "scripts" / "main.gd").is_file()
+    assert "ext_resource" not in (project / "scenes" / "main.tscn").read_text(encoding="utf-8")
+    assert (project / "scripts").is_dir()
     assert (project / "addons" / "vibegame_bridge" / "bridge.gd").is_file()
     assert (project / ".vibegame" / "spec" / "godot" / "engine.md").is_file()
     assert (project / "CLAUDE.md").is_file()
@@ -45,6 +46,29 @@ def test_init_scaffolds_a_godot_project(tmp_path: Path) -> None:
     assert data["startScene"] == "scenes/main.tscn"
     assert is_godot_project(project)
     assert project_engine(project) == data["engine"]
+
+
+def test_init_refuses_to_overwrite_existing_files(tmp_path: Path) -> None:
+    """`vibegame godot init` stops instead of overwriting existing files, and `--force` overwrites them.
+
+    Target: `vibegame godot init`, src/cli/godot.py: init().
+    Input: a folder `game` with no `project.json` and a `CLAUDE.md` that contains "mine". Then the same init with `--force`.
+    Expect: the first init exits 1, names `CLAUDE.md` in its output and leaves `CLAUDE.md` as "mine" and `project.json` absent. The `--force` init exits 0 and replaces `CLAUDE.md` with the Godot instructions.
+    """
+    project = tmp_path / "game"
+    project.mkdir()
+    (project / "CLAUDE.md").write_text("mine", encoding="utf-8")
+    args = ["godot", "init", str(project), "--name", "Test Game", "--lang", "en"]
+
+    refused = runner.invoke(app, args)
+    assert refused.exit_code == 1
+    assert "CLAUDE.md" in refused.output
+    assert (project / "CLAUDE.md").read_text(encoding="utf-8") == "mine"
+    assert not (project / "project.json").exists()
+
+    forced = runner.invoke(app, [*args, "--force"])
+    assert forced.exit_code == 0, forced.output
+    assert (project / "CLAUDE.md").read_text(encoding="utf-8").startswith("# Godot Project")
 
 
 def test_project_schema_accepts_godot_engine(tmp_path: Path) -> None:
@@ -73,8 +97,13 @@ def test_check_rejects_a_missing_entry_scene(tmp_path: Path) -> None:
 @pytest.mark.skipif(find_godot_binary() is None, reason="Godot is not installed")
 def test_check_catches_a_gdscript_parse_error(tmp_path: Path) -> None:
     project = _init_project(tmp_path)
-    script = project / "scripts" / "main.gd"
-    script.write_text(script.read_text(encoding="utf-8") + "\nfunc broken( -> void:\n\tpass\n", encoding="utf-8")
+    (project / "scripts" / "entry.gd").write_text("extends Node2D\nfunc broken( -> void:\n\tpass\n", encoding="utf-8")
+    (project / "scenes" / "main.tscn").write_text(
+        '[gd_scene load_steps=2 format=3]\n\n'
+        '[ext_resource type="Script" path="res://scripts/entry.gd" id="1"]\n\n'
+        '[node name="Main" type="Node2D"]\nscript = ExtResource("1")\n',
+        encoding="utf-8",
+    )
     issues = check_godot_project(project, godot_bin=find_godot_binary(), boot_check=True)
     errors = [issue for issue in issues if issue.level == "error"]
     assert any("Parse Error" in issue.message for issue in errors), issues
@@ -269,6 +298,30 @@ def test_bridge_client_surfaces_bridge_errors() -> None:
         try:
             with pytest.raises(BridgeError, match="node not found"):
                 client.call("set", nodeId="Main", path="x", value=1)
+        finally:
+            client.close()
+
+
+def test_continue_fails_when_the_frames_do_not_finish() -> None:
+    """`continue` raises an error when the game has not run the requested frames before the timeout.
+
+    Target: runtime `continue`, src/cli/godot_runtime.py: _continue_and_wait().
+    Input: a fake bridge that accepts `continue` and always reports `stepRemaining` 5. One frame is requested, so the timeout is the 5 s minimum.
+    Expect: `BridgeError` that says "did not finish 1 frames" and "5 frames remaining".
+    """
+    from cli.godot_runtime import _continue_and_wait
+
+    with _FakeBridge(
+        {
+            "continue": {"ok": True, "frames": 1, "paused": False},
+            "status": {"ok": True, "paused": False, "stepRemaining": 5},
+        }
+    ) as bridge:
+        client = BridgeClient(port=bridge.port, timeout=5)
+        client.connect()
+        try:
+            with pytest.raises(BridgeError, match=r"did not finish 1 frames .*5 frames remaining"):
+                _continue_and_wait(client, 1)
         finally:
             client.close()
 

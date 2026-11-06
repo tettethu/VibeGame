@@ -25,6 +25,8 @@ import typer
 
 GODOT_TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "godot_template"
 VIBEGAME_SRC_DIR = Path(__file__).resolve().parent.parent
+# Copied from src/.vibegame when present.
+SUPPORT_DOCS = (".vibegame/GDD.md", ".vibegame/assets.md")
 TEXT_SUFFIXES = {
     ".cfg",
     ".gd",
@@ -175,16 +177,20 @@ def _replace_placeholders(text: str, replacements: dict[str, str]) -> str:
     return text
 
 
+def _template_files(source: Path) -> list[Path]:
+    return [
+        path
+        for path in sorted(source.rglob("*"))
+        if path.is_file() and "__pycache__" not in path.parts and path.name != ".DS_Store"
+    ]
+
+
 def _copy_template_tree(
     source: Path, target: Path, replacements: dict[str, str]
 ) -> list[str]:
     """Copy a template tree, substituting placeholders in text files."""
     written: list[str] = []
-    for path in sorted(source.rglob("*")):
-        if path.is_dir():
-            continue
-        if "__pycache__" in path.parts or path.name in {".DS_Store"}:
-            continue
+    for path in _template_files(source):
         relative = path.relative_to(source)
         destination = target / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -218,16 +224,27 @@ def init(
     path: str = typer.Argument(default=".", help="Project path (default: current directory)"),
     lang: str | None = typer.Option(None, "--lang", help="Language: zh-CN / en / ..."),
     name: str | None = typer.Option(None, "--name", help="Game name (default: directory name)"),
-    force: bool = typer.Option(False, "--force", help="Overwrite an existing project.json"),
+    force: bool = typer.Option(
+        False, "--force", help="Overwrite existing scaffold files: template files, CLAUDE.md, AGENTS.md, .vibegame docs"
+    ),
     godot_bin: str | None = typer.Option(None, "--godot", help="Path to the Godot executable"),
 ):
     """Initialize a Godot 4 game project."""
     project_path = Path(path).expanduser().resolve()
     project_path.mkdir(parents=True, exist_ok=True)
-    project_json = project_path / "project.json"
-    if project_json.exists() and not force:
+    template_root = GODOT_TEMPLATE_DIR / "project"
+    planned = [
+        *(path.relative_to(template_root).as_posix() for path in _template_files(template_root)),
+        "CLAUDE.md",
+        "AGENTS.md",
+        *(relative for relative in SUPPORT_DOCS if (VIBEGAME_SRC_DIR / relative).is_file()),
+        ".vibegame/global.json",
+    ]
+    existing = [relative for relative in planned if (project_path / relative).exists()]
+    if existing and not force:
         typer.echo(
-            f"Error: {project_json} already exists. Use --force to overwrite the scaffold.",
+            f"Error: init would overwrite existing files in {project_path}. Use --force to overwrite them:\n  "
+            + "\n  ".join(existing),
             err=True,
         )
         raise typer.Exit(1)
@@ -262,9 +279,7 @@ def init(
         "language_code": language,
     }
 
-    written = _copy_template_tree(
-        GODOT_TEMPLATE_DIR / "project", project_path, replacements
-    )
+    written = _copy_template_tree(template_root, project_path, replacements)
     claude_text = _replace_placeholders(
         (GODOT_TEMPLATE_DIR / "CLAUDE.md").read_text(encoding="utf-8"), replacements
     )
@@ -272,7 +287,7 @@ def init(
     (project_path / "AGENTS.md").write_text(claude_text, encoding="utf-8")
     written.extend(["CLAUDE.md", "AGENTS.md"])
 
-    for relative in (".vibegame/GDD.md", ".vibegame/assets.md"):
+    for relative in SUPPORT_DOCS:
         if _copy_support_doc(relative, project_path):
             written.append(relative)
 

@@ -12,7 +12,7 @@ Phaser workflow.
 | `vibegame godot init` | Scaffolds a Godot 4 project with the runtime bridge |
 | `vibegame godot run` | Launches Godot + a `/api/runtime/*` adapter |
 | `vibegame play ...` | Works unchanged: snapshot, screenshot, click, key, eval, pause, continue |
-| `vibegame godot check` | Required files, project.godot, headless boot and GDScript parse |
+| `vibegame godot check` | Required files, project.godot, asset import, every script and scene, headless boot |
 | `vibegame close` | Stops a tracked Godot runtime |
 | `vibegame godot doctor` | Locates the Godot binary and reports versions |
 
@@ -72,8 +72,8 @@ vibegame close
 ```
 project.godot              Godot settings; run/main_scene + VibeGameBridge autoload
 project.json               VibeGame metadata: engine "godot@<version>", canvas size, start scene
-scenes/main.tscn           Entry scene
-scripts/main.gd            Entry script
+scenes/main.tscn           Entry scene, an empty Node2D at init
+scripts/                   Gameplay scripts
 addons/vibegame_bridge/    TCP JSON runtime bridge (autoload)
 assets/                    Imported textures, audio, fonts
 .vibegame/                 GDD, assets, Godot spec, runtime logs
@@ -96,6 +96,8 @@ vibegame play  --HTTP-->  godot_runtime.py  --TCP JSON-->  bridge.gd (in game)
   runtime exposes, so `vibegame play` and its traces need no Godot-specific code.
 - The runtime is tracked in `.vibegame/logs/runtime/servers.json`, which is what
   `vibegame close` and `--status` read.
+- Before launching the game, `godot run` imports new or changed assets with `godot --headless --path . --import`, as the editor does when it opens the project.
+- The adapter serves local CLI clients only. Any request that carries an `Origin` header, which browsers attach to cross-site requests, gets 403, because `eval` can run arbitrary code in the game process.
 
 ### Bridge commands
 
@@ -131,9 +133,9 @@ func vibegame_state() -> Dictionary:
 - `project.json` shape and `engine: "godot@x.y.z"`.
 - `project.godot` exists, uses `config_version=5`, and has `run/main_scene`.
 - The entry scene and the `VibeGameBridge` autoload exist.
-- Every `.gd` file is under the project and the project boots headless
-  (`godot --headless --path . --quit-after 3`), which compiles scripts with
-  autoloads in scope. Parse errors are reported as errors.
+- New or changed assets import (`godot --headless --path . --import`).
+- The project boots headless with `VIBEGAME_GODOT_CHECK=1`. The bridge then loads every `.gd` and `.tscn` under `res://` (dot directories excluded) with autoloads in scope, and checks that every scene dependency exists. A script that fails to compile, a scene that references a missing file, an engine error line, a boot timeout and a non-zero exit are all errors.
+- The check cannot see errors that only happen when code runs, such as `load()` of a missing path or a call to a method that an untyped value lacks. Prefer `preload()` and typed variables so that the compiler catches them.
 - Missing Godot binary is a warning; install Godot or pass `--godot`.
 
 `vibegame check` auto-detects a Godot project and runs the same checks.
@@ -146,6 +148,7 @@ func vibegame_state() -> Dictionary:
   it evaluates expressions, not statements. Use `snapshot` for state.
 - **Pause ownership.** The bridge uses `get_tree().paused` for control mode. Game
   code should keep its own pause flag instead of toggling the tree.
+- **Input while paused.** Input sent while the tree is paused waits in a queue and reaches the game one event per frame once `continue` or `play` advances frames.
 - **Scene reload.** `refresh` reloads the current scene; it does not restart the
   Godot process. Restart the runtime if you need autoload state reset.
 - **Packaging.** Like the Phaser engine, the Godot template lives in the VibeGame

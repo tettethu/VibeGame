@@ -7,8 +7,7 @@ This project runs on **Godot 4.x** with **GDScript**. It is not a Phaser/web pro
 ```
 project.godot              Engine settings, entry scene, autoloads
 project.json               VibeGame metadata (engine, canvas size, start scene)
-scenes/main.tscn           Entry scene (run/main_scene)
-scripts/main.gd            Entry script
+scenes/main.tscn           Entry scene (run/main_scene), an empty Node2D at init
 scripts/                   Gameplay scripts
 scenes/                    Additional scenes
 assets/                    Imported textures, audio, fonts

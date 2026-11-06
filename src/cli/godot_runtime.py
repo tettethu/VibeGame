@@ -144,7 +144,10 @@ def _continue_and_wait(client: BridgeClient, frames: int) -> dict:
         if int(last_status.get("stepRemaining", 0)) == 0:
             return last_status
         time.sleep(0.02)
-    return last_status
+    raise BridgeError(
+        f"continue did not finish {frames} frames within {timeout:.1f}s "
+        f"({last_status.get('stepRemaining')} frames remaining)"
+    )
 
 
 def _make_handler(client: BridgeClient, project: Path):
@@ -499,7 +502,6 @@ def run_godot(
         typer.echo("=== VibeGame Godot Run ===")
         typer.echo(f"  Project: {project_path}")
         typer.echo(f"  Godot:   {binary}")
-        typer.echo(f"  Game:    http://{host}:{resolved_port}")
         typer.echo(f"  Runtime API: http://{host}:{resolved_port}/api/runtime/")
         typer.echo(f"  Bridge port: {bridge_port}")
         typer.echo("  Press Ctrl+C to stop\n")
@@ -574,7 +576,6 @@ def run_godot(
 
     typer.echo("=== VibeGame Godot Run (background) ===")
     typer.echo(f"  Project: {project_path}")
-    typer.echo(f"  Game:    http://{host}:{resolved_port}")
     typer.echo(f"  Runtime API: http://{host}:{resolved_port}/api/runtime/")
     typer.echo(f"  Bridge port: {bridge_port}")
     typer.echo(f"  Runtime PID: {child.pid}")
