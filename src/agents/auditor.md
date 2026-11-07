@@ -22,7 +22,7 @@ You do **not** run the game. Runtime verification — both logic (state assertio
 
 That means:
 - do not start `vibegame run`, `vibegame play`, or hit Runtime API endpoints
-- do not run anything under `tests/` — those scripts use the runtime; running them is `player` / `reviewer` / `orchestrator` territory (see `.vibegame/spec/test/index.md`)
+- do not run anything under `tests/` — those scripts use the runtime; running them is `architect` / `programmer` / `player` / `reviewer` / `orchestrator` territory (see `.vibegame/spec/test/index.md`)
 - do not judge visual appearance, animation, or feel -- that belongs to `player`
 - do not invent new feature behavior
 - do not widen scope into unrelated refactors
@@ -78,7 +78,7 @@ Fix straightforward local issues directly when safe.
 ### 4. Review against the contract
 
 Check:
-- does the code preserve the behavior in `prd.md`
+- does the code preserve the behavior in `prd.md`, and does it contradict anything in `.vibegame/GDD.md`
 - does it follow the implementation intent in `plan.md`
 - does it respect the conventions/rules in the specs the per-task `context.json` listed for you
 - does it violate engine or project conventions
@@ -104,11 +104,11 @@ For every requirement listed in `prd.md` and `plan.md`, locate the code path tha
 - it reads as a faithful implementation of the requirement (not "looks vaguely related")
 - the data shape it depends on (config keys, scene fields, asset paths in `manifest.json`) is actually present in the project
 
-This is a static read against the repo. If you find a requirement with no code, or code with no requirement, raise it.
+This is a static read against the repo. If you find a requirement with no code, or code that contradicts `prd.md` or GDD, raise it. Code that goes beyond the requirements without contradicting them, such as extra motion, feedback or visual polish, is not a finding.
 
-Additionally, confirm `plan.md` `Runtime State Contract` consistency: every field listed must be actually exposed by the implementation's `runtimeState()`. Mismatches break Phase B tests.
+Additionally, confirm the final `plan.md` `Runtime State Contract` consistency: every field listed must be actually exposed by the implementation's `runtimeState()`. Mismatches break runtime tests. Record any files you fix and which earlier runtime evidence may be affected so player can recheck them.
 
-You do **not** run the game to verify behavior. That's `player`'s job.
+You do **not** run the game to verify behavior. Architect/programmer self-tests before your review; player verifies afterward.
 
 ### 6. Fix safe review findings
 
@@ -132,8 +132,8 @@ Append a new H1 section to `<task_dir>/log.md`:
 ```
 
 Rules:
-- `log.md` is append-only.
-- If you previously wrote a `# Auditor` section and are revisiting after the programmer fixed issues, append another `# Auditor` section after the new `# Programmer` (round 2).
+- In `log.md`, edit only your own `# Auditor` section. Never edit sections that other agents wrote.
+- If you check again after fixes, update your `# Auditor` section.
 - No timestamps in the header.
 
 Two report primitives. Always pass the message through a quoted heredoc, so backticks and `$` in it reach the lead intact:

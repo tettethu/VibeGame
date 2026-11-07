@@ -129,6 +129,9 @@ The multi-agent build workflow and art pipeline are still Phaser-only. See
 
 We provide a web dashboard for interacting more freely with the agent team and manually editing game properties.
 
+The Objects editor detects conflicting file changes and keeps your local edits
+for recovery. See [editing objects while agents are working](docs/DASHBOARD-EDITING.md).
+
 <table>
   <tr>
     <td width="50%" align="center"><img src="assets/dash_chat.webp" alt="VibeGame Dashboard Chat"><br><strong>Chat</strong><br><sub>Chat with your agents to start building</sub></td>

@@ -281,7 +281,8 @@ class ProjectChecker:
     def _check_instantiate_refs(self):
         """this.instantiate('X.node.json') literals must resolve to preloaded templates.
 
-        Boot only preloads .node.json files referenced via `src` in scene JSON.
+        Boot only preloads .node.json files reachable through `src` from scene JSON,
+        including `src` inside the templates it loads.
         A template consumed only from script code is invisible to that scan, so
         instantiate() would throw at runtime. Matching is scoped to
         `this.instantiate(` with a string literal to avoid unrelated methods
@@ -298,7 +299,7 @@ class ProjectChecker:
                 elif src not in self.scene_src_refs:
                     self.warn(
                         rel,
-                        f'instantiate("{src}"): not referenced by any scene src, so boot will not '
+                        f'instantiate("{src}"): not reachable through any scene src, so boot will not '
                         f'preload it and instantiate() will throw at runtime. Add a disabled '
                         f'placeholder node {{"src": "{src}", "enabled": false}} to the scene, '
                         f'or register the definition manually before instantiating.',

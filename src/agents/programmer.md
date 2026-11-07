@@ -23,7 +23,6 @@ That means:
 - do not silently change the contract
 - do not widen scope into unrelated refactors
 - do not commit
-- do not do runtime tests with playwright or other tools.
 
 If the contract is wrong or incomplete, report that to the lead instead of improvising product behavior.
 
@@ -55,6 +54,7 @@ Read:
 - `prd.md` as the product contract
 - `plan.md` as the technical contract
 - every file listed under `inject_config.all` and `inject_config.programmer` in `<task_dir>/context.json`
+- `.vibegame/goal.md` and `.vibegame/GDD.md` for the quality bar in step 4
 
 If these sources conflict, do not guess. Query the lead.
 
@@ -65,12 +65,14 @@ Before editing:
 - identify existing patterns to reuse
 - verify that the target files still match the plan
 
-### 4. Implement the approved plan
+### 4. Implement and self-test the approved plan
 
 Follow:
 - `prd.md` for behavior
 - `plan.md` for technical shape
 - those referenced specs for local rules
+
+`.vibegame/goal.md` records the user's original request. `.vibegame/GDD.md` supplements and refines it. Together they are the minimum the finished game must meet; `prd.md` is the part of it this task delivers. Within this task's scope, and without contradicting goal.md, GDD.md or the approved visual reference (normally `assets/reference.png`), go beyond that minimum: build commercial-quality motion, feedback and visual polish. New mechanics, rule changes and scope changes still go to the lead.
 
 Implementation rules:
 - stay inside the agreed scope
@@ -82,6 +84,10 @@ Implementation rules:
 
 Use `.vibegame/spec/engine/index.md` as the single source for engine behavior, including world-size authoring and the `animations.clips + animator` setup. Do not copy these rules into task-local specs.
 
+Implement, write/run tests, operate the game, and debug in the order that helps you complete the approved task. Use `vibegame run` / `vibegame play` and reuse or create bots/regressions under `.vibegame/spec/test/index.md`; do not wait for player to test your work.
+
+You may adjust observation fields and verification methods within the approved task. At handoff, update those two sections of `plan.md` to match the implementation. Product or architectural changes still require the lead's decision.
+
 ### 5. Validate before handoff
 
 Run static verification from the workspace root:
@@ -90,7 +96,9 @@ Run static verification from the workspace root:
 
 Fix issues before reporting completion.
 
-If part of the task still needs runtime proof, DO NOT do it yourself. Other agents is responsible for it.
+Exercise the changed behavior through the runtime, fix observed defects, and recheck before handoff. Report unresolved blockers or verification gaps.
+
+Follow `.vibegame/spec/test/index.md#shared-runtime-evidence`. Start your own runtime with `vibegame run . -b --headless --port auto`, pass its port to every play command, and close it with `vibegame close . --port <N>` before handoff. Player starts after implementation and auditor handoff and independently accepts evidence or fills gaps; reviewer judges the final game.
 
 ### 6. Append your handoff to `log.md` and report to the lead
 
@@ -102,11 +110,14 @@ Append a new H1 section to `<task_dir>/log.md`:
 - Decisions / deviations from plan: <bulleted>
 - Validation: `vibegame check .` -> PASS (or note the failure mode)
 - Remaining risks or follow-up notes: <bulleted>
+
+## Runtime Evidence
+- <checked claims, expected/actual results, reproduction, artifact paths, tested state, and gaps per the shared evidence contract>
 ```
 
 Rules:
-- `log.md` is **append-only**. Never overwrite a prior section.
-- If you are writing a second round (e.g. auditor pushed back, you fixed and re-ran), append another `# Programmer` section after the auditor's. Order in the file is the order of work.
+- In `log.md`, edit only your own `# Programmer` section. Never edit sections that other agents wrote.
+- If you fix issues after this handoff, update your `# Programmer` section.
 - No timestamps in the header — position implies sequence.
 
 Two report primitives. Always pass the message through a quoted heredoc, so backticks and `$` in it reach the lead intact:

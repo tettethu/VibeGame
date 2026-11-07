@@ -13,6 +13,7 @@ let selectedPath = ''
 let preview = null
 let resizeObserver = null
 let initialized = false
+let mounted = false
 let renderToken = 0
 let animationFrameId = 0
 let editState = null
@@ -27,6 +28,7 @@ let cachedSidebarHTML = ''
 let cachedPanelHTML = ''
 
 export async function init(sidebarEl, panelEl, statusFn, options = {}) {
+  mounted = true
   sidebarBody = sidebarEl
   panelBody = panelEl
   onStatusChange = statusFn
@@ -39,6 +41,15 @@ export async function init(sidebarEl, panelEl, statusFn, options = {}) {
     bindAnimationControls()
     bindChildControls()
     bindEditorControls()
+    if (editState) {
+      panelBody.querySelectorAll('.obj-input[data-path]').forEach(input => {
+        const value = getPath(editState.data, input.dataset.path)
+        if (input.type === 'checkbox') input.checked = Boolean(value)
+        else input.value = value == null ? '' : String(value)
+      })
+      refreshBooleanLabels()
+    }
+    updateEditorButtons()
     drawPreview()
     startAnimationLoop()
     return
@@ -75,6 +86,7 @@ export async function init(sidebarEl, panelEl, statusFn, options = {}) {
 }
 
 export function destroy() {
+  mounted = false
   stopAnimationLoop()
   stopCanvasDrag()
   stopCanvasPan()
@@ -100,7 +112,7 @@ function bindKeyboardShortcuts() {
 }
 
 function onEditorKeyDown(event) {
-  if (!editState || !panelBody?.querySelector('.obj-editor')) return
+  if (!editState || editState.saving || !panelBody?.querySelector('.obj-editor')) return
   if (event.key === ' ' && !isTextInput(event.target)) {
     event.preventDefault()
     spaceDown = true
@@ -229,23 +241,28 @@ function reattachHandlers() {
 async function openNode(path, notifySelection = true) {
   stopAnimationLoop()
   selectedPath = path
+  editState = null
   if (notifySelection && onSelect) onSelect(path)
   panelBody.innerHTML = `<div class="obj-loading">Loading ${esc(path)}...</div>`
   try {
     const result = await api.fetchNode(path)
     if (result.error) throw new Error(result.error)
-    await renderObject(path, result.data || {})
+    if (selectedPath !== path) return
+    await renderObject(path, result.data || {}, result.version)
     setStatus(`Loaded ${path}`)
   } catch (err) {
+    if (selectedPath !== path) return
     panelBody.innerHTML = emptyPanel(err.message || 'Could not load object')
     setStatus(`Object load failed: ${err.message || err}`)
   }
 }
 
-async function renderObject(path, node) {
+async function renderObject(path, node, version = null) {
   resetCanvasView()
   editState = {
     path,
+    version,
+    conflict: null,
     data: cloneJSON(node),
     savedData: cloneJSON(node),
     undoStack: [],
@@ -281,6 +298,11 @@ async function renderObject(path, node) {
           <button type="button" class="obj-save-btn" id="obj-save" disabled>Save</button>
         </div>
         <div class="obj-path">${esc(path)}</div>
+      </div>
+      <div class="obj-conflict" id="obj-conflict" role="alert" hidden>
+        <span>Object changed on disk. Your local edits are still here. Copy them before reloading.</span>
+        <button type="button" class="obj-tool-btn" id="obj-copy-local">Copy local JSON</button>
+        <button type="button" class="obj-tool-btn" id="obj-reload-disk">Reload disk version</button>
       </div>
       <div class="obj-body">
         <div class="obj-stage">
@@ -1350,6 +1372,10 @@ function bindEditorControls() {
   if (redoBtn) redoBtn.onclick = redoEdit
   if (revertBtn) revertBtn.onclick = revertEdit
   if (saveBtn) saveBtn.onclick = saveEdit
+  const copyBtn = document.getElementById('obj-copy-local')
+  const reloadBtn = document.getElementById('obj-reload-disk')
+  if (copyBtn) copyBtn.onclick = copyLocalEdit
+  if (reloadBtn) reloadBtn.onclick = reloadDiskEdit
   updateTargetButtons()
 }
 
@@ -1905,10 +1931,14 @@ function updateEditorButtons() {
   const dirty = document.getElementById('obj-dirty')
   if (undoBtn) undoBtn.disabled = !editState.undoStack.length || editState.saving
   if (redoBtn) redoBtn.disabled = !editState.redoStack.length || editState.saving
-  if (revertBtn) revertBtn.disabled = (!editState.dirty && !editState.undoStack.length) || editState.saving
-  if (saveBtn) saveBtn.disabled = !editState.dirty || hasErrors || editState.saving
+  if (revertBtn) revertBtn.disabled = (!editState.dirty && !editState.undoStack.length) || editState.saving || !!editState.conflict
+  if (saveBtn) saveBtn.disabled = !editState.dirty || hasErrors || editState.saving || !!editState.conflict
+  const body = panelBody.querySelector('.obj-body')
+  if (body) body.inert = editState.saving
+  const conflict = document.getElementById('obj-conflict')
+  if (conflict) conflict.hidden = !editState.conflict
   if (dirty) {
-    dirty.textContent = hasErrors ? 'Invalid' : editState.dirty ? 'Unsaved' : 'Saved'
+    dirty.textContent = editState.conflict ? 'Conflict' : editState.saving ? 'Saving' : hasErrors ? 'Invalid' : editState.dirty ? 'Unsaved' : 'Saved'
     dirty.classList.toggle('invalid', hasErrors)
     dirty.classList.toggle('dirty', editState.dirty && !hasErrors)
   }
@@ -1933,54 +1963,94 @@ function redoEdit() {
 }
 
 async function saveEdit() {
-  if (!editState || editState.saving || Object.keys(editErrors).length) return
-  const changes = diffJSON(editState.savedData, editState.data)
-  if (!changes.length) {
+  if (!editState || editState.saving || editState.conflict || Object.keys(editErrors).length) return
+  if (jsonEqual(editState.savedData, editState.data)) {
     updateEditorButtons()
     return
   }
-  editState.saving = true
-  updateEditorButtons()
-  const result = await api.putNode(editState.path, editState.data, changes, 'save')
-  editState.saving = false
-  if (result.error) {
-    setStatus(`Save failed: ${result.error}`)
-    updateEditorButtons()
-    return
-  }
-  editState.savedData = cloneJSON(editState.data)
-  editState.undoStack = []
-  editState.redoStack = []
-  editState.dirty = false
-  updateEditorButtons()
-  setStatus(`Saved ${editState.path}`)
+  await persistEdit('save', editState.data)
 }
 
 async function revertEdit() {
-  if (!editState || editState.saving) return
-  const reverted = cloneJSON(editState.savedData)
-  const changes = diffJSON(editState.data, reverted)
-  editState.data = reverted
-  editState.undoStack = []
-  editState.redoStack = []
-  editErrors = {}
-  if (changes.length) {
-    editState.saving = true
-    updateEditorButtons()
-    const result = await api.putNode(editState.path, editState.data, changes, 'revert')
-    editState.saving = false
+  if (!editState || editState.saving || editState.conflict) return
+  if (await persistEdit('revert', editState.savedData)) {
+    if (mounted) rerenderCurrentObject('Reverted')
+    else cachedPanelHTML = ''
+  }
+}
+
+async function persistEdit(action, data) {
+  const target = editState
+  const submitted = cloneJSON(data)
+  const changes = diffJSON(target.savedData, submitted)
+  target.saving = true
+  updateEditorButtons()
+  try {
+    const result = await api.putNode(target.path, submitted, changes, action, target.version)
+    // A response for a previous object must not update the active editor.
+    if (editState !== target) return false
     if (result.error) {
-      setStatus(`Revert failed: ${result.error}`)
-      updateEditorButtons()
+      if (result.status === 409 && result.code === 'edit_conflict') target.conflict = result
+      setStatus('Save failed: ' + result.error)
+      return false
+    }
+    target.version = result.version
+    target.savedData = cloneJSON(submitted)
+    if (action === 'revert') target.data = cloneJSON(submitted)
+    if (jsonEqual(target.data, submitted)) {
+      target.undoStack = []
+      target.redoStack = []
+    }
+    if (mounted) setStatus('Saved ' + target.path)
+    return true
+  } catch (err) {
+    if (editState === target) setStatus('Save failed: ' + (err.message || err))
+    return false
+  } finally {
+    target.saving = false
+    if (editState === target && mounted) updateEditorButtons()
+  }
+}
+
+async function copyLocalEdit() {
+  if (!editState) return
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(editState.data, null, 2) + '\n')
+    setStatus('Copied local JSON')
+  } catch (err) {
+    setStatus('Copy failed: ' + (err.message || err))
+  }
+}
+
+async function reloadDiskEdit() {
+  if (!editState || editState.saving) return
+  if (!window.confirm('Discard local unsaved edits and reload the object from disk?')) return
+  const target = editState
+  target.saving = true
+  updateEditorButtons()
+  try {
+    const result = await api.fetchNode(target.path)
+    if (editState !== target) return
+    if (result.error) throw new Error(result.error)
+    if (!mounted) {
+      cachedPanelHTML = ''
       return
     }
+    await renderObject(target.path, result.data, result.version)
+    setStatus('Reloaded ' + target.path)
+  } catch (err) {
+    if (editState === target) setStatus('Reload failed: ' + (err.message || err))
+  } finally {
+    target.saving = false
+    if (editState === target) updateEditorButtons()
   }
-  rerenderCurrentObject('Reverted')
 }
 
 function rerenderCurrentObject(statusMessage) {
   if (!editState) return
   const path = editState.path
+  const version = editState.version
+  const conflict = editState.conflict
   const data = cloneJSON(editState.data)
   const savedData = cloneJSON(editState.savedData)
   const undoStack = editState.undoStack.map(cloneJSON)
@@ -1994,12 +2064,16 @@ function rerenderCurrentObject(statusMessage) {
     selectedBoxTarget,
   } : null
   const previousCanvasView = canvasView ? { ...canvasView } : null
-  renderObject(path, data).then(() => {
-    if (!editState) return
-    editState.savedData = savedData
-    editState.undoStack = undoStack
-    editState.redoStack = redoStack
-    editState.selectedBoxTarget = selectedBoxTarget
+  const rendering = renderObject(path, data, version)
+  const target = editState
+  target.conflict = conflict
+  target.savedData = savedData
+  target.undoStack = undoStack
+  target.redoStack = redoStack
+  target.selectedBoxTarget = selectedBoxTarget
+  updateEditorButtons()
+  rendering.then(() => {
+    if (editState !== target) return
     if (preview) preview.selectedBoxTarget = selectedBoxTarget
     editState.dirty = !jsonEqual(editState.data, editState.savedData)
     if (previousCanvasView) canvasView = previousCanvasView

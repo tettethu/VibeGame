@@ -26,8 +26,9 @@
   "default_config": {
     "architect": [
       { "file": ".vibegame/spec/engine/index.md", "reason": "Complete game development guide for planning and implementation" },
-      { "file": ".vibegame/spec/test/index.md", "reason": "Test contract — for planning runtime evidence" },
-      { "file": ".vibegame/GDD.md", "reason": "PRD -> GDD consistency check only" },
+      { "file": ".vibegame/spec/test/index.md", "reason": "Test and shared evidence contract for planning, self-testing, and handoff" },
+      { "file": ".vibegame/GDD.md", "reason": "PRD -> GDD consistency check when planning; quality bar when implementing" },
+      { "file": ".vibegame/goal.md", "reason": "User's original request: quality bar when implementing" },
       { "file": "prd.md", "reason": "Task product contract (task-local)" }
     ],
     "all": [
@@ -35,16 +36,18 @@
       { "file": "plan.md", "reason": "Technical plan — downstream agents implement / verify against it (task-local)" }
     ],
     "programmer": [
-      { "file": ".vibegame/spec/engine/index.md", "reason": "Complete game development guide for implementation and validation" }
+      { "file": ".vibegame/spec/engine/index.md", "reason": "Complete game development guide for implementation and validation" },
+      { "file": ".vibegame/spec/test/index.md", "reason": "Test and shared evidence contract for self-testing and handoff" }
     ],
     "auditor": [
-      { "file": ".vibegame/spec/engine/index.md", "reason": "Game development guide: engine conventions and UI for static review" }
+      { "file": ".vibegame/spec/engine/index.md", "reason": "Game development guide: engine conventions and UI for static review" },
+      { "file": ".vibegame/GDD.md", "reason": "Requirements the code must not contradict" }
     ],
     "player": [
       { "file": ".vibegame/play.md", "reason": "Game overview and play scenarios" },
       { "file": ".vibegame/spec/engine/index.md", "reason": "Game development guide: runtime startup, control, bots, evidence and shutdown" },
       { "file": ".vibegame/spec/cli/vlm.md", "reason": "VLM CLI — player's verifier for visual fine-tuning" },
-      { "file": ".vibegame/spec/test/index.md", "reason": "Regression suite contract — player creates and maintains tests/" }
+      { "file": ".vibegame/spec/test/index.md", "reason": "Shared evidence and regression contract: inspect existing proof, fill gaps, maintain tests/" }
     ]
   },
   "require_task_dir": ["architect", "programmer", "auditor", "player"],

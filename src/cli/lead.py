@@ -108,18 +108,19 @@ def cmd_status():
 
 @lead_app.command("agent")
 def cmd_agent(
-    prompt: str = typer.Option("", "--prompt", help="Initial task prompt for the teammate. Required unless --resume is given."),
+    prompt: str = typer.Option("", "--prompt", help="Initial task prompt for the teammate. Required unless --resume or --shortcut-peer is given."),
     name: Optional[str] = typer.Option(None, "--name", help="Optional teammate instance name. Defaults to --agent-type."),
     workdir: Optional[str] = typer.Option(None, "--workdir", help="Optional workdir. Defaults to the workspace root."),
     model: Optional[str] = typer.Option(None, "--model", help="Optional model override."),
     agent_type: Optional[str] = typer.Option(None, "--agent-type", "--agent_type", help="Optional agent template name."),
     resume: Optional[str] = typer.Option(None, "--resume", help="Resume previous Claude/Codex session by id."),
+    shortcut_peer: Optional[str] = typer.Option(None, "--shortcut-peer", help="Start the new teammate as the starter of a shortcut with this teammate. The task message comes from stdin."),
 ):
     """Spawn a teammate in a new tmux pane."""
     _bootstrap()
     _exit(_lead_main.cmd_agent(SimpleNamespace(
         prompt=prompt, name=name, workdir=workdir, model=model,
-        agent_type=agent_type, resume=resume,
+        agent_type=agent_type, resume=resume, shortcut_peer=shortcut_peer,
     )))
 
 
@@ -131,6 +132,16 @@ def cmd_send(
     """Send a message to a teammate."""
     _bootstrap()
     _exit(_lead_main.cmd_send(SimpleNamespace(name=name, message=message)))
+
+
+@lead_app.command("shortcut")
+def cmd_shortcut(
+    starter: str = typer.Argument(..., help="Teammate that starts the work."),
+    peer: str = typer.Argument(..., help="Teammate that waits for the starter's first message."),
+):
+    """Connect two teammates for direct reports; stdin is the task message for both."""
+    _bootstrap()
+    _exit(_lead_main.cmd_shortcut(SimpleNamespace(starter=starter, peer=peer)))
 
 
 @lead_app.command("inbox")

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Optional, List
 
 import typer
+from typer.core import TyperCommand
 from typing import Annotated
 
 from .providers import PROVIDERS
@@ -72,6 +73,33 @@ def _supported_models(provider: str) -> set:
     return getattr(mod, "SUPPORTED_MODELS", set()) if mod else set()
 
 
+# Generation options a provider may support, with their CLI defaults.
+OPTION_DEFAULTS = {"size": "", "quality": "auto", "aspect": "auto", "resolution": "auto"}
+OPTION_FLAGS = {"size": "--size", "quality": "--quality", "aspect": "--aspect", "resolution": "--resolution"}
+
+
+def _option_help(provider: str) -> dict[str, str]:
+    """Help text per option for a provider; options it does not support say so."""
+    supported = PROVIDERS[provider].OPTION_HELP
+    return {name: supported.get(name, "Not supported") for name in OPTION_DEFAULTS}
+
+
+class ImageCommand(TyperCommand):
+    """Render option help for the configured IMAGE_PROVIDER."""
+
+    def format_help(self, ctx, formatter):
+        _load_env()
+        provider = _get_config()["provider"]
+        if provider in PROVIDERS:
+            texts = _option_help(provider)
+            for param in self.params:
+                if param.name in texts:
+                    param.help = texts[param.name]
+                    param.show_default = param.name in PROVIDERS[provider].OPTION_HELP
+            self.epilog = getattr(PROVIDERS[provider], "NOTES", "")
+        super().format_help(ctx, formatter)
+
+
 # === CLI ===
 
 def cmd_list():
@@ -92,26 +120,19 @@ def cmd_list():
         supported = sorted(_supported_models(provider))
         if supported:
             print(f"Supported models ({provider}):")
-            gpt = [m for m in supported if m.startswith("gpt-image")]
-            nb = [m for m in supported if m.startswith("nano-banana")]
-            other = [m for m in supported if not m.startswith("gpt-image") and not m.startswith("nano-banana")]
-            if gpt:
-                for m in gpt:
-                    marker = " <- default" if m == model else ""
-                    print(f"  {m}  (--size + --quality){marker}")
-            if nb:
-                for m in nb:
-                    marker = " <- default" if m == model else ""
-                    print(f"  {m}  (--aspect + --resolution){marker}")
-            for m in other:
+            for m in supported:
                 marker = " <- default" if m == model else ""
                 print(f"  {m}{marker}")
+            print()
+            print(f"Options ({provider}):")
+            for name, text in _option_help(provider).items():
+                print(f"  {OPTION_FLAGS[name]}: {text}")
+            notes = getattr(PROVIDERS[provider], "NOTES", "")
+            if notes:
+                print(f"Notes: {notes}")
         print()
         if model:
-            if model.startswith("gpt-image-1"):
-                print("Workflow: direct transparent PNG generation")
-            else:
-                print("Workflow: white background -> GDC pipeline (decompose -> cut -> replace)")
+            print("Workflow: white background -> GDC pipeline (decompose -> cut -> replace)")
     else:
         print("Not configured (set IMAGE_API_KEY)")
 
@@ -151,19 +172,19 @@ def cmd_image(
         print(f"{provider} does not support {model}")
         raise typer.Exit(1)
 
+    values = {"size": size, "quality": quality, "aspect": aspect, "resolution": resolution}
+    for name, value in values.items():
+        if name not in PROVIDERS[provider].OPTION_HELP and value != OPTION_DEFAULTS[name]:
+            print(f"{provider} does not support {OPTION_FLAGS[name]}. See 'vibegame art gen image --help'.")
+            raise typer.Exit(1)
+
     is_gpt = model.startswith("gpt-image")
     is_nb = model.startswith("nano-banana")
     if is_gpt and size and "x" not in size:
         print(f"--size for {model} expects pixel size (e.g. 1024x1024), got '{size}'")
         raise typer.Exit(1)
-    if is_gpt and resolution != "auto":
-        print(f"{model} does not support --resolution (gpt uses --size)")
-        raise typer.Exit(1)
     if is_nb and resolution and resolution not in ("auto", "1K", "2K", "4K"):
         print(f"Invalid --resolution '{resolution}' for {model}. Valid: 1K, 2K, 4K, auto")
-        raise typer.Exit(1)
-    if is_nb and size:
-        print(f"{model} does not support --size (nb uses --resolution + --aspect)")
         raise typer.Exit(1)
 
     if not text:

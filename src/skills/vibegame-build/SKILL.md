@@ -16,7 +16,9 @@ Core lead responsibilities in this mode:
 
 ## Phase 1: Plan
 
-Clarify the goal until it is concrete and actionable. Do not proceed to execution or use `create_goal` tool until the goal is aligned.
+Clarify the goal until it is concrete and actionable. Do not proceed to execution until the goal is aligned.
+
+This goal is not a native CLI goal, such as one set with `create_goal`. A native goal starts a new turn each time you stop. That works against this workflow: you stop while teammates work, and their reports wake you.
 
 `.vibegame/goal.md` `## User Input` holds the user's verbatim request, written there by a hook when this build was invoked. Confirm it is non-empty before anything else; if empty, paste the user's original words in yourself, unedited. GDD, `prd.md` and the final review all answer to it.
 
@@ -79,7 +81,7 @@ Delegate to teammates and supervise through to completion.
    - Follow `.vibegame/orchestrator.md` for the full task pipeline (architect → programmer → auditor → player)
    - After the stage is complete, update the progress checklist in `.vibegame/goal.md`
 3. After all stages are complete, notify the reviewer that all tasks are done and request final review. Use the review request message format in `src/.vibegame/orchestrator.md` `## Use reviewer for final quality gate`.
-4. Wait for the reviewer verdict. After done, read the verdict via `vibegame lead read --name reviewer`. The reviewer will release the lock after approving the final goal. If rejected, address feedback and request review again (same message format, updated evidence). Remember the reviewer always has to review all final quality gates instead of just checking new fixes.
+4. Read reviewer's reports via `vibegame lead read --name reviewer` and arrange fixes as findings arrive while reviewer continues testing, following `.vibegame/orchestrator.md`. The reviewer will release the lock after approving the final goal. If it ends with a reject verdict, address outstanding feedback and request review again (same message format, updated evidence). Remember the reviewer always has to review all final quality gates instead of just checking new fixes.
 
 ---
 

@@ -77,7 +77,9 @@ class RuntimeClock:
     def wait_ready(self) -> None:
         deadline = time.monotonic() + 30
         while True:
-            state = self.page.evaluate('({engine: Boolean(window.__vibegame_ready), clock: Boolean(window.__vibegameClock?.ready)})')
+            state = self.page.evaluate('({engine: Boolean(window.__vibegame_ready), clock: Boolean(window.__vibegameClock?.ready), error: window.__vibegame_boot_error || null})')
+            if state['error']:
+                raise RuntimeError(f"Game init error: {state['error']}")
             if state['engine'] and state['clock']:
                 break
             if state['engine']:

@@ -243,6 +243,8 @@
             { "file": "messages.py" },
             { "file": "paths.py" },
             { "file": "settings.py" },
+            { "file": "shortcut.py" },
+            { "file": "wake.py" },
             { "file": "state.py" },
             { "file": "tmux.py" },
             { "file": "models.json", "onConflict": "ask" }

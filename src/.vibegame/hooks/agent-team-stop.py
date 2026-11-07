@@ -22,12 +22,9 @@ Orchestrator Priority Checks (in order):
    Unread messages always have highest priority because they may contain
    critical feedback or reports.
 
-4. Working agents → WAIT (up to 270s)
-   Agents still working? Wait for one of:
-   - New unread messages arrived → block with sender summary
-   - User sent new prompt → block (user wants attention)
-   - 270s timeout → block with agent names, suggest checking their status
-   Each outcome has a distinct feedback message.
+4. Working agents: use orchestrator_wait_mode from settings.json.
+   message: approve this turn. Every report pastes a notice into the orchestrator pane.
+   poll: wait for reports or the existing 270s timeout.
 
 5. Review lock → BLOCK
    review-lock.json still locked? Block and tell orchestrator to read
@@ -37,6 +34,9 @@ Orchestrator Priority Checks (in order):
    review-lock.json or logs/review.md).
 
 6. All checks pass → APPROVE stop
+
+Every approved stop (orchestrator or mate) is recorded, so prompt deliveries know the pane
+is idle. For the orchestrator, a report that arrives during the checks blocks the stop instead.
 
 Mate Rules:
 - Agent must set status to "can-stop" or "waiting" via report before stop is allowed.
@@ -63,8 +63,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from team.hook_identity import is_subagent_event  # noqa: E402
 from team.messages import unread_inbound  # noqa: E402
 from team.paths import ensure_team_dir, find_team_dir, primary_repo_root, state_path  # noqa: E402
-from team.settings import stop_hooks_for_role  # noqa: E402
-from team.state import load_state, require_agent  # noqa: E402
+from team.settings import load_settings, stop_hooks_for_role  # noqa: E402
+from team.shortcut import rules as shortcut_rules  # noqa: E402
+from team.state import load_state, require_agent, stop_record, update_agent  # noqa: E402
+from team.wake import mark_stopped, working_agents  # noqa: E402
 from team.logger import get_logger  # noqa: E402
 
 STOP_WAIT_TIMEOUT = 270.0
@@ -267,6 +269,14 @@ def check_mate_stop(team_dir: str, mate_name: str) -> tuple[bool, str]:
         if hook.get("type") != "check":
             continue
         if hook.get("check") == "agent-reported" and agent.get("status") not in ("can-stop", "waiting"):
+            mate = agent.get("shortcut_peer")
+            if mate:
+                # Inside a shortcut, only the shortcut rules apply.
+                return False, (
+                    f"Report your progress before stopping. You are in a shortcut with `{mate}`. "
+                    "Pass the text through a quoted heredoc (`<<'EOF'`), so backticks and $ in it arrive intact.\n"
+                    + shortcut_rules(mate)
+                )
             return False, (
                 f"Report your progress before stopping. Pass the text through a quoted heredoc, so backticks and $ in it reach the lead intact:\n"
                 "    vibegame mate report --over <<'EOF'\n"
@@ -282,11 +292,7 @@ def check_mate_stop(team_dir: str, mate_name: str) -> tuple[bool, str]:
 # -- Shared helpers ---------------------------------------------------------
 
 def current_working_agents(team_dir: str) -> list[str]:
-    state = load_state(team_dir)
-    agents = state.get("agents", {})
-    # "waiting" counts as in-flight: the mate stopped but its background jobs are
-    # still running, so the lead should idle-wait, not fall through to later gates.
-    return [name for name, agent in agents.items() if agent.get("status") in ("working", "waiting")]
+    return working_agents(load_state(team_dir))
 
 
 def format_messages_summary(messages: list[dict]) -> str:
@@ -446,6 +452,8 @@ def main() -> int:
             _block("Missing VIBEGAME_MATE_NAME for mate stop hook.")
             return 0
         allowed, message = check_mate_stop(team_dir, mate_name)
+        if allowed:
+            update_agent(mate_name, team_dir, stopped=stop_record())
 
     elif role == "orchestrator":
         # 1. Project config
@@ -460,6 +468,12 @@ def main() -> int:
             _approve("No vibegame session context.", payload, role, team_dir, source_app)
             return 0
 
+        try:
+            wait_mode = load_settings(team_dir)["orchestrator_wait_mode"]
+        except (ValueError, OSError) as exc:
+            _block(f"Cannot read orchestrator wait settings: {exc}")
+            return 0
+
         # 4. Unread messages → block immediately
         unread = unread_inbound(team_dir)
         if unread:
@@ -471,7 +485,10 @@ def main() -> int:
         else:
             # 5. Working agents → wait for messages/timeout
             working = current_working_agents(team_dir)
-            if working:
+            if working and wait_mode == "message":
+                allowed = True
+                message = "Waiting for teammate reports."
+            elif working:
                 _notify_dashboard_status(payload, role, team_dir, source_app, "waiting")
                 event_messages = wait_for_messages_or_timeout(team_dir)
                 _notify_dashboard_status(payload, role, team_dir, source_app, "running")
@@ -498,6 +515,10 @@ def main() -> int:
                     # 7. All clear
                     allowed = True
                     message = "orchestrator stop allowed"
+
+        if allowed and not mark_stopped(team_dir):
+            allowed = False
+            message = "New teammate reports. Run `vibegame lead read --name ALL` before stopping."
 
     else:
         _approve("No vibegame session context.", payload, role, team_dir, source_app)

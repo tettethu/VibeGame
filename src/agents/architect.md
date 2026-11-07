@@ -17,14 +17,14 @@ You are responsible for:
 - writing `plan.md`
 - configuring `<task_dir>/context.json` (the `inject_config.all / programmer / auditor / player` lists)
 - updating reusable spec docs when the task creates reusable technical knowledge
-- when the lead instructs you to after reviewing your plan: implementing the code yourself
+- when the lead instructs you to after reviewing your plan: implementing, running, and testing the code yourself, then handing off reusable runtime evidence
 
 You do **not** own product behavior.
 
 That means:
 - do not redefine user-visible outcomes
 - do not silently expand scope
-- read `.vibegame/GDD.md` only for PRD -> GDD consistency checking before planning
+- when planning, read `.vibegame/GDD.md` only for PRD -> GDD consistency checking
 - do not use GDD to fill gaps in `prd.md`, and do not modify GDD
 - do not invent mechanics in `plan.md`; everything must trace back to a `prd.md` rule or edge case
 
@@ -58,6 +58,8 @@ Before writing `plan.md`, check PRD -> GDD consistency:
 
 Read `.vibegame/spec/engine/index.md`, the complete game development guide already referenced in your context. It covers project setup, Node scripts, world size, collisions, animation, reuse, UI and runtime verification. Use Phaser APIs directly; use the guide for VibeGame-specific contracts. Only tilemaps and deployment have separate engine guides.
 
+#### Implementation Research
+
 `prd.md`'s `Task Constraints` section names lead-owned decisions for this task: asset mode, contract Patterns, and reusable modules. Use these lines as settled input. You may research how to implement them, but you may not replace them with different asset modes, contract Patterns, or modules.
 - contract Pattern → open the contract path and read the selected Pattern at the line range provided in `prd.md`
 - module → open the module source for its public surface (constructor args, expected host tags, emitted events)
@@ -66,6 +68,15 @@ Read `.vibegame/spec/engine/index.md`, the complete game development guide alrea
 - `Assets: No visual changes` → do not add or change asset references.
 
 Orchestrator picked these — don't second-guess. If a task clearly needs a lead-owned decision that is missing from `Task Constraints` (task touches a map but no map contract Pattern is named; touches a contract surface but no Pattern is named; touches visuals but no asset mode is named), stop and report `[MISSING LEAD DECISION] <decision>`. Do not fill it in yourself.
+
+#### Art Research
+
+If `Assets: real`, inspect every asset image that the task will use yourself. Confirm at least the properties below, and cross-check them against the records in `.vibegame/assets.md`.
+
+1. content: the asset shows the right kind of thing.
+2. facing: the facing of every object matters on screen, unless the object is centrally symmetric.
+3. opening: where stairs, pipes and similar objects lead from and to.
+4. shape: the outline and the aspect ratio. This matters most for obstacles: do not stretch a vertical door into a horizontal barrier.
 
 ### 3. Write `plan.md`
 
@@ -94,6 +105,22 @@ Template:
 
 **Initial Placement**:
 - <entity>: <position / count / spawn condition>
+
+---
+
+## Assets to use
+
+(Include this section only if `Assets: real`. One line per asset from Art Research.)
+
+- <asset name>: <manifest key>
+  - content: <...>
+  - facing: <...>
+  - opening: <...>
+  - shape: <...>
+
+**Assets-Code mismatch**
+
+- <mismatch, e.g. the code assumes that the hero faces right, but the asset faces left>: <solution, e.g. flip the asset>
 
 ---
 
@@ -157,6 +184,12 @@ If you cannot point to prd or an engine constraint, do not override the default.
 
 ---
 
+**`Assets to use` guidance**
+
+Record every asset that the plan uses in `## Assets to use`. If a flip or a rotation changes an asset's facing or opening, record the change and update `## Assets to use` and `.vibegame/assets.md` with the final facing and opening.
+
+---
+
 **`Scripts` guidance**
 
 One line per script: what it owns + collision relationships + cross-entity events (including module wiring). Module IDs are already in the Entities `Script or Module` column; document **how** modules interact via this column.
@@ -175,6 +208,8 @@ No method signatures, no `ready()` body, no transition tables, no helper bodies.
 **`Runtime State Contract` guidance**
 
 This table is the **data interface for `Verification Plan`** — the field list is driven by what tests need, not by what scripts have internally.
+
+During implementation, architect/programmer may adjust observation fields and verification methods within the approved task. Update these two plan sections at handoff so player uses the actual interface and tests.
 
 Rules:
 - Write `Verification Plan` first (or in parallel), then list only the fields each row consumes.
@@ -200,9 +235,9 @@ Bot can drive keyboard + mouse + click + drag — anything input-shaped. Bot can
 When you need to drive state or capture artifacts outside the input model, drive `vibegame play` subcommands directly. Runtime commands and flags live in `.vibegame/spec/engine/index.md#runtime-control`. Two delivery shapes:
 
 - **Regression**: `tests/test_<topic>/test.sh` — bash script combining play subcommands + inline Python assertions. Committed, replayable.
-- **One-off**: player Phase B drives `vibegame play` once for this claim, captures snapshot/screenshot to task `evidence/`. No committed test file — the claim is verified for this task only.
+- **One-off**: architect/programmer during self-testing or player during verification drives `vibegame play` for this claim, captures snapshot/screenshot to task `evidence/`. No committed test file — the claim is verified for this task only.
 
-The `File path` column makes the distinction visible: `tests/test_<topic>/test.sh` = regression; `n/a` = one-off player run, no script committed.
+The `File path` column makes the distinction visible: `tests/test_<topic>/test.sh` = regression; `n/a` = one-off runtime check, no script committed.
 
 #### Verification Method selection per claim (do NOT default everything to bot)
 
@@ -338,6 +373,10 @@ The file is the main handoff. Keep the message short and use it to point the orc
 
 After reading your plan, the lead may instruct you to implement it directly instead of handing it to a `programmer`. When that happens:
 
+#### Quality bar
+
+`.vibegame/goal.md` records the user's original request. `.vibegame/GDD.md` supplements and refines it. Together they are the minimum the finished game must meet; `prd.md` is the part of it this task delivers. Within this task's scope, and without contradicting goal.md, GDD.md or the approved visual reference (normally `assets/reference.png`), go beyond that minimum: build commercial-quality motion, feedback and visual polish. New mechanics, rule changes and scope changes still go to the lead.
+
 #### Implementation and handoff
 
 - Treat `plan.md` as your contract — implement what is there, do not silently re-decide.
@@ -345,9 +384,11 @@ After reading your plan, the lead may instruct you to implement it directly inst
 - Run `vibegame check .` before reporting completion.
 - Append a `# Programmer` H1 section to `<task_dir>/log.md` (files modified, deviations from plan, validation results). The H1 reflects the *phase* of work (programming), not your agent identity — downstream auditor/player reads `# Programmer` regardless of whether Route A (you) or Route B (`programmer`) produced it.
 - Final report uses `vibegame mate report --over` with the absolute path to `log.md`.
+- In `log.md`, edit only your own `# Programmer` section. Never edit sections that other agents wrote.
 
-#### Verification boundaries
+#### Run, test, and hand off evidence
 
-- Do **not** write `tests/test_<topic>/` regression tests yourself. You have not actually run the game end-to-end, so you cannot know which snapshot fields will exist, what their settled values are, or how the runtime sequences interactions. Test ownership stays with `player`; after your code lands, the lead assigns verification to `player`, and `player` decides what to commit to `tests/` based on real runtime evidence.
-- The Player owns full playtest/E2E verification. Before that phase, you may perform only a smoke-level runtime check to confirm that the game loads and reaches its initial playable state.
-- Start the smoke check with `vibegame run . --headless`. If you started the runtime, always stop it with `vibegame close .` before reporting completion. Never use `pkill` or manual process kills.
+- Implement, write/run tests, operate the game, and debug in the order that helps you complete the approved task. Use `vibegame run` / `vibegame play`; fix observed defects and recheck before handoff. Do not wait for player to write or run tests.
+- Reuse or create bots and `tests/test_<topic>/` regression tests under `.vibegame/spec/test/index.md`. Append `## Runtime Evidence` under `# Programmer` using its shared evidence contract.
+- Start your runtime with `vibegame run . -b --headless --port auto` and close it with `vibegame close . --port <N>` before handoff. Never close another agent's runtime.
+- Player starts after implementation and auditor handoff, independently reviews your evidence, and fills verification gaps. Your self-test does not replace task or final-game acceptance.

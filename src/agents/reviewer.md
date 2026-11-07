@@ -35,7 +35,14 @@ The lead spawns you when the first final review begins. You stay alive and only 
 
 # Final Review
 
-> **Act as a picky game QA tester, and stop the moment you find any reject-worthy issue.** Walk the build through three dimensions, **basic → advanced**: Functionality → Visual Quality → Playability; a failure at any earlier dimension makes the later ones irrelevant. Report the first blocker rather than enumerating every defect — the lead decides the next step.
+> **Act as a picky game QA tester. Report each reject-worthy issue immediately using `vibegame mate report` without `--over`, then continue testing in the game already open while the lead arranges fixes.** Walk the build through three dimensions, **basic → advanced**: Functionality → Visual Quality → Playability. Continue all checks that remain meaningful; stop early only when a blocker prevents further testing.
+
+Do not close the runtime that you started while you send findings. When a fix is ready, do these steps:
+1. Finish the check that you are doing now.
+2. Reload the game with `vibegame play --port <N> refresh`.
+3. Do the check for the fixed issue again. Also check the game behavior that the fix can change.
+
+Before you approve, do all the checks that a defect prevented.
 
 A runtime started with `-b` keeps running after the command returns, so stop each one you started with `vibegame close . --port <N>` before you report your verdict — including when you stop early to reject. `vibegame run --status` lists every background runtime in the project, other agents' included, so close by your own ports and never with `--all`. Never use `pkill` or manual process kills.
 
@@ -45,23 +52,26 @@ The game runs and the goal's user-visible outcome is observable end to end.
 
 - Game loads without console errors (Runtime: `.vibegame/spec/engine/index.md#runtime-control`).
 - Walk the goal's core loop with `vibegame play`; the user-visible outcome must be reachable.
-- **When ad-hoc `vibegame play` would take many rounds (boss fights, multi-stage flows), author your own short bot under `tests/bot/` and run it via `vibegame run --bot`.** Five lines of `decide()` + 30s of `vibegame run --bot` usually replaces 10+ rounds of agent-loop play; you get `video.webm` + `trace.jsonl` + `result.json` in one shot. Use this on top of any bots player already delivered, not as a replacement. See `.vibegame/spec/engine/index.md#runtime-bot` for the protocol.
+- **When ad-hoc `vibegame play` would take many rounds (boss fights, multi-stage flows), author your own short bot under `tests/bot/` and run it via `vibegame run --bot`.** Five lines of `decide()` + 30s of `vibegame run --bot` usually replaces 10+ rounds of agent-loop play; you get `video.webm` + `trace.jsonl` + `result.json` in one shot. Reuse or extend existing bots when they serve this final check; a fresh core-loop run need not use a new bot file. See `.vibegame/spec/engine/index.md#runtime-bot` for the protocol.
 - **Run every regression test under `tests/`** (mandatory). Per the contract in `.vibegame/spec/test/index.md`, run each `tests/test_*/test.sh` individually with a port you manage. Triage failures:
   - true regression → reject; the responsible task must fix the code
   - outdated assertion (legitimate behavior change per `prd.md`) → update the assert yourself if the fix is local and obvious; otherwise reject and explain
-- Read each task's `log.md` — the `# Auditor` and `# Player` sections carry static-review findings and runtime evidence. For every acceptance criterion:
+- Read each task's `log.md`: `# Auditor` carries static findings, `# Player` records task acceptance, and `# Programmer` may contain the implementation owner's original runtime evidence. Follow references to the actual artifacts rather than asking player to recapture them. Record `reused`, `rerun`, or `new check`, source when applicable, and reason in your review notes. For every acceptance criterion:
   - Audit player's evidence (snapshot JSON for state ACs, screenshots for visual ACs, both when both apply).
   - If the evidence is vague or the wrong type for the criterion, note it as a gap.
   - For high-risk or under-evidenced criteria, re-verify yourself via Runtime API.
+- A task without a `# Player` section went straight to final review, and your review is its acceptance: verify each acceptance criterion in its `prd.md` yourself, reusing the implementation owner's evidence where it applies.
 - No NaN positions, missing nodes, or broken references.
-
-If functionality fails, reject here — visual and playability review are wasted on a broken build.
 
 ## 2. Dimension 2 — Visual Quality
 
-Visual Quality means the game screen looks commercially usable at runtime. This does not mean every effect must be expensive or flashy. It means the final pixels are coherent: consistent style, no visual misalignment, clear gameplay meaning, readable UI, and no broken integration artifacts.
+Visual Quality means the game screen looks commercially usable at runtime. It means
+1. Coherent (always required): consistent style, no visual misalignment, clear gameplay meaning, readable UI, and no broken integration artifacts.
+2. Alive: the game responds and moves like a commercial game, not a slide deck. State changes animate instead of jumping, player actions and game events produce visible feedback, and screens do not freeze while the player waits. Effects must not hide information the player needs to read. Motion listed in the GDD `### UI & Effects` table is a requirement, checked under GDD coverage. Liveliness beyond it is not a reject reason: report it as advice; the lead decides based on the budget.
 
-Visual Quality must be checked from actual runtime screenshots, not inferred from code, manifests, or scene JSON. If the player has prepared screenshots, review those screenshots directly. If screenshots are missing or insufficient, run `vibegame play` yourself, walk the relevant flow, and capture fresh screenshots.
+Visual Quality must be checked from actual runtime visual evidence (videos, screenshots), not inferred from code, manifests, or scene JSON. If architect, programmer, or player has prepared applicable evidence, review that evidence directly and make your own judgment. If evidence is missing or insufficient, collect it yourself (`.vibegame/spec/engine/index.md#runtime-control`):
+- `vibegame play` checks game state and still frames: positions are aligned and sizes are consistent. Runtime control freezes the game between commands, so these screenshots never show motion. Stepping one command at a time is slow; group commands with `vibegame play batch` (`.vibegame/spec/engine/index.md#batch`).
+- Motion (item 2) needs a real-time recording: the `video.webm` of a bot run (`vibegame run . --headless --bot <file>`, `.vibegame/spec/engine/index.md#runtime-bot`) or a `--shot` recording. Extract consecutive frames, e.g. `ffmpeg -i <video> -vf fps=4 <dir>/%03d.png`, and compare them.
 
 Checklist:
 
@@ -108,8 +118,6 @@ Procedure:
 3. Run specialized alignment checks when applicable
    - For raster-map scenes, additionally use the rastermap VLM checks for feet/platform/wall alignment.
    - These alignment checks are extra checks. They do not replace the full-screen visual quality gate.
-
-Visual elements are coherent across the whole game.
 
 **Mandatory: no leftover placeholders**
 
@@ -162,13 +170,13 @@ Walk through every item before declaring approve. Any fail -> reject. Do not get
 
   **Counter-examples that DO NOT count as Runnable evidence**:
   - "Frames are advancing" — particles and tweens keep frame entropy high while gameplay logic is broken. Require state diffs, not "the screen is moving".
-  - "Verified via eval" — eval bypasses the game loop; it proves a function exists, not that gameplay can reach it. Reject.
-  - "Round N carried forward" — a prior reviewer session's evidence is stale if any code changed since. Re-verify in the current session.
+  - "Verified via eval alone" — directly invoking gameplay logic or writing the expected result does not prove Runnable. `eval`/`set` may prepare a scenario; verify behavior through normal input and the game loop. Skipped progression remains unverified.
+  - "Round N carried forward" without inspecting artifacts and tested state. Reuse requires the shared evidence checks; re-verify affected or uncertain coverage. Always play the current final core loop yourself.
   - "Engine fix to make tests pass" — turning on a testing-only knob (e.g. Phaser `forceSetTimeOut`) in production code is a workaround, not a fix. Require the underlying bug be addressed.
 
   **When any of these fails**, diagnose in this order: project code (scripts / scene config / input map) -> engine code.
 
-- [ ] **GDD coverage.** Every item under GDD `### Signature Mechanics`, Detailed Design `### System Mechanics`, and `## Art Requirements` has an implementation trace: game code for a mechanic, an `assets/manifest.json` entry for an art item. A missing trace is a reject unless `goal.md` `## Done When` excludes it.
+- [ ] **GDD coverage.** Every item under GDD `### Signature Mechanics`, Detailed Design `### System Mechanics`, and `## Art Requirements` has an implementation trace: game code for a mechanic, an `assets/manifest.json` entry for an art item, the effect visible in a real-time recording for a `### UI & Effects` motion row. A missing trace is a reject unless `goal.md` `## Done When` excludes it.
 
   **For any mechanic whose state the player reads in order to decide, the trace is not done until you can point at where it is drawn.** Name the screen and the element in a runtime screenshot. "The code computes it" and "it is in `runtimeState()`" are not answers: a value the player cannot read changes no decision, so the mechanic does not exist for the player.
 
@@ -246,7 +254,7 @@ If rejected, keep the lock and explain what must be fixed.
 
 When rejecting, be specific about what's wrong.
 
-> Clean old review notes when writing new notes.
+> Keep review notes current, preserving unresolved findings and untested checks.
 
 ---
 

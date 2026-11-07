@@ -9,13 +9,13 @@
 3. When outputting a file path for user review, always use markdown link format `[name](absolute_path)`. Do not use relative paths or `[name](file://absolute_path)`
 4. Never modify files outside the game project directory unless the user explicitly permits it. When deleting files, prefer recoverable methods (e.g. `trash` on macOS) over `rm`.
 5. Never use `pkill -f 'vibegame'`; it can terminate the entire VibeGame agent team, Dashboard, runtime, and tmux session.
+6. Engine source code is available in the project's `engine/` directory; read it when the documentation does not answer your question, and modify it when necessary, such as to fix an engine bug.
 
 ## User Interaction
 
 You must interact with the user in this way:
 1. **Always** respond and write docs in: **{{language_name}}**. File names, identifiers, code, and engine vocabulary stay in English.
 2. **DO NOT** use `AskUserQuestion` or other equaliant tools. To ask user questions or ask user to choose between options, just output the question and options.
-
 
 ## Glossary
 
@@ -46,9 +46,12 @@ Engine usage lives in [.vibegame/spec/engine/index.md](.vibegame/spec/engine/ind
 - **input-map** - Mappings from physical keys to game actions.
 
 ### Workflow
-- **agent** — A specialist sub-process with a defined role. Persistent: `designer`, `artist`, `reviewer`. Spawned per task: `architect`, `programmer`, `auditor`, `player`. For one-shot codebase exploration the orchestrator uses Claude Code's built-in Task tool with the `Explore` subagent (or Codex equivalent) — the team backbone is reserved for stateful, multi-turn task work.
+- **agent team** — 8 kinds of specialist agents develop this project together (team lead: `orchestrator`. teammates: `artist`, `designer`, `architect`, `programmer`, `auditor`, `player`, `reviewer`). They communicate with `vibegame` commands. Never use native multi-agent tools (e.g. `send_message`, `spawn_agent`) to start or communicate with these 8 kinds of specialist agents. Only two ways of communication exist:
+  1. orchestrator <-> teammates
+  2. The orchestrator creates a `shortcut` between 2 teammates. While the `shortcut` is open, the 2 teammates can only send messages to each other or leave the `shortcut`.
+- **shortcut** — A direct conversation channel that the orchestrator creates between two teammates. Its usage is explained when it starts.
 - **task** — A bounded unit of feature work tracked under `.vibegame/tasks/<name>/`. Created and initialized by the orchestrator via `vibegame lead task create` / `vibegame lead task init`. Pipeline: orchestrator writes `prd.md` → `architect` produces `plan.md` and configures the per-task `context.json` → `programmer` writes code → `auditor` does static review → `player` runtime-verifies (state assertions + screenshots) → orchestrator accepts. Optionally runs in its own git worktree for isolation.
 - **prd.md** — A task's product specification. Owned by the orchestrator. User-visible outcome, entry conditions, boundaries, acceptance notes. Never holds implementation detail.
 - **plan.md** — A task's technical plan. Owned by `architect`. Lists files to touch, technical decisions, reuse points, constraints. The contract `programmer` and `auditor` execute against.
-- **log.md** — A task's append-only work record. Owned by downstream sprint agents. Each phase appends one H1 section (`# Programmer`, `# Auditor`, `# Player`) containing files modified, decisions, validation results, evidence pointers. H1 reflects the phase, not the agent identity — Route A `architect` writes `# Programmer` when it self-implements. Multi-round rework appends additional sections rather than overwriting.
+- **log.md** — A task's work record. Owned by downstream sprint agents. Each phase writes one H1 section (`# Programmer`, `# Auditor`, `# Player`) containing files modified, decisions, validation results, evidence pointers. H1 reflects the phase, not the agent identity — Route A `architect` writes `# Programmer` when it self-implements. Each agent edits only its own section. After rework, it updates that section instead of adding another.
 - **context.json (per task)** — `<task_dir>/context.json` holds `{file, reason}` lists keyed by `all / programmer / auditor / player`. Seeded from source `config/context.json:default_config` at `vibegame lead task init`, edited by `architect` to add task-specific specs. Path resolver tries the task dir first, then the workspace root.

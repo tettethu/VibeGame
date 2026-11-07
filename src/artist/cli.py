@@ -45,7 +45,7 @@ from .perfectify import cmd_perfectify
 from .pixel import pixel_app
 from .video import cmd_v2f
 from .decompose import cmd_decompose
-from .imagegen import cmd_image, cmd_list
+from .imagegen import ImageCommand, cmd_image, cmd_list
 from .videogen import cmd_video
 
 art_app.command("cut")(cmd_cut)
@@ -73,7 +73,7 @@ gen_app = typer.Typer(
     rich_markup_mode=None,
     pretty_exceptions_enable=False,
 )
-gen_app.command("image")(cmd_image)
+gen_app.command("image", cls=ImageCommand)(cmd_image)
 gen_app.command("video")(cmd_video)
 gen_app.command("list")(cmd_list)
 art_app.add_typer(gen_app, name="gen")

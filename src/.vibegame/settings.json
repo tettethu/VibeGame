@@ -1,4 +1,5 @@
 {
+  "orchestrator_wait_mode": "poll",
   "agents": {
     "orchestrator": {
       "cli": "claude",

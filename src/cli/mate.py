@@ -52,9 +52,11 @@ def _exit(rc: int) -> None:
 def cmd_report(
     content: Optional[str] = typer.Argument(None, help="Report content. Reads from stdin if omitted."),
     name: Optional[str] = typer.Option(None, "--name", help="Mate name. Defaults to $VIBEGAME_MATE_NAME."),
+    to: str = typer.Option("lead", "--to", help="Recipient: lead or a teammate connected by lead shortcut."),
     over: bool = typer.Option(False, "--over", help="Mark current work as over; status -> can-stop."),
     wait: bool = typer.Option(False, "--wait", help="Turn done but background jobs still running; status -> waiting."),
+    close_shortcut: bool = typer.Option(False, "--close-shortcut", help="With --over to the lead, leave your shortcut and notify the other teammate."),
 ):
-    """Send a progress or completion report from a mate back to the lead."""
+    """Send a report to the lead or a connected teammate."""
     _bootstrap()
-    _exit(_mate_main.cmd_report(SimpleNamespace(content=content, name=name, over=over, wait=wait)))
+    _exit(_mate_main.cmd_report(SimpleNamespace(content=content, name=name, to=to, over=over, wait=wait, close_shortcut=close_shortcut)))

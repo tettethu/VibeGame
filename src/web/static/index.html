@@ -714,6 +714,18 @@
             grid-template-columns: minmax(360px, 1fr) 300px;
             min-height: 0;
         }
+        .obj-conflict {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #b86a32;
+            background: rgba(184,106,50,0.12);
+            color: var(--charcoal);
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .obj-conflict[hidden] { display: none; }
         .obj-stage {
             display: grid;
             grid-template-rows: minmax(260px, 7fr) auto minmax(128px, 3fr);
@@ -1772,6 +1784,32 @@
             margin: 0 auto;
             width: 100%;
         }
+
+        .detail-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 4rem 2rem;
+            color: var(--stone);
+            font-size: 0.9rem;
+        }
+
+        .earlier-turns {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+        .earlier-turns button {
+            border: 1px solid var(--border, #ddd);
+            background: transparent;
+            color: var(--stone);
+            border-radius: 6px;
+            padding: 0.3rem 0.8rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .earlier-turns button:hover { color: inherit; }
 
         /* User bubble */
         .cm-user {
@@ -3003,7 +3041,11 @@
         let detailRequestVersion = 0;
         let detailRefreshTimers = [];
         let detailPollTimer = null;
-        let lastRenderedMessages = null;  // {id, messages} of the last renderDetail, baseline for sendPrompt
+        let lastRenderedMessages = null;  // {id, messages, revision, turns} of the last renderDetail, baseline for sendPrompt
+        // The chat shows the last turns only (a turn starts at a user message); each click on the
+        // button above them adds this many more. A whole long conversation took the browser over a GB.
+        const CHAT_WINDOW_TURNS = 10;
+        let detailTurns = { id: null, turns: CHAT_WINDOW_TURNS };
         let currentView = 'chats'; // 'chats' | 'assets' | 'objects' | 'play'
         let reviewSidebarOpen = false;
         let reviewPayload = null;
@@ -3308,15 +3350,8 @@
             // Auto-start when entering Play tab if not running
             if (!playState.running && !playState.starting) {
                 playState.starting = true;
-                currentView = 'play';
+                switchView('play', false);
                 if (updateHash) setViewHash('play');
-                document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.view === 'play'));
-                mainPanel.classList.remove('chats-view', 'review-open');
-                reviewSidebarOpen = false;
-                sidebarBody.innerHTML = '';
-                sidebarBody.style.display = '';
-                panelInput.style.display = 'none';
-                renderPlayUI();
                 await playStart();
             } else if (currentView === 'play') {
                 // Re-clicking Play while already on Play means "reload the
@@ -3494,12 +3529,23 @@
             }
         }
 
-        async function fetchSessionDetail(id) {
+        // With `known`, the server leaves out the messages when the transcript is still at that revision.
+        // With `turns`, it returns only the last that many turns; without, the whole conversation.
+        async function fetchSessionDetail(id, known = '', turns = 0) {
             try {
-                const res = await fetch(`/sessions/${encodeURIComponent(id)}`);
-                if (!res.ok) return null;
-                return await res.json();
-            } catch { return null; }
+                const params = new URLSearchParams();
+                if (known) params.set('known', known);
+                if (turns) params.set('turns', String(turns));
+                const query = params.toString() ? `?${params}` : '';
+                const res = await fetch(`/sessions/${encodeURIComponent(id)}${query}`);
+                // A deleted session is a normal outcome; any other failure is reported to the caller.
+                if (res.status === 404) return null;
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) return { error: data.error || `HTTP ${res.status}` };
+                return data;
+            } catch (err) {
+                return { error: `Dashboard server unreachable: ${err.message || err}` };
+            }
         }
 
         function cancelDetailRefresh() {
@@ -3669,9 +3715,21 @@
 
         async function loadDetail(id) {
             const requestVersion = ++detailRequestVersion;
-            const session = await fetchSessionDetail(id);
+            if (detailTurns.id !== id) detailTurns = { id, turns: CHAT_WINDOW_TURNS };
+            const turns = detailTurns.turns;
+            // The held messages stand for this request only when they cover the same window.
+            const held = lastRenderedMessages?.id === id && lastRenderedMessages.turns === turns ? lastRenderedMessages : null;
+            // Until the first detail of a session arrives, the panel names it, so it does not look unselected.
+            if (lastRenderedMessages?.id !== id || !panelBody.querySelector(':scope > .chat')) showDetailLoading(id);
+            const session = await fetchSessionDetail(id, held?.revision || '', turns);
             if (requestVersion !== detailRequestVersion || currentView !== 'chats' || selectedId !== id) return;
             if (!session) { showWelcome(); return; }
+            if (session.error) {
+                panelBody.innerHTML = `<div style="padding:2rem;color:var(--red);font-family:monospace;white-space:pre-wrap">Failed to load session:\n${esc(session.error)}</div>`;
+                console.error('loadDetail failed:', session.error);
+                return;
+            }
+            if (session.unchanged) session.messages = held.messages;
             try {
                 renderDetail(session);
             } catch (err) {
@@ -3696,6 +3754,20 @@
                     <p>Select an agent session to chat,<br>or browse Assets.</p>
                 </div>`;
             panelInput.style.display = 'none';
+        }
+
+        function showDetailLoading(id) {
+            const s = sessions.find(x => x.id === id);
+            const name = s ? displayName(s) : id;
+            detailTitle.textContent = name;
+            detailHeader.classList.add('visible');
+            panelBody.classList.add('detail-active');
+            panelInput.style.display = 'none';
+            panelBody.innerHTML = `
+                <div class="detail-loading">
+                    <span class="cc-star-spinner" aria-hidden="true"></span>
+                    <span>Loading ${esc(name)}...</span>
+                </div>`;
         }
 
         function hideDetailHeader() {
@@ -3735,8 +3807,16 @@
             detailHeader.classList.add('visible');
             panelBody.classList.add('detail-active');
 
+            // Rebuilding a long chat is the costly part, so a chat already showing this view is kept.
+            // The key lives on the chat element: any other content in the panel drops it.
+            const awaiting = pendingPrompt?.sessionId === s.id ? pendingPrompt.ts : '';
+            const win = s.turn_window || {};
+            const renderKey = [s.id, s.transcript_revision, s.status, s.tmux_pane, awaiting, win.shown_turns, win.total_turns].join('|');
+            if (s.transcript_revision && panelBody.querySelector(':scope > .chat')?.dataset.renderKey === renderKey) return;
+
             const messages = (s.messages || []).slice();
-            lastRenderedMessages = { id: s.id, messages: s.messages || [] };
+            const turns = detailTurns.id === s.id ? detailTurns.turns : CHAT_WINDOW_TURNS;
+            lastRenderedMessages = { id: s.id, messages: s.messages || [], revision: s.transcript_revision || '', turns };
             if (pendingPrompt && pendingPrompt.sessionId === s.id && s.id === selectedId) {
                 if (countMatchingUserPrompts(messages, pendingPrompt.text) > pendingPrompt.seenCount) {
                     pendingPrompt = null;
@@ -3748,12 +3828,24 @@
                     messages.push({ role: 'user', text: pendingPrompt.text, ts: pendingPrompt.ts });
                 }
             }
-            panelBody.innerHTML = `<div class="chat">${buildChat(messages)}${activityRow(s)}</div>`;
+            const earlier = win.has_before
+                ? `<div class="earlier-turns"><button type="button" onclick="showEarlierTurns()">Show ${Math.min(CHAT_WINDOW_TURNS, win.total_turns - win.shown_turns)} earlier turns (${win.shown_turns} of ${win.total_turns} shown)</button></div>`
+                : '';
+            panelBody.innerHTML = `<div class="chat" data-render-key="${escAttr(renderKey)}">${earlier}${buildChat(messages)}${activityRow(s)}</div>`;
             if (wasAtBottom) panelBody.scrollTop = panelBody.scrollHeight;
 
             // Show input only when tmux pane is available
             panelInput.style.display = s.tmux_pane ? 'flex' : 'none';
             updateSendButton();
+        }
+
+        // Widen the window by one step and keep the messages that were in view where they were.
+        async function showEarlierTurns() {
+            if (!selectedId || detailTurns.id !== selectedId) return;
+            const fromBottom = panelBody.scrollHeight - panelBody.scrollTop;
+            detailTurns = { id: selectedId, turns: detailTurns.turns + CHAT_WINDOW_TURNS };
+            await loadDetail(selectedId);
+            panelBody.scrollTop = panelBody.scrollHeight - fromBottom;
         }
 
         function activityRow(s) {
@@ -4239,7 +4331,8 @@
 
         async function showSessionStatus(id) {
             const fresh = await fetchSessionDetail(id);
-            const s = fresh || sessions.find(x => x.id === id);
+            // Without a detail, the list entry still has the session's identity and paths.
+            const s = fresh && !fresh.error ? fresh : sessions.find(x => x.id === id);
             if (!s) return;
             const usage = s.token_usage;
             const tokenFields = usage ? [
@@ -4258,6 +4351,7 @@
                 ['tmux_pane', s.tmux_pane],
                 ['model', s.model],
                 ...tokenFields,
+                ...(fresh?.error ? [['detail_error', fresh.error]] : []),
             ];
             const overlay = document.createElement('div');
             overlay.className = 'status-backdrop';

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Record the latest orchestrator user-prompt time for Codex stop gating."""
+"""Record prompt submission for the orchestrator and mates; mark mates working on new work."""
 
 from __future__ import annotations
 
@@ -14,7 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from team.hook_identity import is_subagent_event  # noqa: E402
 from team.paths import ensure_team_dir, find_team_dir, primary_repo_root  # noqa: E402
-from team.state import mutate_state  # noqa: E402
+from team.shortcut import has_work  # noqa: E402
+from team.state import update_agent  # noqa: E402
+from team.wake import record_prompt  # noqa: E402
 
 
 def _load_input() -> dict:
@@ -40,11 +42,15 @@ def _resolve_orchestrator_team_dir(payload: dict) -> str | None:
 
 
 def record_last_user_prompt(team_dir: str) -> None:
-    def _mutate(state: dict) -> None:
-        lead = state.setdefault("lead", {})
-        lead["last_user_prompt_at"] = time.time()
+    record_prompt(team_dir)
 
-    mutate_state(_mutate, team_dir)
+
+def record_mate_prompt(payload: dict) -> None:
+    """Acknowledge the submission; any prompt beyond notices is work the mate must report on."""
+    fields = {"last_prompt_at": time.time()}
+    if has_work(payload["prompt"]):
+        fields["status"] = "working"
+    update_agent(os.environ["VIBEGAME_MATE_NAME"], os.environ["VIBEGAME_TEAM_DIR"], **fields)
 
 
 def main() -> int:
@@ -52,10 +58,14 @@ def main() -> int:
     parser.add_argument("--source-app")
     parser.parse_known_args()
 
-    if os.environ.get("VIBEGAME_ROLE") != "orchestrator":
+    role = os.environ.get("VIBEGAME_ROLE")
+    if role not in ("orchestrator", "mate"):
         return 0
     payload = _load_input()
     if is_subagent_event(payload):
+        return 0
+    if role == "mate":
+        record_mate_prompt(payload)
         return 0
     team_dir = os.environ.get("VIBEGAME_TEAM_DIR") or _resolve_orchestrator_team_dir(payload)
     if not team_dir:

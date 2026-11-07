@@ -14,7 +14,10 @@ import logging
 
 logger = logging.getLogger('vibegame.dashboard')
 import json
+import hashlib
 import os
+import stat
+import tempfile
 import sqlite3
 import subprocess
 import sys
@@ -24,6 +27,7 @@ import urllib.request
 from datetime import datetime
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import uuid
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import parse_qs, unquote, urlparse
@@ -41,6 +45,8 @@ GLOBAL_DASHBOARD_DIR = Path.home() / '.vibegame' / 'dashboard'
 # Game project directory (set at startup via --project)
 PROJECT_DIR: Optional[Path] = None
 DASHBOARD_TOKEN: Optional[str] = None
+_node_write_locks: dict[Path, threading.Lock] = {}
+_node_write_locks_guard = threading.Lock()
 IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp'}
 PREVIEW_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.bmp'}
 PREVIEW_TEXT_EXTENSIONS = {'.md', '.json', '.txt', '.yaml', '.yml', '.toml', '.py', '.js', '.ts', '.html', '.css', '.xml', '.csv', '.log'}
@@ -92,103 +98,13 @@ def _claude_usage_values(usage: dict) -> dict[str, int]:
 
 
 def extract_claude_token_usage(path: str) -> dict[str, Any]:
-    result = _empty_token_usage('claude')
-    if not path:
-        return result
-
-    usage_by_key: dict[str, dict[str, int]] = {}
-    try:
-        with open(path) as f:
-            for line_no, line in enumerate(f, 1):
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-                msg = entry.get('message', {})
-                if not isinstance(msg, dict) or msg.get('role') != 'assistant':
-                    continue
-                usage = msg.get('usage')
-                if not isinstance(usage, dict):
-                    continue
-
-                request_id = entry.get('requestId') or entry.get('request_id')
-                message_id = msg.get('id') or entry.get('message_id')
-                if request_id:
-                    key = f"req:{request_id}"
-                elif message_id:
-                    key = f"msg:{message_id}"
-                else:
-                    key = f"line:{line_no}"
-
-                result['entries'] += 1
-                usage_by_key[key] = _claude_usage_values(usage)
-    except Exception:
-        return result
-
-    result['groups'] = len(usage_by_key)
-    for values in usage_by_key.values():
-        for key in (
-            'input_tokens',
-            'cache_write_tokens',
-            'cached_input_tokens',
-            'output_tokens',
-            'reasoning_output_tokens',
-            'total_tokens',
-        ):
-            result[key] += values[key]
-    return result
+    view = _parsed_transcript(path, is_codex=False) if path else None
+    return view.token_usage() if view else _empty_token_usage('claude')
 
 
 def extract_codex_token_usage(path: str) -> dict[str, Any] | None:
-    if not path:
-        return None
-
-    result = _empty_token_usage('codex')
-    latest: dict[str, Any] | None = None
-    try:
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-                payload = entry.get('payload', {})
-                if not isinstance(payload, dict):
-                    continue
-                if entry.get('type') != 'event_msg' or payload.get('type') != 'token_count':
-                    continue
-
-                info = payload.get('info')
-                if not isinstance(info, dict):
-                    continue
-                usage = info.get('total_token_usage')
-                if not isinstance(usage, dict):
-                    continue
-
-                result['entries'] += 1
-                latest = usage
-    except Exception:
-        return None
-
-    if latest is None:
-        return None
-
-    result['groups'] = 1
-    result['input_tokens'] = _token_int(latest, 'input_tokens')
-    result['cached_input_tokens'] = _token_int(latest, 'cached_input_tokens')
-    result['output_tokens'] = _token_int(latest, 'output_tokens')
-    result['reasoning_output_tokens'] = _token_int(latest, 'reasoning_output_tokens')
-    total_tokens = _token_int(latest, 'total_tokens')
-    result['total_tokens'] = total_tokens or (result['input_tokens'] + result['output_tokens'])
-    return result
+    view = _parsed_transcript(path, is_codex=True) if path else None
+    return view.token_usage() if view else None
 
 
 def extract_token_usage(path: str, is_codex_transcript: bool) -> dict[str, Any] | None:
@@ -515,6 +431,46 @@ def _validate_node_path(rel_path: str) -> Path | None:
     if any(part in {'.vibegame', '.claude', '.codex', '.trellis', 'node_modules'} for part in rel_parts):
         return None
     return target
+
+
+def _read_node_document(path: Path) -> dict:
+    """Parse and version the same byte snapshot, including external edits."""
+    raw = path.read_bytes()
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise ValueError('Existing node file is not a JSON object')
+    return {'data': data, 'version': hashlib.sha256(raw).hexdigest()}
+
+
+class _NodeEditConflict(Exception):
+    def __init__(self, current: dict):
+        self.current = current
+
+
+def _save_node_document(path: Path, data: dict, base_version: str) -> dict:
+    """Serialize Dashboard writers; external writers must share this protocol
+    for strict exclusion across the final version check and replacement.
+    """
+    with _node_write_locks_guard:
+        lock = _node_write_locks.setdefault(path, threading.Lock())
+    with lock:
+        current = _read_node_document(path)
+        if current['version'] != base_version:
+            raise _NodeEditConflict(current)
+        changes = _diff_json(current['data'], data)
+        raw = (json.dumps(data, indent=2, ensure_ascii=False) + '\n').encode('utf-8')
+        mode = stat.S_IMODE(path.stat().st_mode)
+        fd, temporary = tempfile.mkstemp(prefix=f'.{path.name}.', suffix='.tmp', dir=path.parent)
+        try:
+            with os.fdopen(fd, 'wb') as handle:
+                handle.write(raw)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(temporary, mode)
+            os.replace(temporary, path)
+        finally:
+            Path(temporary).unlink(missing_ok=True)
+        return {'version': hashlib.sha256(raw).hexdigest(), 'changes': changes}
 
 
 def _build_node_tree(game_dir: Path) -> dict:
@@ -2136,142 +2092,129 @@ def parse_transcript(path: str) -> list[dict]:
       {role: 'tool_use',    tool: str,  input: dict, id: str, ts: int|None}
       {role: 'tool_result', tool_use_id: str, content: str, is_error: bool, ts: int|None}
     """
-    messages = []
-    if not path:
-        return messages
-    try:
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
+    view = _parsed_transcript(path, is_codex=False)
+    return view.messages() if view else []
 
-                if _should_hide_claude_entry_by_structure(entry):
+
+def _consume_claude_entry(messages: list[dict], entry: dict) -> None:
+    """Append the chat messages of one Claude Code transcript entry."""
+    if _should_hide_claude_entry_by_structure(entry):
+        return
+
+    msg = entry.get('message', {})
+    entry_type = entry.get('type', '')
+    ts = entry.get('timestamp')
+
+    # Queue-operation: treat as user message immediately (unless system injection)
+    if entry_type == 'queue-operation' and entry.get('operation') == 'enqueue':
+        text = (entry.get('content') or '').strip()
+        if text:
+            sys_tool = _is_system_injection(text)
+            if sys_tool:
+                inp = {'name': _parse_skill_name(text)} if sys_tool == 'Skill' else {'text': text}
+                messages.append({'role': 'tool_use', 'tool': sys_tool, 'input': inp, 'id': '', 'ts': ts})
+            else:
+                messages.append({'role': 'user', 'text': text, 'ts': ts, '_queued': True})
+        return
+
+    if not msg or not isinstance(msg, dict):
+        return
+
+    role = msg.get('role', '')
+    content = msg.get('content', '')
+    ts = entry.get('timestamp')
+
+    if entry.get('isCompactSummary') is True:
+        summary = _extract_text(content).strip()
+        if summary:
+            messages.append({
+                'role': 'tool_use',
+                'tool': 'Compact',
+                'input': {'summary': summary},
+                'id': f"claude-compact:{entry.get('uuid', '')}",
+                'ts': ts,
+            })
+        return
+
+    if role == 'user':
+        if isinstance(content, list):
+            for block in content:
+                if not isinstance(block, dict):
                     continue
-
-                msg = entry.get('message', {})
-                entry_type = entry.get('type', '')
-                ts = entry.get('timestamp')
-
-                # Queue-operation: treat as user message immediately (unless system injection)
-                if entry_type == 'queue-operation' and entry.get('operation') == 'enqueue':
-                    text = (entry.get('content') or '').strip()
+                btype = block.get('type', '')
+                if btype == 'tool_result':
+                    rc = block.get('content', '')
+                    if isinstance(rc, list):
+                        rc = '\n'.join(
+                            b.get('text', '') for b in rc
+                            if isinstance(b, dict) and b.get('type') == 'text'
+                        )
+                    stream_disconnect = _stream_disconnect_text(str(rc))
+                    messages.append({
+                        'role': 'tool_result',
+                        'tool_use_id': block.get('tool_use_id', ''),
+                        'content': _truncate_tool_output(str(rc)),
+                        'is_error': bool(block.get('is_error', False)),
+                        'ts': ts,
+                    })
+                    if stream_disconnect:
+                        messages.append(_stream_disconnect_message(stream_disconnect, ts))
+                elif btype == 'text':
+                    raw_text = block.get('text', '')
+                    text = _normalize_claude_user_text(raw_text)
                     if text:
-                        sys_tool = _is_system_injection(text)
+                        if _is_claude_request_interrupted_message(raw_text):
+                            messages.append(_interrupted_message(ts))
+                            continue
+                        sys_tool = _is_system_injection(raw_text)
                         if sys_tool:
-                            inp = {'name': _parse_skill_name(text)} if sys_tool == 'Skill' else {'text': text}
+                            inp = {'name': _parse_skill_name(raw_text)} if sys_tool == 'Skill' else {'text': text}
                             messages.append({'role': 'tool_use', 'tool': sys_tool, 'input': inp, 'id': '', 'ts': ts})
-                        else:
-                            messages.append({'role': 'user', 'text': text, 'ts': ts, '_queued': True})
-                    continue
-
-                if not msg:
-                    continue
-
-                role = msg.get('role', '')
-                content = msg.get('content', '')
-                ts = entry.get('timestamp')
-
-                if entry.get('isCompactSummary') is True:
-                    summary = _extract_text(content).strip()
-                    if summary:
-                        messages.append({
-                            'role': 'tool_use',
-                            'tool': 'Compact',
-                            'input': {'summary': summary},
-                            'id': f"claude-compact:{entry.get('uuid', '')}",
-                            'ts': ts,
-                        })
-                    continue
-
-                if role == 'user':
-                    if isinstance(content, list):
-                        for block in content:
-                            if not isinstance(block, dict):
-                                continue
-                            btype = block.get('type', '')
-                            if btype == 'tool_result':
-                                rc = block.get('content', '')
-                                if isinstance(rc, list):
-                                    rc = '\n'.join(
-                                        b.get('text', '') for b in rc
-                                        if isinstance(b, dict) and b.get('type') == 'text'
-                                    )
-                                stream_disconnect = _stream_disconnect_text(str(rc))
-                                messages.append({
-                                    'role': 'tool_result',
-                                    'tool_use_id': block.get('tool_use_id', ''),
-                                    'content': _truncate_tool_output(str(rc)),
-                                    'is_error': bool(block.get('is_error', False)),
-                                    'ts': ts,
-                                })
-                                if stream_disconnect:
-                                    messages.append(_stream_disconnect_message(stream_disconnect, ts))
-                            elif btype == 'text':
-                                raw_text = block.get('text', '')
-                                text = _normalize_claude_user_text(raw_text)
-                                if text:
-                                    if _is_claude_request_interrupted_message(raw_text):
-                                        messages.append(_interrupted_message(ts))
-                                        continue
-                                    sys_tool = _is_system_injection(raw_text)
-                                    if sys_tool:
-                                        inp = {'name': _parse_skill_name(raw_text)} if sys_tool == 'Skill' else {'text': text}
-                                        messages.append({'role': 'tool_use', 'tool': sys_tool, 'input': inp, 'id': '', 'ts': ts})
-                                        continue
-                                    # Skip if matching queue-operation already added this
-                                    match = _match_queued(messages, text)
-                                    if match:
-                                        match.pop('_queued', None)  # consume
-                                        continue
-                                    messages.append({'role': 'user', 'text': text, 'ts': ts})
+                            continue
+                        # Skip if matching queue-operation already added this
+                        match = _match_queued(messages, text)
+                        if match:
+                            match.pop('_queued', None)  # consume
+                            continue
+                        messages.append({'role': 'user', 'text': text, 'ts': ts})
+        else:
+            raw_text = _extract_text(content)
+            text = _normalize_claude_user_text(raw_text)
+            if text:
+                if _is_claude_request_interrupted_message(raw_text):
+                    messages.append(_interrupted_message(ts))
+                    return
+                sys_tool = _is_system_injection(raw_text)
+                if sys_tool:
+                    inp = {'name': _parse_skill_name(raw_text)} if sys_tool == 'Skill' else {'text': text}
+                    messages.append({'role': 'tool_use', 'tool': sys_tool, 'input': inp, 'id': '', 'ts': ts})
+                else:
+                    match = _match_queued(messages, text)
+                    if match:
+                        match.pop('_queued', None)
                     else:
-                        raw_text = _extract_text(content)
-                        text = _normalize_claude_user_text(raw_text)
-                        if text:
-                            if _is_claude_request_interrupted_message(raw_text):
-                                messages.append(_interrupted_message(ts))
-                                continue
-                            sys_tool = _is_system_injection(raw_text)
-                            if sys_tool:
-                                inp = {'name': _parse_skill_name(raw_text)} if sys_tool == 'Skill' else {'text': text}
-                                messages.append({'role': 'tool_use', 'tool': sys_tool, 'input': inp, 'id': '', 'ts': ts})
-                            else:
-                                match = _match_queued(messages, text)
-                                if match:
-                                    match.pop('_queued', None)
-                                else:
-                                    messages.append({'role': 'user', 'text': text, 'ts': ts})
+                        messages.append({'role': 'user', 'text': text, 'ts': ts})
 
-                elif role == 'assistant':
-                    if isinstance(content, list):
-                        for block in content:
-                            if not isinstance(block, dict):
-                                continue
-                            btype = block.get('type', '')
-                            if btype == 'text':
-                                text = block.get('text', '').strip()
-                                if text:
-                                    messages.append({'role': 'assistant', 'text': text, 'ts': ts})
-                            elif btype == 'tool_use':
-                                messages.append({
-                                    'role': 'tool_use',
-                                    'tool': block.get('name', ''),
-                                    'input': block.get('input', {}),
-                                    'id': block.get('id', ''),
-                                    'ts': ts,
-                                })
-                    elif isinstance(content, str) and content.strip():
-                        messages.append({'role': 'assistant', 'text': content.strip(), 'ts': ts})
-
-    except Exception:
-        pass
-
-    return messages
+    elif role == 'assistant':
+        if isinstance(content, list):
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                btype = block.get('type', '')
+                if btype == 'text':
+                    text = block.get('text', '').strip()
+                    if text:
+                        messages.append({'role': 'assistant', 'text': text, 'ts': ts})
+                elif btype == 'tool_use':
+                    messages.append({
+                        'role': 'tool_use',
+                        'tool': block.get('name', ''),
+                        'input': block.get('input', {}),
+                        'id': block.get('id', ''),
+                        'ts': ts,
+                    })
+        elif isinstance(content, str) and content.strip():
+            messages.append({'role': 'assistant', 'text': content.strip(), 'ts': ts})
 
 
 def extract_plan_text(_transcript_path: str) -> Optional[str]:
@@ -2296,23 +2239,8 @@ def extract_model(path: str) -> Optional[str]:
     """Extract model name from latest assistant message in transcript."""
     if not path:
         return None
-    model = None
-    try:
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                msg = entry.get('message', {})
-                if msg.get('role') == 'assistant' and msg.get('model'):
-                    model = msg['model']
-    except Exception:
-        pass
-    return model
+    view = _parsed_transcript(path, is_codex=_is_codex_transcript_path(path))
+    return view.model if view else None
 
 
 def parse_codex_transcript(path: str, session_id: str | None = None) -> list[dict]:
@@ -2322,122 +2250,304 @@ def parse_codex_transcript(path: str, session_id: str | None = None) -> list[dic
     - Rollout format: entries with 'type' and 'payload' fields
     - History format: entries with 'session_id', 'ts', 'text' fields (codex history.jsonl)
     """
-    messages = []
-    if not path:
-        return messages
+    view = _parsed_transcript(path, is_codex=True, session_id=session_id)
+    return view.messages() if view else []
 
-    is_history_format = path.endswith('/.codex/history.jsonl')
 
+def _consume_codex_entry(messages: list[dict], entry: dict, session_id: str | None) -> None:
+    """Append the chat messages of one Codex rollout entry, or of one history entry when `session_id` is set."""
+    # History format (codex history.jsonl): filter by session_id
+    if session_id is not None:
+        if entry.get('session_id') != session_id:
+            return
+        text = entry.get('text', '').strip()
+        if not text:
+            return
+        ts = entry.get('ts')
+        if isinstance(ts, (int, float)):
+            ts = int(ts * 1000) if ts > 1e12 else int(ts * 1000)
+        else:
+            ts = None
+        _append_codex_user_text_with_context(messages, text, ts)
+        return
+
+    # Rollout format
+    entry_type = entry.get('type', '')
+    payload = entry.get('payload', {})
+    if not isinstance(payload, dict):
+        return
+    ts_raw = entry.get('timestamp')
+    ts = None
+    if ts_raw:
+        try:
+            if isinstance(ts_raw, (int, float)):
+                ts = int(ts_raw)
+            else:
+                dt = datetime.fromisoformat(str(ts_raw).replace('Z', '+00:00'))
+                ts = int(dt.timestamp() * 1000)
+        except ValueError:
+            pass
+
+    if entry_type == 'event_msg' and payload.get('type') == 'turn_aborted':
+        messages.append(_interrupted_message(ts))
+        return
+
+    if entry_type == 'event_msg' and payload.get('type') == 'error':
+        stream_disconnect = _stream_disconnect_text(payload.get('message'))
+        if stream_disconnect:
+            messages.append(_stream_disconnect_message(stream_disconnect, ts))
+        return
+
+    if entry_type != 'response_item':
+        return
+
+    ptype = payload.get('type', '')
+
+    if ptype == 'message':
+        role = payload.get('role', '')
+        content = payload.get('content', [])
+        if isinstance(content, list):
+            text = '\n'.join(
+                b.get('text', '') for b in content
+                if isinstance(b, dict) and b.get('type') in ('input_text', 'output_text')
+            )
+        else:
+            text = str(content).strip()
+        text = text.strip()
+        if not text:
+            return
+        if role == 'user':
+            if _is_codex_turn_aborted_message(text):
+                return
+            _append_codex_user_text_with_context(messages, text, ts)
+        elif role == 'assistant':
+            messages.append({'role': 'assistant', 'text': text, 'ts': ts})
+
+    elif ptype in ('function_call', 'custom_tool_call'):
+        if ptype == 'custom_tool_call':
+            decoded_tools = decode_codex_custom_tool_inputs(payload)
+        else:
+            args_str = payload.get('arguments', '{}')
+            try:
+                args = json.loads(args_str) if isinstance(args_str, str) else args_str
+            except json.JSONDecodeError:
+                args = {'raw': args_str}
+            decoded_tools = [_decode_codex_direct_tool(payload.get('name', ''), args)]
+        call_id = payload.get('call_id', '')
+        for index, (tool_name, args) in enumerate(decoded_tools):
+            messages.append({
+                'role': 'tool_use',
+                'tool': tool_name,
+                'input': args,
+                'id': call_id if index == 0 else f'{call_id}:inner:{index}',
+                'ts': ts,
+            })
+
+    elif ptype in ('function_call_output', 'custom_tool_call_output'):
+        output = _codex_tool_output_text(payload.get('output', ''))
+        messages.append({
+            'role': 'tool_result',
+            'tool_use_id': payload.get('call_id', ''),
+            'content': _truncate_tool_output(output),
+            'is_error': False,
+            'ts': ts,
+        })
+
+
+TRANSCRIPT_READ_CHUNK = 4 * 1024 * 1024
+
+
+class TranscriptView:
+    """Messages, token usage and model of one transcript, kept current by parsing appended lines only.
+
+    Agent CLIs only append to their transcripts, so a view resumes at the byte offset it reached.
+    A file that shrank or was replaced is parsed again from the start. Rollouts reach hundreds of
+    MB, and re-reading one for every Dashboard refresh took tens of seconds.
+    """
+
+    def __init__(self, path: str, is_codex: bool, session_id: str | None = None):
+        self.path = path
+        self.is_codex = is_codex
+        # Codex history.jsonl holds every session; only the entries of this one are read.
+        self.history_session = session_id if path.endswith('/.codex/history.jsonl') else None
+        self.lock = threading.Lock()
+        self._reset(None)
+
+    def _reset(self, identity: tuple[int, int] | None) -> None:
+        self.identity = identity
+        self.offset = 0
+        self.line_no = 0
+        self.raw_messages: list[dict] = []
+        self.model: str | None = None
+        self.usage_entries = 0
+        self.claude_usage: dict[str, dict[str, int]] = {}
+        self.codex_usage: dict | None = None
+
+    @property
+    def revision(self) -> str:
+        """Changes whenever the parsed content can differ."""
+        return f"{self.identity[1]}:{self.offset}" if self.identity else ''
+
+    def refresh(self) -> None:
+        """Parse the lines appended since the last refresh. Raises FileNotFoundError for a missing file."""
+        stat = os.stat(self.path)
+        identity = (stat.st_dev, stat.st_ino)
+        if identity != self.identity or stat.st_size < self.offset:
+            self._reset(identity)
+        if stat.st_size == self.offset:
+            return
+        remaining = stat.st_size - self.offset
+        tail = b''
+        # Chunked, so a first parse of a large rollout does not hold the whole file in memory.
+        with open(self.path, 'rb') as f:
+            f.seek(self.offset)
+            while remaining > 0:
+                chunk = f.read(min(TRANSCRIPT_READ_CHUNK, remaining))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+                data = tail + chunk
+                end = data.rfind(b'\n') + 1
+                for raw in data[:end].split(b'\n')[:-1]:
+                    self._consume(raw)
+                self.offset += end
+                tail = data[end:]
+        # A last line without its newline is either still being written or complete; only a complete one parses.
+        if tail.strip():
+            try:
+                json.loads(tail)
+            except ValueError:
+                return
+            self._consume(tail)
+            self.offset += len(tail)
+
+    def _consume(self, raw: bytes) -> None:
+        self.line_no += 1
+        line = raw.decode('utf-8', 'replace').strip()
+        if not line:
+            return
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            return
+        if not isinstance(entry, dict):
+            return
+        msg = entry.get('message')
+        if isinstance(msg, dict) and msg.get('role') == 'assistant' and msg.get('model'):
+            self.model = msg['model']
+        if self.is_codex:
+            self._codex_usage(entry)
+            _consume_codex_entry(self.raw_messages, entry, self.history_session)
+        else:
+            self._claude_usage(entry, msg)
+            _consume_claude_entry(self.raw_messages, entry)
+
+    def _claude_usage(self, entry: dict, msg: Any) -> None:
+        if not isinstance(msg, dict) or msg.get('role') != 'assistant' or not isinstance(msg.get('usage'), dict):
+            return
+        request_id = entry.get('requestId') or entry.get('request_id')
+        message_id = msg.get('id') or entry.get('message_id')
+        if request_id:
+            key = f"req:{request_id}"
+        elif message_id:
+            key = f"msg:{message_id}"
+        else:
+            key = f"line:{self.line_no}"
+        self.usage_entries += 1
+        self.claude_usage[key] = _claude_usage_values(msg['usage'])
+
+    def _codex_usage(self, entry: dict) -> None:
+        payload = entry.get('payload')
+        if entry.get('type') != 'event_msg' or not isinstance(payload, dict) or payload.get('type') != 'token_count':
+            return
+        info = payload.get('info')
+        usage = info.get('total_token_usage') if isinstance(info, dict) else None
+        if isinstance(usage, dict):
+            self.usage_entries += 1
+            self.codex_usage = usage
+
+    def messages(self) -> list[dict]:
+        """Shallow copies, so a later refresh in another thread cannot change them while they are serialized."""
+        messages = [dict(message) for message in self.raw_messages]
+        return _collapse_interrupted_before_user(messages) if self.is_codex else messages
+
+    def token_usage(self) -> dict[str, Any] | None:
+        if self.is_codex:
+            if self.codex_usage is None:
+                return None
+            latest = self.codex_usage
+            result = _empty_token_usage('codex')
+            result['entries'] = self.usage_entries
+            result['groups'] = 1
+            result['input_tokens'] = _token_int(latest, 'input_tokens')
+            result['cached_input_tokens'] = _token_int(latest, 'cached_input_tokens')
+            result['output_tokens'] = _token_int(latest, 'output_tokens')
+            result['reasoning_output_tokens'] = _token_int(latest, 'reasoning_output_tokens')
+            total_tokens = _token_int(latest, 'total_tokens')
+            result['total_tokens'] = total_tokens or (result['input_tokens'] + result['output_tokens'])
+            return result
+        result = _empty_token_usage('claude')
+        result['entries'] = self.usage_entries
+        result['groups'] = len(self.claude_usage)
+        for values in self.claude_usage.values():
+            for key in ('input_tokens', 'cache_write_tokens', 'cached_input_tokens', 'output_tokens',
+                        'reasoning_output_tokens', 'total_tokens'):
+                result[key] += values[key]
+        return result
+
+
+def _parsed_transcript(path: str, is_codex: bool, session_id: str | None = None) -> TranscriptView | None:
+    """A fully parsed, uncached view; None when the file does not exist."""
+    view = TranscriptView(path, is_codex, session_id)
     try:
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
+        view.refresh()
+    except FileNotFoundError:
+        return None
+    return view
 
-                # History format (codex history.jsonl): filter by session_id
-                if is_history_format:
-                    if entry.get('session_id') != session_id:
-                        continue
-                    text = entry.get('text', '').strip()
-                    if not text:
-                        continue
-                    ts = entry.get('ts')
-                    if isinstance(ts, (int, float)):
-                        ts = int(ts * 1000) if ts > 1e12 else int(ts * 1000)
-                    else:
-                        ts = None
-                    _append_codex_user_text_with_context(messages, text, ts)
-                    continue
 
-                # Rollout format
-                entry_type = entry.get('type', '')
-                payload = entry.get('payload', {})
-                ts_raw = entry.get('timestamp')
-                ts = None
-                if ts_raw:
-                    try:
-                        if isinstance(ts_raw, (int, float)):
-                            ts = int(ts_raw)
-                        else:
-                            dt = datetime.fromisoformat(str(ts_raw).replace('Z', '+00:00'))
-                            ts = int(dt.timestamp() * 1000)
-                    except Exception:
-                        pass
+# The Dashboard keeps one view per transcript it has shown, least recently used first.
+TRANSCRIPT_VIEW_LIMIT = 8
+_transcript_views: 'OrderedDict[tuple[str, bool, str | None], TranscriptView]' = OrderedDict()
+_transcript_views_lock = threading.Lock()
 
-                if entry_type == 'event_msg' and payload.get('type') == 'turn_aborted':
-                    messages.append(_interrupted_message(ts))
-                    continue
 
-                if entry_type == 'event_msg' and payload.get('type') == 'error':
-                    stream_disconnect = _stream_disconnect_text(payload.get('message'))
-                    if stream_disconnect:
-                        messages.append(_stream_disconnect_message(stream_disconnect, ts))
-                    continue
+def conversation_window(messages: list[dict], turns: int) -> tuple[list[dict], dict[str, Any]]:
+    """The messages of the last `turns` turns, and how many turns there are in all.
 
-                if entry_type != 'response_item':
-                    continue
+    A turn starts at a user message and runs to the next one, as in ccs. Rendering a whole long
+    conversation took the browser over a GB, so the chat shows a window that the user can widen.
+    """
+    starts = [index for index, message in enumerate(messages) if message.get('role') == 'user']
+    total = len(starts)
+    if turns <= 0 or total <= turns:
+        return messages, {'total_turns': total, 'shown_turns': total, 'has_before': False}
+    return messages[starts[total - turns]:], {'total_turns': total, 'shown_turns': turns, 'has_before': True}
 
-                ptype = payload.get('type', '')
 
-                if ptype == 'message':
-                    role = payload.get('role', '')
-                    content = payload.get('content', [])
-                    if isinstance(content, list):
-                        text = '\n'.join(
-                            b.get('text', '') for b in content
-                            if isinstance(b, dict) and b.get('type') in ('input_text', 'output_text')
-                        )
-                    else:
-                        text = str(content).strip()
-                    text = text.strip()
-                    if not text:
-                        continue
-                    if role == 'user':
-                        if _is_codex_turn_aborted_message(text):
-                            continue
-                        _append_codex_user_text_with_context(messages, text, ts)
-                    elif role == 'assistant':
-                        messages.append({'role': 'assistant', 'text': text, 'ts': ts})
-
-                elif ptype in ('function_call', 'custom_tool_call'):
-                    if ptype == 'custom_tool_call':
-                        decoded_tools = decode_codex_custom_tool_inputs(payload)
-                    else:
-                        args_str = payload.get('arguments', '{}')
-                        try:
-                            args = json.loads(args_str) if isinstance(args_str, str) else args_str
-                        except json.JSONDecodeError:
-                            args = {'raw': args_str}
-                        decoded_tools = [_decode_codex_direct_tool(payload.get('name', ''), args)]
-                    call_id = payload.get('call_id', '')
-                    for index, (tool_name, args) in enumerate(decoded_tools):
-                        messages.append({
-                            'role': 'tool_use',
-                            'tool': tool_name,
-                            'input': args,
-                            'id': call_id if index == 0 else f'{call_id}:inner:{index}',
-                            'ts': ts,
-                        })
-
-                elif ptype in ('function_call_output', 'custom_tool_call_output'):
-                    output = _codex_tool_output_text(payload.get('output', ''))
-                    messages.append({
-                        'role': 'tool_result',
-                        'tool_use_id': payload.get('call_id', ''),
-                        'content': _truncate_tool_output(output),
-                        'is_error': False,
-                        'ts': ts,
-                    })
-
-    except Exception:
-        pass
-
-    return _collapse_interrupted_before_user(messages)
+def transcript_snapshot(path: str, is_codex: bool, session_id: str | None) -> dict[str, Any] | None:
+    """Current messages, token usage, model and revision of a transcript; None when the file does not exist."""
+    key = (path, is_codex, session_id if path.endswith('/.codex/history.jsonl') else None)
+    with _transcript_views_lock:
+        view = _transcript_views.pop(key, None) or TranscriptView(path, is_codex, session_id)
+        _transcript_views[key] = view
+        while len(_transcript_views) > TRANSCRIPT_VIEW_LIMIT:
+            _transcript_views.popitem(last=False)
+    with view.lock:
+        try:
+            view.refresh()
+        except FileNotFoundError:
+            return None
+        except Exception:
+            # A half-applied refresh would repeat its lines on the next one, so the next one starts over.
+            view._reset(None)
+            raise
+        return {
+            'messages': view.messages(),
+            'token_usage': view.token_usage(),
+            'model': view.model,
+            'revision': view.revision,
+        }
 db: Optional[Database] = None
 ws_clients: set = set()
 
@@ -2778,6 +2888,12 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             if not session:
                 self._send_json({'error': 'Session not found'}, 404)
                 return
+            # `turns=N` returns only the last N turns; 0 or no value returns the whole conversation.
+            try:
+                turns = int(query.get('turns', ['0'])[0] or 0)
+            except ValueError:
+                self._send_json({'error': 'turns must be an integer'}, 400)
+                return
             raw_id = session.get('session_id', '')
             transcript_path = session.get('transcript_path')
             allow_backfill = _should_backfill_session_metadata(session)
@@ -2793,18 +2909,33 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
             # Parse based on transcript path format, not source_app, since Claude Code
             # sessions can write to .codex/sessions/ rollouts and vice versa.
             is_codex_transcript = _is_codex_transcript_path(transcript_path)
-            if is_codex_transcript:
-                messages = parse_codex_transcript(transcript_path, session_id=raw_id)
-            else:
-                messages = parse_transcript(transcript_path)
-            token_usage = extract_token_usage(transcript_path, is_codex_transcript)
+            try:
+                snapshot = transcript_snapshot(transcript_path, is_codex_transcript, raw_id) if transcript_path else None
+            except Exception as exc:
+                # Reported, not hidden: the log keeps the traceback and the page shows the reason.
+                logger.exception(f"[DETAIL] transcript parse failed session={session_id} path={transcript_path}")
+                self._send_json({'error': f"Transcript parse failed: {type(exc).__name__}: {exc}"}, 500)
+                return
+            if snapshot is None:
+                logger.info(f"[DETAIL] no transcript session={session_id} path={transcript_path}")
+                snapshot = {
+                    'messages': [], 'model': None, 'revision': '',
+                    'token_usage': None if is_codex_transcript else _empty_token_usage('claude'),
+                }
+            messages = snapshot['messages']
             # Extract & cache model from transcript (latest assistant msg)
-            model = extract_model(transcript_path)
+            model = snapshot['model']
             if model and allow_backfill:
                 db.upsert_session(session['source_app'], raw_id, model=model)
                 session['model'] = model
-            session['messages'] = messages
-            session['token_usage'] = token_usage
+            # A caller that already holds this revision gets everything but the messages.
+            session['transcript_revision'] = snapshot['revision']
+            window, session['turn_window'] = conversation_window(messages, turns)
+            if snapshot['revision'] and query.get('known', [''])[0] == snapshot['revision']:
+                session['unchanged'] = True
+            else:
+                session['messages'] = window
+            session['token_usage'] = snapshot['token_usage']
             session['event_count'] = len(messages)
             session['tool_count'] = sum(1 for m in messages if m['role'] == 'tool_use')
             # If last message is interrupted, session is stopped
@@ -2930,11 +3061,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self._send_json({'error': 'Node file not found'}, 404)
                 return
             try:
-                data = json.loads(node_path.read_text(encoding='utf-8'))
-            except json.JSONDecodeError as e:
+                document = _read_node_document(node_path)
+            except (ValueError, UnicodeError) as e:
                 self._send_json({'error': f'Invalid JSON: {e}'}, 400)
                 return
-            self._send_json({'path': str(node_path.relative_to(PROJECT_DIR)), 'data': data})
+            self._send_json({'path': str(node_path.relative_to(PROJECT_DIR)), **document})
             return
 
         # API: Asset tree for game project
@@ -3384,18 +3515,19 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 if not isinstance(body, dict):
                     self._send_json({'error': 'Payload must be a JSON object'}, 400)
                     return
-                data = body.get('data') if isinstance(body.get('data'), dict) else body
+                base_version = body.get('baseVersion')
+                if base_version is None:
+                    self._send_json({'error': 'Read the object before saving; baseVersion is required'}, 428)
+                    return
+                if not isinstance(base_version, str) or not base_version:
+                    self._send_json({'error': 'baseVersion must be a nonempty string'}, 400)
+                    return
+                data = body.get('data')
                 if not isinstance(data, dict):
                     self._send_json({'error': 'Node data must be a JSON object'}, 400)
                     return
-                old_data = json.loads(node_path.read_text(encoding='utf-8'))
-                if not isinstance(old_data, dict):
-                    self._send_json({'error': 'Existing node file is not a JSON object'}, 400)
-                    return
-                changes = body.get('changes')
-                if not isinstance(changes, list):
-                    changes = _diff_json(old_data, data)
-                node_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+                saved = _save_node_document(node_path, data, base_version)
+                changes = saved['changes']
                 rel_path = str(node_path.relative_to(PROJECT_DIR))
                 _append_user_operation_log({
                     'ts': datetime.now().astimezone().isoformat(),
@@ -3405,8 +3537,15 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     'changes': changes,
                 })
                 logger.info(f'[NODES] Updated: {node_path}')
-                self._send_json({'ok': True, 'path': rel_path, 'changes': changes})
-            except json.JSONDecodeError:
+                self._send_json({'ok': True, 'path': rel_path, **saved})
+            except _NodeEditConflict as e:
+                self._send_json({
+                    'error': 'Object changed on disk. Your edits have not been saved.',
+                    'code': 'edit_conflict', **e.current,
+                }, 409)
+            except FileNotFoundError:
+                self._send_json({'error': 'Node file not found'}, 404)
+            except (ValueError, UnicodeError):
                 self._send_json({'error': 'Invalid JSON'}, 400)
             except Exception as e:
                 self._send_json({'error': str(e)}, 500)

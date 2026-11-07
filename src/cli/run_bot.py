@@ -10,6 +10,7 @@ This file is the implementation; do not duplicate the spec here.
 
 import importlib.util
 import json
+import math
 import signal
 import threading
 import time
@@ -20,20 +21,19 @@ from typing import Any, Callable
 
 
 # Phaser KeyCode names -> DOM KeyboardEvent.code.
-# Source of truth: src/engine/InputMap.js DOM_TO_PHASER (line 9), inverted.
-# Kept here so the runner does NOT need to import JS-side code.
+# Uses the Phaser names accepted by InputMap and the static checker.
 PHASER_TO_DOM: dict[str, str] = {
     "LEFT": "ArrowLeft", "RIGHT": "ArrowRight", "UP": "ArrowUp", "DOWN": "ArrowDown",
     "SPACE": "Space", "ENTER": "Enter", "ESC": "Escape", "TAB": "Tab",
     "SHIFT": "ShiftLeft", "CTRL": "ControlLeft", "ALT": "AltLeft",
     "BACKSPACE": "Backspace", "DELETE": "Delete",
     **{c: f"Key{c}" for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"},
-    **{str(d): f"Digit{d}" for d in range(10)},
+    **{name: f"Digit{d}" for d, name in enumerate(
+        ("ZERO", "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE")
+    )},
 }
 
 DEFAULT_MAX_SECONDS = 10
-TAP_HOLD_S = 0.04         # internal down->up hold for "tap" kind
-TAP_HOLD_MIN_S = 0.02
 
 TERMINAL_KINDS = {"done", "fail", "breakpoint"}
 POINTER_KINDS = {"mousemove", "click", "drag"}
@@ -235,33 +235,26 @@ def translate_action(page, action: tuple, *, wait=time.sleep) -> str | None:
         raise ValueError(f"unknown action kind: {kind!r}")
 
     duration = float(duration)
+    if not math.isfinite(duration) or duration < 0:
+        raise ValueError('duration_s must be finite and non-negative')
 
     if kind == "wait":
         if duration > 0:
             wait(duration)
         return None
 
-    if kind == "tap":
+    if kind in {"tap", "hold"}:
         keys = _normalize_keys(key)
-        for k in keys:
-            page.keyboard.down(k)
-        hold = min(TAP_HOLD_S, max(duration / 2, TAP_HOLD_MIN_S))
-        wait(hold)
-        for k in keys:
-            page.keyboard.up(k)
-        remainder = duration - hold
-        if remainder > 0:
-            wait(remainder)
-        return None
-
-    if kind == "hold":
-        keys = _normalize_keys(key)
-        for k in keys:
-            page.keyboard.down(k)
-        if duration > 0:
-            wait(duration)
-        for k in keys:
-            page.keyboard.up(k)
+        pressed = []
+        try:
+            for k in keys:
+                page.keyboard.down(k)
+                pressed.append(k)
+            if duration > 0:
+                wait(duration)
+        finally:
+            for k in pressed:
+                page.keyboard.up(k)
         return None
 
     if kind == "down":

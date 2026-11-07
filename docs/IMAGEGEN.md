@@ -49,7 +49,10 @@ Every provider module **must** expose these attributes:
 PROVIDER_NAME: str              # Unique name, used as IMAGE_PROVIDER env value
 BASE_URL: str                   # Default API endpoint
 SUPPORTED_MODELS: set[str]      # Canonical model names this provider supports
+OPTION_HELP: dict[str, str]     # Help per supported option: size, quality, aspect, resolution
 ```
+
+`OPTION_HELP` drives `vibegame art gen image --help` and `vibegame art gen list` for the configured provider. Describe what the upstream actually does with each option, not what the official API documents. An option missing from `OPTION_HELP` is shown as not supported, and the CLI rejects it when set.
 
 And these two functions:
 
@@ -98,6 +101,7 @@ Return success or failure through `GenResult`. The routing layer (`imagegen.py`)
 
 ```python
 MODEL_MAP: dict[str, str]  # Canonical name -> provider-specific name
+NOTES: str                 # Provider-wide note shown under --help and in `art gen list`
 ```
 
 If your provider uses different model names than vibegame's canonical names, define `MODEL_MAP`. The routing layer resolves it before calling your functions.
@@ -187,8 +191,8 @@ def i2i(base_url, api_key, prompt, images, output, model, *, size="", aspect_rat
 ## Checklist
 
 1. Create `src/artist/providers/your_provider.py`
-2. Define `PROVIDER_NAME`, `BASE_URL`, `SUPPORTED_MODELS`
-3. Optionally define `MODEL_MAP` if model names differ
+2. Define `PROVIDER_NAME`, `BASE_URL`, `SUPPORTED_MODELS`, `OPTION_HELP`
+3. Optionally define `MODEL_MAP` if model names differ, and `NOTES`
 4. Implement `t2i()` and `i2i()` — return the request result through `GenResult`
 5. Adapt `"auto"` values for `aspect_ratio` and `resolution` to the target API
-6. Test: `vibegame art gen list` should show your provider and models
+6. Test: `vibegame art gen list` should show your provider, models and options

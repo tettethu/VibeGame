@@ -70,3 +70,5 @@ markers = [
 # Only `base` runs by default. api / e2e cost money or drive real agents, so a
 # bare `pytest` must never touch them; `make test-api` / `test-e2e` opt in with -m.
 addopts = "--strict-markers -m base"
+# Lets the test report (tests/report, loaded by `make test`) record passing asserts.
+enable_assertion_pass_hook = true

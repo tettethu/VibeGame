@@ -98,7 +98,7 @@ export class SceneTree {
     if (!srcDef) {
       throw new Error(
         `SceneTree: node definition "${def.src}" not found in nodeDefinitions. ` +
-        `Templates are preloaded from scene JSON src references; add a disabled placeholder ` +
+        `Templates are preloaded from src references in the scene and in the templates it loads; add a disabled placeholder ` +
         `node with this src to the scene, or register it manually before instantiate().`
       )
     }

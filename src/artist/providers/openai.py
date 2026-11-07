@@ -14,7 +14,12 @@ from . import TIMEOUT, GenResult, _mime, resolve_openai_response
 
 PROVIDER_NAME = "Openai"
 BASE_URL = "https://api.openai.com/v1"
-SUPPORTED_MODELS = {"gpt-image-1", "gpt-image-1.5", "gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare"}
+SUPPORTED_MODELS = {"gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare"}
+OPTION_HELP = {
+    "size": "1024x1024 | 1024x1536 | 1536x1024 (gpt-image-2: + 2560x1440 | 3840x2160)",
+    "quality": "high | medium | low | auto",
+}
+NOTES = "Describes the official OpenAI API. A third-party endpoint set by IMAGE_BASE_URL may handle --size differently."
 MAX_UPLOAD_EDGE = 3840
 MAX_UPLOAD_BYTES = 4 * 1024 * 1024
 

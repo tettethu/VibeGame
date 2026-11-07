@@ -48,10 +48,14 @@ This is why visual fine-tuning is a **binary search loop** (player edits a value
 Configure the endpoint, API key, and model ID in `<git_root>/.env`:
 
 ```
-VLM_BASE_URL=https://api.example.com/v1             # API base URL, not /chat/completions
+# API base URL, not /chat/completions
+VLM_BASE_URL=https://api.example.com/v1
 VLM_API_KEY=sk-xxxxxxxxxxxxxxxxxxxx
-VLM_MODEL=your-provider-model-id                   # required unless --model is passed
+# Required unless --model is passed
+VLM_MODEL=your-provider-model-id
 ```
+
+Put comments on their own lines. Text after a value, such as `# ...`, becomes part of the value.
 
 Replace the placeholders with your own provider configuration. The model ID must be valid for `VLM_BASE_URL`. There is no built-in default model. `--model` overrides `VLM_MODEL` for one call; if neither supplies a non-empty model ID, the command fails before sending a request.
 
@@ -91,7 +95,7 @@ Using raw text as prompt
 ... (model output)
 ```
 
-A path with any other extension (e.g. `.json`, `.yaml`) or to a non-existent file is treated as a literal string.
+A path to an existing file with any other extension (e.g. `.json`, `.yaml`) is rejected, and the command exits with code 1. A path to a non-existent file is treated as a literal string.
 
 ---
 

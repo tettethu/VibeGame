@@ -191,7 +191,7 @@ player must know. How they are told is the artist's and implementer's call. -->
 ## Art Requirements
 
 <!-- Simple asset list for the Artist agent. Describe what is needed and what it should look like.
-Do NOT specify frame counts or animation details — that is Artist's responsibility. -->
+Do NOT specify frame counts or frame-animation details — that is Artist's responsibility. -->
 
 ### Characters
 
@@ -218,7 +218,24 @@ Do NOT specify frame counts or animation details — that is Artist's responsibi
 ### UI & Effects
 
 - Font style: <!-- TODO -->
-- Visual effects: <!-- e.g., screen shake on hit, particles on death, damage numbers -->
+
+**Motion and feedback**
+
+<!-- What must visibly react or move, so the game feels alive rather than a slide deck. Each row is a change the code can produce, such as a tween, flash, particle effect or CSS transition, not a frame animation: name character actions such as hurt in Characters. Write what the player must see happen, not how: look, timing and technique belong to the implementer. Effects must never hide a value listed under Player Visible.
+
+Answer every category. Write "none: <reason>" when a category does not apply; do not leave it blank. -->
+
+| Category | When it applies | What the player must see |
+|----------|-----------------|--------------------------|
+| Transition | Scene, screen and phase changes | <!-- e.g. one screen hands over to the next instead of cutting --> |
+| Control response | Hover, press, select, disabled, invalid action | <!-- e.g. an invalid choice is visibly refused --> |
+| Value change | HP, score, resources, timers | <!-- e.g. a changing number is seen changing, not silently replaced --> |
+| Impact | Hits and collisions | <!-- e.g. the struck object visibly reacts --> |
+| Spawn and removal | Appearing, destroyed, collected | <!-- e.g. a removed object visibly leaves instead of vanishing --> |
+| Position change | A unit, piece, card or projectile goes from one place to another | <!-- e.g. a move is animated from start to end, not instant --> |
+| Drawing the eye | Something already on screen that needs notice now: a warning, a newly available option | <!-- e.g. a newly available element draws the eye once --> |
+| Ambient | Each screen while the player does nothing; answer per screen | <!-- e.g. lighting shifts; ambient particles drift --> |
+| Celebration | Victory, unlock, level up | <!-- e.g. a reward is revealed, not just listed --> |
 
 ---
 

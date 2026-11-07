@@ -50,6 +50,11 @@
           },
           {
             "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.vibegame/hooks/user-prompt-submit.py\" --source-app claude",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.vibegame/hooks/web_hook.py\" --source-app claude --event-type UserPromptSubmit",
             "timeout": 5
           }
