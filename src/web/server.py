@@ -14,7 +14,10 @@ import logging
 
 logger = logging.getLogger('vibegame.dashboard')
 import json
+import hashlib
 import os
+import stat
+import tempfile
 import sqlite3
 import subprocess
 import sys
@@ -42,6 +45,8 @@ GLOBAL_DASHBOARD_DIR = Path.home() / '.vibegame' / 'dashboard'
 # Game project directory (set at startup via --project)
 PROJECT_DIR: Optional[Path] = None
 DASHBOARD_TOKEN: Optional[str] = None
+_node_write_locks: dict[Path, threading.Lock] = {}
+_node_write_locks_guard = threading.Lock()
 IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp'}
 PREVIEW_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.bmp'}
 PREVIEW_TEXT_EXTENSIONS = {'.md', '.json', '.txt', '.yaml', '.yml', '.toml', '.py', '.js', '.ts', '.html', '.css', '.xml', '.csv', '.log'}
@@ -426,6 +431,46 @@ def _validate_node_path(rel_path: str) -> Path | None:
     if any(part in {'.vibegame', '.claude', '.codex', '.trellis', 'node_modules'} for part in rel_parts):
         return None
     return target
+
+
+def _read_node_document(path: Path) -> dict:
+    """Parse and version the same byte snapshot, including external edits."""
+    raw = path.read_bytes()
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise ValueError('Existing node file is not a JSON object')
+    return {'data': data, 'version': hashlib.sha256(raw).hexdigest()}
+
+
+class _NodeEditConflict(Exception):
+    def __init__(self, current: dict):
+        self.current = current
+
+
+def _save_node_document(path: Path, data: dict, base_version: str) -> dict:
+    """Serialize Dashboard writers; external writers must share this protocol
+    for strict exclusion across the final version check and replacement.
+    """
+    with _node_write_locks_guard:
+        lock = _node_write_locks.setdefault(path, threading.Lock())
+    with lock:
+        current = _read_node_document(path)
+        if current['version'] != base_version:
+            raise _NodeEditConflict(current)
+        changes = _diff_json(current['data'], data)
+        raw = (json.dumps(data, indent=2, ensure_ascii=False) + '\n').encode('utf-8')
+        mode = stat.S_IMODE(path.stat().st_mode)
+        fd, temporary = tempfile.mkstemp(prefix=f'.{path.name}.', suffix='.tmp', dir=path.parent)
+        try:
+            with os.fdopen(fd, 'wb') as handle:
+                handle.write(raw)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(temporary, mode)
+            os.replace(temporary, path)
+        finally:
+            Path(temporary).unlink(missing_ok=True)
+        return {'version': hashlib.sha256(raw).hexdigest(), 'changes': changes}
 
 
 def _build_node_tree(game_dir: Path) -> dict:
@@ -3016,11 +3061,11 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 self._send_json({'error': 'Node file not found'}, 404)
                 return
             try:
-                data = json.loads(node_path.read_text(encoding='utf-8'))
-            except json.JSONDecodeError as e:
+                document = _read_node_document(node_path)
+            except (ValueError, UnicodeError) as e:
                 self._send_json({'error': f'Invalid JSON: {e}'}, 400)
                 return
-            self._send_json({'path': str(node_path.relative_to(PROJECT_DIR)), 'data': data})
+            self._send_json({'path': str(node_path.relative_to(PROJECT_DIR)), **document})
             return
 
         # API: Asset tree for game project
@@ -3470,18 +3515,19 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                 if not isinstance(body, dict):
                     self._send_json({'error': 'Payload must be a JSON object'}, 400)
                     return
-                data = body.get('data') if isinstance(body.get('data'), dict) else body
+                base_version = body.get('baseVersion')
+                if base_version is None:
+                    self._send_json({'error': 'Read the object before saving; baseVersion is required'}, 428)
+                    return
+                if not isinstance(base_version, str) or not base_version:
+                    self._send_json({'error': 'baseVersion must be a nonempty string'}, 400)
+                    return
+                data = body.get('data')
                 if not isinstance(data, dict):
                     self._send_json({'error': 'Node data must be a JSON object'}, 400)
                     return
-                old_data = json.loads(node_path.read_text(encoding='utf-8'))
-                if not isinstance(old_data, dict):
-                    self._send_json({'error': 'Existing node file is not a JSON object'}, 400)
-                    return
-                changes = body.get('changes')
-                if not isinstance(changes, list):
-                    changes = _diff_json(old_data, data)
-                node_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+                saved = _save_node_document(node_path, data, base_version)
+                changes = saved['changes']
                 rel_path = str(node_path.relative_to(PROJECT_DIR))
                 _append_user_operation_log({
                     'ts': datetime.now().astimezone().isoformat(),
@@ -3491,8 +3537,15 @@ class DashboardRequestHandler(BaseHTTPRequestHandler):
                     'changes': changes,
                 })
                 logger.info(f'[NODES] Updated: {node_path}')
-                self._send_json({'ok': True, 'path': rel_path, 'changes': changes})
-            except json.JSONDecodeError:
+                self._send_json({'ok': True, 'path': rel_path, **saved})
+            except _NodeEditConflict as e:
+                self._send_json({
+                    'error': 'Object changed on disk. Your edits have not been saved.',
+                    'code': 'edit_conflict', **e.current,
+                }, 409)
+            except FileNotFoundError:
+                self._send_json({'error': 'Node file not found'}, 404)
+            except (ValueError, UnicodeError):
                 self._send_json({'error': 'Invalid JSON'}, 400)
             except Exception as e:
                 self._send_json({'error': str(e)}, 500)

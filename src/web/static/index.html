@@ -714,6 +714,18 @@
             grid-template-columns: minmax(360px, 1fr) 300px;
             min-height: 0;
         }
+        .obj-conflict {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #b86a32;
+            background: rgba(184,106,50,0.12);
+            color: var(--charcoal);
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .obj-conflict[hidden] { display: none; }
         .obj-stage {
             display: grid;
             grid-template-rows: minmax(260px, 7fr) auto minmax(128px, 3fr);

@@ -31,16 +31,16 @@ export async function fetchNodeTree() {
 }
 
 export async function fetchNode(path) {
-  return api(`/api/nodes/${encodeURIComponent(path)}`)
+  return api(`/api/nodes/${encodeURIComponent(path)}`, { cache: 'no-store' })
 }
 
-export async function putNode(path, data, changes = [], action = 'save') {
+export async function putNode(path, data, changes = [], action = 'save', baseVersion = null) {
   const resp = await fetch(`/api/nodes/${encodeURIComponent(path)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ data, changes, action }),
+    body: JSON.stringify({ data, changes, action, baseVersion }),
   })
-  return resp.ok ? { ok: true } : resp.json()
+  return { ...await resp.json(), status: resp.status }
 }
 
 export async function resolveNodeTexture(key) {
