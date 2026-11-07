@@ -21,6 +21,34 @@ OPTION_HELP = {
 }
 
 
+def _image_data(response: object) -> str | None:
+    """Find the first output image in the first candidate, after any text."""
+    if not isinstance(response, dict):
+        return None
+    candidates = response.get("candidates")
+    if not isinstance(candidates, list) or not candidates:
+        return None
+    candidate = candidates[0]
+    content = candidate.get("content") if isinstance(candidate, dict) else None
+    parts = content.get("parts") if isinstance(content, dict) else None
+    if not isinstance(parts, list):
+        return None
+    for part in parts:
+        if not isinstance(part, dict) or part.get("thought"):
+            continue
+        inline = part.get("inlineData")
+        if not isinstance(inline, dict):
+            continue
+        mime = inline.get("mimeType", "image/png")
+        data = inline.get("data")
+        if (
+            isinstance(mime, str) and mime.startswith("image/")
+            and isinstance(data, str) and data.strip()
+        ):
+            return data
+    return None
+
+
 def t2i(base_url, api_key, prompt, output, model, *, size="", aspect_ratio="auto", resolution="auto", quality="auto"):
     payload = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
@@ -39,11 +67,10 @@ def t2i(base_url, api_key, prompt, output, model, *, size="", aspect_ratio="auto
         elapsed = time.time() - t0
         if resp.status_code != 200:
             return GenResult(False, error=f"{resp.status_code}: {resp.text[:300]}", elapsed=elapsed)
-        try:
-            inline = resp.json()["candidates"][0]["content"]["parts"][0]["inlineData"]
-        except (KeyError, IndexError, TypeError):
+        data = _image_data(resp.json())
+        if data is None:
             return GenResult(False, error=f"No image in response:\n{resp.text}", elapsed=elapsed)
-        save_image(inline["data"], output)
+        save_image(data, output)
         return GenResult(True, elapsed=elapsed)
     except Exception as e:
         return GenResult(False, error=str(e), elapsed=time.time() - t0)
@@ -72,11 +99,10 @@ def i2i(base_url, api_key, prompt, images, output, model, *, size="", aspect_rat
         elapsed = time.time() - t0
         if resp.status_code != 200:
             return GenResult(False, error=f"{resp.status_code}: {resp.text[:300]}", elapsed=elapsed)
-        try:
-            inline = resp.json()["candidates"][0]["content"]["parts"][0]["inlineData"]
-        except (KeyError, IndexError, TypeError):
+        data = _image_data(resp.json())
+        if data is None:
             return GenResult(False, error=f"No image in response:\n{resp.text}", elapsed=elapsed)
-        save_image(inline["data"], output)
+        save_image(data, output)
         return GenResult(True, elapsed=elapsed)
     except Exception as e:
         return GenResult(False, error=str(e), elapsed=time.time() - t0)
