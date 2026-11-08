@@ -1,0 +1,12 @@
+{
+  "name": "{{PROJECT_NAME}}",
+  "version": "0.1.0",
+  "engine": "{{ENGINE_ID}}",
+  "settings": {
+    "width": {{WIDTH}},
+    "height": {{HEIGHT}},
+    "backgroundColor": "#1c2333"
+  },
+  "startScene": "scenes/main.tscn",
+  "inputMap": "config/input-map.json"
+}

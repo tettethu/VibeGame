@@ -1,0 +1,4 @@
+{
+  "_comment": "Optional metadata for agents. Godot reads real input actions from project.godot's [input] section; the bridge's `vibegame play input --action NAME` command injects an InputEventAction with this name.",
+  "actions": {}
+}

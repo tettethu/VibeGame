@@ -6,6 +6,7 @@ import typer
 from artist.cli import art_app
 from cli.vlm import cmd_vlm
 
+from cli.godot import godot_app
 from cli.play import play_app
 
 HELP_CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
@@ -23,6 +24,7 @@ app = typer.Typer(
 app.add_typer(art_app, name="art", help="Game art asset processing toolkit")
 app.command("vlm")(cmd_vlm)
 app.add_typer(play_app, name="play", help="Runtime API CLI wrapper")
+app.add_typer(godot_app, name="godot", help="Godot engine support (experimental)")
 
 
 def _register_team_cli() -> None:
