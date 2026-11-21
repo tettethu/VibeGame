@@ -12,7 +12,7 @@
     &nbsp;·&nbsp;
     <a href="https://vibegame.tettet.org/#demos"><strong>Watch Demos</strong></a>
     &nbsp;·&nbsp;
-    <a href="./technical_report.pdf"><strong>Technical Report</strong></a>
+    <a href="https://arxiv.org/abs/2610.33106"><strong>Paper</strong></a>
     &nbsp;·&nbsp;
     <a href="https://discord.gg/Ec6d9wx8sU"><strong>Discord</strong></a>
     &nbsp;·&nbsp;
@@ -23,7 +23,8 @@
 
 ## News
 
-- **[2026.08]** 🚀 We release VibeGame: Prompt-to-Game Development with AI-Native Engine and Self-Evolving Adversarial Agent Team! Check our [Project Page](https://vibegame.tettet.org) and [Technical Report](./technical_report.pdf)
+- **[2026.10]** 📄 Our paper is now on [arXiv](https://arxiv.org/abs/2610.33106).
+- **[2026.08]** 🚀 We release VibeGame: Prompt-to-Game Development with AI-Native Engine and Self-Evolving Adversarial Agent Team! Check our [Project Page](https://vibegame.tettet.org) and [Technical Report](https://arxiv.org/abs/2610.33106)
 
 ## Demos
 
@@ -151,6 +152,22 @@ for recovery. See [editing objects while agents are working](docs/DASHBOARD-EDIT
 - [ ] Integrate Godot with the multi-agent build workflow
 - [ ] Add Unity support
 - [ ] Expand VibeGame from 2D to end-to-end 3D game creation
+
+## Citation
+
+If you find VibeGame useful, please cite:
+
+```bibtex
+@misc{hu2026vibegame,
+      title={VibeGame: Prompt-to-Game Development with AI-Native Engine and Self-Evolving Adversarial Agent Team},
+      author={Wenbo Hu and Ken Li and Jiazhe Wei and Yukang Cao and Weiyi Hong and Jiayi Dai and Chenjun Bai and Jiajun Liang and Yucheng Liao and Ruichuan An and Zeyu Lou and Haofan Wang and Yueming Lyu and Jingkang Yang and Ziwei Liu and Chenyang Si},
+      year={2026},
+      eprint={2610.33106},
+      archivePrefix={arXiv},
+      primaryClass={cs.MA},
+      url={https://arxiv.org/abs/2610.33106},
+}
+```
 
 ## Acknowledgments
 
